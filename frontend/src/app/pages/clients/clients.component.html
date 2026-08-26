@@ -1,0 +1,269 @@
+<p-toast />
+<p-confirmdialog />
+
+<div class="page-content">
+
+  <!-- Header -->
+  <div class="page-header">
+    <div style="display:flex;align-items:center;gap:0.75rem">
+      <div class="page-icon"><i class="pi pi-users"></i></div>
+      <div>
+        <h1 class="page-header__title">Clients</h1>
+        <p class="page-header__sub">
+          @if (total > 0) { {{ clients.length }} / {{ total }} clients }
+          @else { Clients enregistrés }
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <div class="table-container">
+
+    <!-- Toolbar -->
+    <div class="table-header">
+      <div class="table-header-left">
+        <div class="table-search">
+          <div class="search-icon"><i class="pi pi-search"></i></div>
+          <input placeholder="Rechercher…" [(ngModel)]="searchQuery" (input)="onSearch()" />
+        </div>
+      </div>
+      <div class="table-actions">
+        <button class="table-action-btn" pTooltip="Colonnes visibles" (click)="colMenu.toggle($event)">
+          <i class="pi pi-sliders-h"></i>
+        </button>
+        <p-popover #colMenu>
+          <div class="table-options-menu">
+            <div class="table-options-section">
+              <span class="table-options-label">Colonnes visibles</span>
+              <div class="table-options-columns">
+                @for (col of allColumns; track col.field) {
+                  <label class="column-toggle">
+                    <input type="checkbox" [checked]="col.visible" (change)="toggleColumn(col.field)" />
+                    <span>{{ col.header }}</span>
+                  </label>
+                }
+              </div>
+            </div>
+          </div>
+        </p-popover>
+        @if (isAdmin) {
+          <button class="btn-secondary" (click)="exportExcel()" [disabled]="exporting">
+            <i class="pi" [class.pi-download]="!exporting" [class.pi-spin]="exporting" [class.pi-spinner]="exporting"></i>
+            <span class="mob-hide">{{ exporting ? 'Export…' : 'Excel' }}</span>
+          </button>
+        }
+        <button class="btn-secondary" (click)="openMap()">
+          <i class="pi pi-map"></i>
+          <span class="mob-hide">Carte</span>
+        </button>
+        <button class="btn-add" (click)="openAdd()">
+          <i class="pi pi-plus"></i>
+          <span>Ajouter</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Table (desktop) -->
+    <div class="table-wrapper mob-hide" #tableWrapper>
+      @if (loading) {
+        @for (_ of [1,2,3,4,5]; track $index) {
+          <div style="padding:0.65rem 1rem;border-bottom:1px solid var(--border-color-light)">
+            <div style="height:1rem;border-radius:6px;background:var(--surface-200);animation:skeleton 1.2s infinite alternate"></div>
+          </div>
+        }
+      } @else if (sorted.length === 0) {
+        <div class="table-empty">
+          {{ searchQuery ? 'Aucun résultat pour "' + searchQuery + '"' : 'Aucun client enregistré' }}
+        </div>
+      } @else {
+        <table class="table">
+          <thead>
+            <tr>
+              <!-- Name always first -->
+              <th class="th-sort" (click)="sortBy('name')"
+                [class.th-sort--asc]="sortCol==='name'&&sortDir===1"
+                [class.th-sort--desc]="sortCol==='name'&&sortDir===-1">
+                Nom / Magasin <i class="pi pi-sort-alt"></i>
+              </th>
+              <!-- Dynamic columns -->
+              @for (col of visibleColumns; track col.field) {
+                @if (col.sortable) {
+                  <th class="th-sort" [style.min-width]="col.width"
+                    (click)="sortBy(col.field)"
+                    [class.th-sort--asc]="sortCol===col.field&&sortDir===1"
+                    [class.th-sort--desc]="sortCol===col.field&&sortDir===-1">
+                    {{ col.header }} <i class="pi pi-sort-alt"></i>
+                  </th>
+                } @else {
+                  <th [style.min-width]="col.width">{{ col.header }}</th>
+                }
+              }
+              <!-- Actions always last -->
+              <th style="width:7rem"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of sorted; track c.id; let i = $index) {
+              <tr class="table-row-animate" [style.--row-delay]="i * 20 + 'ms'">
+                <!-- Name always first -->
+                <td>
+                  <div class="table-item-info">
+                    <span class="table-item-name">{{ c.name }}</span>
+                    @if (c.store_name && c.store_name !== c.name) {
+                      <span class="table-item-desc">{{ c.store_name }}</span>
+                    }
+                  </div>
+                </td>
+                <!-- Dynamic columns -->
+                @for (col of visibleColumns; track col.field) {
+                  <td>
+                    @switch (col.field) {
+                      @case ('category') {
+                        <span [class]="categoryBadge[c.category]">{{ categoryLabel[c.category] }}</span>
+                      }
+                      @case ('phone') {
+                        <span class="text-muted">{{ c.phone || '—' }}</span>
+                      }
+                      @case ('nom_sodichn') {
+                        @if (editingSodichnId === c.id) {
+                          <input class="inline-input"
+                            [(ngModel)]="editingSodichnValue"
+                            [placeholder]="sodichnPlaceholder"
+                            (keydown.enter)="saveSodichn(c)"
+                            (keydown.escape)="cancelEditSodichn()"
+                            (blur)="cancelEditSodichn()"
+                            (click)="$event.stopPropagation()"
+                            autofocus />
+                        } @else {
+                          <span (click)="startEditSodichn(c)"
+                            [style]="!c.nom_sodichn ? 'cursor:pointer;min-width:120px;display:inline-block;font-size:0.65rem' : 'cursor:pointer;min-width:120px;display:inline-block'"
+                            [class.text-muted]="!c.nom_sodichn">
+                            {{ c.nom_sodichn || sodichnPlaceholder }}
+                          </span>
+                        }
+                      }
+                      @default {
+                        <span class="text-muted">{{ getVal(c, col.field) }}</span>
+                      }
+                    }
+                  </td>
+                }
+                <!-- Actions always last -->
+                <td class="actions-cell">
+                  <button class="table-action-btn" title="Modifier" (click)="openEdit(c)">
+                    <i class="pi pi-pencil"></i>
+                  </button>
+                  <button class="table-action-btn" title="BLs"
+                    [routerLink]="['/historique']" [queryParams]="{clientId: c.id}">
+                    <i class="pi pi-list"></i>
+                  </button>
+                  <button class="table-action-btn table-action-btn--danger" title="Supprimer" (click)="confirmDelete(c)">
+                    <i class="pi pi-trash"></i>
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
+    </div>
+
+    <!-- Card list (mobile) -->
+    <div class="mob-card-list desk-hide">
+      @if (loading) {
+        @for (_ of [1,2,3,4,5]; track $index) {
+          <div class="mob-client-card mob-client-card--skeleton">
+            <div class="mob-skeleton-line"></div>
+            <div class="mob-skeleton-line mob-skeleton-line--short"></div>
+          </div>
+        }
+      } @else if (sorted.length === 0) {
+        <div class="table-empty">
+          {{ searchQuery ? 'Aucun résultat pour "' + searchQuery + '"' : 'Aucun client enregistré' }}
+        </div>
+      } @else {
+        @for (c of sorted; track c.id) {
+          <div class="mob-client-card">
+            <div class="mob-client-card__main">
+              <div class="mob-client-card__info">
+                <span class="mob-client-card__name">{{ c.name }}</span>
+                @if (c.store_name && c.store_name !== c.name) {
+                  <span class="mob-client-card__store">{{ c.store_name }}</span>
+                }
+                <div class="mob-client-card__meta">
+                  <span [class]="categoryBadge[c.category]">{{ categoryLabel[c.category] }}</span>
+                  @if (c.commune) {
+                    <span class="mob-client-card__location"><i class="pi pi-map-marker"></i>{{ c.commune }}</span>
+                  }
+                </div>
+                @if (c.phone) {
+                  <span class="mob-client-card__phone"><i class="pi pi-phone"></i>{{ c.phone }}</span>
+                }
+              </div>
+              <div class="mob-client-card__actions">
+                <button class="table-action-btn" title="Modifier" (click)="openEdit(c)">
+                  <i class="pi pi-pencil"></i>
+                </button>
+                <button class="table-action-btn" title="BLs"
+                  [routerLink]="['/historique']" [queryParams]="{clientId: c.id}">
+                  <i class="pi pi-list"></i>
+                </button>
+                <button class="table-action-btn table-action-btn--danger" title="Supprimer" (click)="confirmDelete(c)">
+                  <i class="pi pi-trash"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+        }
+      }
+    </div>
+
+    <!-- Infinite scroll footer -->
+    <div style="padding:0.75rem 1rem;text-align:center;color:var(--text-color-secondary);font-size:var(--font-size-sm)">
+      @if (loadingMore) {
+        <span><i class="pi pi-spin pi-spinner" style="margin-right:0.4rem"></i>Chargement… — {{ clients.length }} / {{ total }} clients</span>
+      } @else if (hasMore && !loading) {
+        <span><i class="pi pi-angle-double-down" style="margin-right:0.4rem"></i>Faites défiler pour charger plus — {{ clients.length }} / {{ total }} clients</span>
+      } @else if (total > 0 && !loading) {
+        <span>{{ total }} clients au total</span>
+      }
+    </div>
+
+  </div>
+
+</div>
+
+<p-popover #pop>
+  @if (activeClient) {
+    @let sent     = activeType === 'plastique' ? (activeClient.plastic_sent     ?? 0) : (activeClient.wood_sent     ?? 0);
+    @let retour   = activeType === 'plastique' ? (activeClient.plastic_retour   ?? 0) : (activeClient.wood_retour   ?? 0);
+    @let consigne = activeType === 'plastique' ? (activeClient.plastic_consigne ?? 0) : (activeClient.wood_consigne ?? 0);
+    @let balance  = activeType === 'plastique' ? (activeClient.plastic_balance  ?? 0) : (activeClient.wood_balance  ?? 0);
+    <div style="min-width:210px;padding:0.25rem 0">
+      <div class="palette-pop__header">
+        <img [src]="activeType === 'plastique' ? 'assets/plastiquepallette.png' : 'assets/woodpallette.png'" style="height:14px" alt="">
+        <span class="palette-pop__name">{{ activeType === 'plastique' ? 'Plastique' : 'Bois' }}</span>
+        <span style="font-size:var(--font-size-xs);color:var(--text-color-secondary)">{{ activeClient.name }}</span>
+      </div>
+      <div class="palette-pop__row" style="font-weight:600;color:var(--text-color)">
+        <span>Envoyées</span>
+        <span class="palette-pop__val">{{ sent }}</span>
+      </div>
+      <div class="palette-pop__row" style="color:var(--color-success,#22c55e)">
+        <span>Retournées</span>
+        <span class="palette-pop__val">− {{ retour }}</span>
+      </div>
+      <div class="palette-pop__row" style="color:var(--color-success,#22c55e)">
+        <span>Consigne encaissée</span>
+        <span class="palette-pop__val">− {{ consigne }}</span>
+      </div>
+      <div style="border-top:var(--border-width) solid var(--surface-border);margin:0.5rem 0.25rem"></div>
+      <div class="palette-pop__row" style="font-weight:700;font-size:var(--font-size-sm)">
+        <span>Balance due</span>
+        <span class="palette-pop__val" [style.color]="balance > 0 ? 'var(--color-error,#ef4444)' : 'var(--color-success,#22c55e)'">
+          {{ balance }}
+        </span>
+      </div>
+    </div>
+  }
+</p-popover>

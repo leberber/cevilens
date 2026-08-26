@@ -1,0 +1,655 @@
+import json
+import logging
+from datetime import date as date_type
+from typing import Any, List, Optional
+
+import pandas as pd
+from fastapi import APIRouter, Depends, File, Query, UploadFile
+
+logger = logging.getLogger("app.upload")
+from fastapi.responses import StreamingResponse
+from sqlalchemy import func, delete as sa_delete, case as sa_case
+from sqlmodel import Session, select
+
+from app.api.deps import get_current_user
+from app.database import get_session
+from app.models.user import User
+from app.models.vente import Vente, VentePage, VenteRead, RapprochementLigne, RapprochementResult
+from app.models.produit_bl_mapping import ProduitBlMapping
+from app.utils.parse import parse_file
+
+router = APIRouter()
+
+
+def _normalize_date(d: str) -> str:
+    """Accept YYYY-MM or YYYY-MM-DD, always return YYYY-MM-DD."""
+    if d and len(d) == 7:
+        return d + '-01'
+    return d
+
+
+def _extract_canal(code_fdv: Optional[str]) -> Optional[str]:
+    if not code_fdv:
+        return None
+    upper = code_fdv.upper()
+    if 'VH' in upper:
+        return 'VH'
+    if 'VD' in upper:
+        return 'VD'
+    return None
+
+
+def _safe_str(val: Any, max_len: int) -> Optional[str]:
+    if val is None:
+        return None
+    try:
+        if pd.isna(val):
+            return None
+    except (TypeError, ValueError):
+        pass
+    s = str(val).strip()
+    return s[:max_len] if s else None
+
+
+def _normalize_code(val: Any, max_len: int) -> Optional[str]:
+    """Like _safe_str but strips the .0 suffix that pandas adds when a numeric
+    column contains empty cells (int → float coercion)."""
+    s = _safe_str(val, max_len)
+    if s and s.endswith('.0'):
+        try:
+            s = str(int(float(s)))
+        except (ValueError, OverflowError):
+            pass
+    return s
+
+
+def _safe_float(val: Any) -> Optional[float]:
+    if val is None:
+        return None
+    try:
+        f = float(val)
+        return None if pd.isna(f) else f
+    except (ValueError, TypeError):
+        return None
+
+
+def _safe_date(val: Any) -> Optional[Any]:
+    if val is None:
+        return None
+    try:
+        if pd.isna(val):
+            return None
+    except (TypeError, ValueError):
+        pass
+    try:
+        ts = pd.to_datetime(val, dayfirst=True)
+        if pd.isna(ts):
+            return None
+        return ts.date()
+    except Exception:
+        return None
+
+
+def _row_to_vente(row: pd.Series, annee_mois: str, uploaded_by_id: int) -> Vente:
+    date_val = row.get('Date')
+    date_obj = date_val.date() if pd.notna(date_val) and hasattr(date_val, 'date') else None
+
+    return Vente(
+        annee_mois=annee_mois,
+        date_commande=date_obj,
+        num_commande=_safe_str(row.get('N° Commande'), 60),
+        type_commande=_safe_str(row.get('Type'), 30),
+        source=_safe_str(row.get('Source'), 30),
+        code_client=_normalize_code(row.get('Code Client'), 50),
+        nom_client=_safe_str(row.get('Nom client'), 150),
+        categorie_client=_safe_str(row.get('Categories Client'), 20),
+        adresse_client=_safe_str(row.get('Adresse Client'), 200),
+        route=_safe_str(row.get('Route'), 50),
+        commune=_safe_str(row.get('Commune'), 60),
+        wilaya=_safe_str(row.get('Wilya'), 60),           # source typo
+        zone=_safe_str(row.get('Zone'), 30),
+        region=_safe_str(row.get('Region'), 30),
+        tel_client=_safe_str(row.get('Tél'), 30),
+        type_client=_safe_str(row.get('Type Client'), 20),
+        code_fdv=_safe_str(row.get('Code-FDV'), 30),
+        canal=_extract_canal(_safe_str(row.get('Code-FDV'), 30)),
+        nom_fdv=_safe_str(row.get('Nom-FDV'), 100),
+        type_fdv=_safe_str(row.get('Type-FDV'), 30),
+        code_sup=_safe_str(row.get('Code-Sup'), 30),
+        nom_sup=_safe_str(row.get('Nom-Sup'), 100),
+        buid=_normalize_code(row.get('BUID'), 30),
+        code_distributeur=_normalize_code(row.get('Code Distributeur'), 30),
+        nom_distributeur=_safe_str(row.get('Nom Distributeur'), 100),
+        depot_livraison=_safe_str(row.get('Dépôt Livraison'), 50),
+        statut_commande=_safe_str(row.get('Statut Commande'), 30),
+        date_creation=_safe_date(row.get('Date Création')),
+        date_confirmation=_safe_date(row.get('Date Confirmation')),
+        date_facturation=_safe_date(row.get('Date Facturation')),
+        code_livreur=_normalize_code(row.get('Code Livreur'), 30),
+        nom_livreur=_safe_str(row.get('Nom Livreur'), 100),
+        matricule_van=_safe_str(row.get('Matricule VAN'), 30),
+        code_produit=_normalize_code(row.get('Code Produit'), 30),
+        description_produit=_safe_str(row.get('Description Produit'), 200),
+        famille=_safe_str(row.get('Famille'), 50),
+        sous_famille=_safe_str(row.get('Sous Famille'), 80),
+        uom_vente=_safe_str(row.get('UOM Vente'), 20),
+        cout_produit=_safe_float(row.get('Cout Produit')),
+        prix_unitaire=_safe_float(row.get('Prix Unitaire')),
+        uom_principale=_safe_str(row.get('UOM principale'), 20),
+        prix_unitaire_uom_pr=_safe_float(row.get('Prix unitaire UOM PR')),
+        qte_commandee=_safe_float(row.get('Qte Commandée')),
+        qte_chargee=_safe_float(row.get('Qte Chargée')),
+        qte_livree=_safe_float(row.get('Qte Livrée')),
+        qte_facturee=_safe_float(row.get('Qte  Facturée')),    # double space
+        total_commande=_safe_float(row.get('Total Commandée')),
+        total_facture=_safe_float(row.get('Total  Facturée')), # double space
+        total_remise=_safe_float(row.get('Total Remise')),
+        gratuite=_safe_float(row.get('Gratuité')),
+        uploaded_by_id=uploaded_by_id,
+    )
+
+
+_FILTERABLE_FIELDS = {
+    'sous_famille', 'type_commande', 'categorie_client', 'statut_commande',
+    'wilaya', 'zone', 'region', 'type_client',
+    'source', 'canal', 'route', 'nom_fdv', 'nom_livreur', 'famille', 'nom_distributeur',
+}
+
+
+@router.get("", response_model=VentePage)
+def list_ventes(
+    page: int = Query(default=1, ge=1),
+    per_page: int = Query(default=50, ge=1, le=200),
+    annee_mois: Optional[str] = Query(default=None),
+    date_from: Optional[str] = Query(default=None),
+    date_to: Optional[str] = Query(default=None),
+    famille: Optional[str] = Query(default=None),
+    sous_famille: Optional[str] = Query(default=None),
+    type_commande: Optional[str] = Query(default=None),
+    categorie_client: Optional[str] = Query(default=None),
+    statut_commande: Optional[str] = Query(default=None),
+    wilaya: Optional[str] = Query(default=None),
+    zone: Optional[str] = Query(default=None),
+    region: Optional[str] = Query(default=None),
+    source: Optional[str] = Query(default=None),
+    canal: Optional[str] = Query(default=None),
+    route: Optional[str] = Query(default=None),
+    nom_fdv: Optional[str] = Query(default=None),
+    nom_livreur: Optional[str] = Query(default=None),
+    nom_distributeur: Optional[str] = Query(default=None),
+    nom_client: Optional[str] = Query(default=None),
+    search: Optional[str] = Query(default=None),
+    session: Session = Depends(get_session),
+) -> Any:
+    conditions = []
+    if annee_mois:
+        conditions.append(Vente.annee_mois == annee_mois)
+    if date_from:
+        conditions.append(Vente.date_commande >= date_type.fromisoformat(_normalize_date(date_from)))
+    if date_to:
+        conditions.append(Vente.date_commande <= date_type.fromisoformat(_normalize_date(date_to)))
+    if famille:
+        conditions.append(Vente.famille == famille)
+    if sous_famille:
+        conditions.append(Vente.sous_famille == sous_famille)
+    if type_commande:
+        conditions.append(Vente.type_commande == type_commande)
+    if categorie_client:
+        conditions.append(Vente.categorie_client == categorie_client)
+    if statut_commande:
+        conditions.append(Vente.statut_commande == statut_commande)
+    if wilaya:
+        conditions.append(Vente.wilaya == wilaya)
+    if zone:
+        conditions.append(Vente.zone == zone)
+    if region:
+        conditions.append(Vente.region == region)
+    if source:
+        conditions.append(Vente.source == source)
+    if canal:
+        conditions.append(Vente.canal == canal)
+    if route:
+        conditions.append(Vente.route == route)
+    if nom_livreur:
+        conditions.append(Vente.nom_livreur == nom_livreur)
+    if nom_fdv:
+        conditions.append(Vente.nom_fdv == nom_fdv)
+    if nom_distributeur:
+        conditions.append(Vente.nom_distributeur == nom_distributeur)
+    if nom_client:
+        conditions.append(Vente.nom_client == nom_client)
+    if search:
+        term = f"%{search}%"
+        conditions.append(
+            Vente.nom_client.ilike(term) |
+            Vente.description_produit.ilike(term) |
+            Vente.num_commande.ilike(term)
+        )
+
+    count_q = select(func.count(Vente.id))
+    items_q = select(Vente)
+    for c in conditions:
+        count_q = count_q.where(c)
+        items_q = items_q.where(c)
+
+    total = session.exec(count_q).one()
+    offset = (page - 1) * per_page
+    items = session.exec(
+        items_q.order_by(Vente.date_commande.desc()).offset(offset).limit(per_page)
+    ).all()
+
+    return VentePage(
+        total=total,
+        items=[VenteRead.model_validate(v) for v in items],
+    )
+
+
+@router.get("/periodes", response_model=List[str])
+def list_periodes(session: Session = Depends(get_session)) -> Any:
+    result = session.exec(
+        select(Vente.annee_mois).distinct().order_by(Vente.annee_mois.desc())
+    ).all()
+    return list(result)
+
+
+@router.get("/date-range")
+def get_date_range(session: Session = Depends(get_session)) -> Any:
+    min_date = session.exec(select(func.min(Vente.date_commande))).one()
+    max_date = session.exec(select(func.max(Vente.date_commande))).one()
+    return {
+        "min_date": str(min_date) if min_date else None,
+        "max_date": str(max_date) if max_date else None,
+    }
+
+
+@router.get("/fdvs", response_model=List[str])
+def list_fdvs(
+    annee_mois: Optional[str] = Query(default=None),
+    date_from: Optional[str] = Query(default=None),
+    date_to: Optional[str] = Query(default=None),
+    session: Session = Depends(get_session),
+) -> Any:
+    q = select(Vente.nom_fdv).distinct().order_by(Vente.nom_fdv)
+    if annee_mois:
+        q = q.where(Vente.annee_mois == annee_mois)
+    if date_from:
+        q = q.where(Vente.date_commande >= date_type.fromisoformat(_normalize_date(date_from)))
+    if date_to:
+        q = q.where(Vente.date_commande <= date_type.fromisoformat(_normalize_date(date_to)))
+    return [v for v in session.exec(q).all() if v]
+
+
+@router.get("/familles", response_model=List[str])
+def list_familles(
+    annee_mois: Optional[str] = Query(default=None),
+    date_from: Optional[str] = Query(default=None),
+    date_to: Optional[str] = Query(default=None),
+    session: Session = Depends(get_session),
+) -> Any:
+    q = select(Vente.famille).distinct().order_by(Vente.famille)
+    if annee_mois:
+        q = q.where(Vente.annee_mois == annee_mois)
+    if date_from:
+        q = q.where(Vente.date_commande >= date_type.fromisoformat(_normalize_date(date_from)))
+    if date_to:
+        q = q.where(Vente.date_commande <= date_type.fromisoformat(_normalize_date(date_to)))
+    return [v for v in session.exec(q).all() if v]
+
+
+@router.get("/distinct/{field}", response_model=List[str])
+def list_distinct(
+    field: str,
+    date_from: Optional[str] = Query(default=None),
+    date_to: Optional[str] = Query(default=None),
+    session: Session = Depends(get_session),
+) -> Any:
+    from fastapi import HTTPException
+    if field not in _FILTERABLE_FIELDS:
+        raise HTTPException(status_code=400, detail=f"Field '{field}' not filterable")
+    col = getattr(Vente, field)
+    q = select(col).distinct().order_by(col)
+    if date_from:
+        q = q.where(Vente.date_commande >= date_type.fromisoformat(_normalize_date(date_from)))
+    if date_to:
+        q = q.where(Vente.date_commande <= date_type.fromisoformat(_normalize_date(date_to)))
+    return [v for v in session.exec(q).all() if v]
+
+
+@router.get("/clients", response_model=List[str])
+def list_clients(
+    annee_mois: Optional[str] = Query(default=None),
+    date_from: Optional[str] = Query(default=None),
+    date_to: Optional[str] = Query(default=None),
+    nom_fdv: Optional[str] = Query(default=None),
+    session: Session = Depends(get_session),
+) -> Any:
+    q = select(Vente.nom_client).distinct().order_by(Vente.nom_client)
+    if annee_mois:
+        q = q.where(Vente.annee_mois == annee_mois)
+    if date_from:
+        q = q.where(Vente.date_commande >= date_type.fromisoformat(_normalize_date(date_from)))
+    if date_to:
+        q = q.where(Vente.date_commande <= date_type.fromisoformat(_normalize_date(date_to)))
+    if nom_fdv:
+        q = q.where(Vente.nom_fdv == nom_fdv)
+    return [v for v in session.exec(q).all() if v]
+
+
+@router.post("/rapprochement-bl", response_model=RapprochementResult)
+async def rapprochement_bl(
+    file: UploadFile = File(...),
+    nom_livreur: str = Query(...),
+    source: Optional[str] = Query(None),
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> Any:
+    from fastapi import HTTPException
+    from app.models.produit import Produit
+    import io
+
+    # Parse BL Excel — header row is row 0
+    contents = await file.read()
+    df = pd.read_excel(io.BytesIO(contents), header=0)
+
+    bl_rows = []
+    for _, row in df.iterrows():
+        code = _safe_str(row.get('Code produit'), 30)
+        if not code:
+            continue
+        bl_rows.append({
+            'code_produit': code,
+            'libelle': (_safe_str(row.get('Libellé'), 200) or '').replace('_x000d_', '').replace('\r', '').strip(),
+            'bl_qte_unites': _safe_float(row.get('Quantité')) or 0.0,
+            'bl_prix_unitaire': _safe_float(row.get('Prix unitaire')) or 0.0,
+            'bl_montant_ttc': _safe_float(row.get('Montant TTC')) or 0.0,
+        })
+
+    if not bl_rows:
+        raise HTTPException(status_code=400, detail="Aucune ligne valide trouvée dans le fichier")
+
+    # Load code mappings for all BL codes found
+    bl_codes = list({r['code_produit'] for r in bl_rows})
+    mapping_rows = session.exec(
+        select(ProduitBlMapping).where(ProduitBlMapping.bl_code.in_(bl_codes))
+    ).all()
+    code_map: dict[str, str] = {m.bl_code: m.code_produit for m in mapping_rows}
+
+    net_a_payer = sum(r['bl_montant_ttc'] for r in bl_rows)
+
+    # Extract BL date from the Excel — use first non-null value in date column
+    date_col = df.get("Date d'insertion du détail")
+    if date_col is None or date_col.dropna().empty:
+        raise HTTPException(status_code=400, detail="Impossible de lire la date depuis le fichier Excel")
+    raw_date = pd.to_datetime(date_col.dropna().iloc[0], dayfirst=False)
+    date_obj = raw_date.date()
+    _norm_fact = sa_case(
+        (
+            (Vente.uom_vente == 'UN') & Produit.colisage.isnot(None),
+            Vente.qte_facturee / Produit.colisage,
+        ),
+        else_=Vente.qte_facturee,
+    )
+    agg_stmt = (
+        select(
+            Vente.code_produit,
+            func.sum(_norm_fact).label('qte_colis'),
+            func.sum(Vente.qte_facturee).label('qte_facturee_raw'),
+            func.max(Vente.uom_vente).label('uom_vente'),
+            func.max(Vente.prix_unitaire).label('prix_unitaire'),
+            func.sum(Vente.total_facture).label('total_facture'),
+        )
+        .outerjoin(Produit, Vente.code_produit == Produit.code_produit)
+        .where(Vente.nom_livreur == nom_livreur)
+        .where(Vente.date_facturation == date_obj)
+        .where(Vente.code_produit.isnot(None))
+        .where(Vente.source == source if source else True)
+        .group_by(Vente.code_produit)
+    )
+    ventes_map: dict = {
+        row.code_produit: row
+        for row in session.execute(agg_stmt).all()
+    }
+
+    # Fetch colisage + prix spéciaux — include both original BL codes and mapped codes
+    # so that e.g. HLLI001B (colisage=12) takes priority over HLLI001 (colisage=10)
+    original_codes = list({r['code_produit'] for r in bl_rows})
+    mapped_codes = list({code_map.get(c, c) for c in original_codes})
+    all_codes = list(set(original_codes + mapped_codes))
+    col_stmt = (
+        select(Produit.code_produit, Produit.colisage, Produit.prix_dd, Produit.prix_promotion, Produit.prix_club)
+        .where(Produit.code_produit.in_(all_codes))
+    )
+    prod_info_map: dict = {
+        row.code_produit: row
+        for row in session.execute(col_stmt).all()
+    }
+    # colisage: prefer the original BL code entry, fall back to the mapped code entry
+    colisage_map: dict = {
+        bl_c: (prod_info_map.get(bl_c) or prod_info_map.get(code_map.get(bl_c, bl_c)))
+        for bl_c in original_codes
+    }
+
+    # Pre-compute total BL units and max price per mapped code.
+    # The max price is the reference (regular) price; rows below it are discounted.
+    total_bl_units_by_code: dict[str, float] = {}
+    max_price_by_code: dict[str, float] = {}
+    for r in bl_rows:
+        c = code_map.get(r['code_produit'], r['code_produit'])
+        total_bl_units_by_code[c] = total_bl_units_by_code.get(c, 0) + r['bl_qte_unites']
+        if r['bl_prix_unitaire'] > max_price_by_code.get(c, 0):
+            max_price_by_code[c] = r['bl_prix_unitaire']
+
+    seen_codes: set[str] = set()
+    lignes = []
+    for r in bl_rows:
+        bl_code = r['code_produit']
+        code = code_map.get(bl_code, bl_code)  # translated code for DB lookups
+        mapped = code if code != bl_code else None
+        is_first = code not in seen_codes
+        seen_codes.add(code)
+
+        prod_entry = colisage_map.get(bl_code)
+        colisage = prod_entry.colisage if prod_entry else None
+        prod_row = prod_info_map.get(code)
+
+        bl_nb_colis = None
+        if colisage:
+            bl_nb_colis = round(r['bl_qte_unites'] / colisage, 4)
+
+        if is_first:
+            vente_row = ventes_map.get(code)
+            qte_colis = vente_row.qte_colis if vente_row else None
+            ventes_qte_unites = None
+            difference = None
+            is_match = False
+            if qte_colis is not None and colisage:
+                ventes_qte_unites = round(qte_colis * colisage, 4)
+                total_bl = total_bl_units_by_code.get(code, 0)
+                difference = round(total_bl - ventes_qte_unites, 4)
+                is_match = abs(difference) < 0.01
+            lignes.append(RapprochementLigne(
+                code_produit=bl_code,
+                libelle=r['libelle'],
+                bl_qte_unites=r['bl_qte_unites'],
+                bl_nb_colis=bl_nb_colis,
+                bl_prix_unitaire=r['bl_prix_unitaire'],
+                bl_montant_ttc=r['bl_montant_ttc'],
+                ventes_qte_colis=qte_colis,
+                colisage=colisage,
+                ventes_qte_unites=ventes_qte_unites,
+                difference_unites=difference,
+                match=is_match,
+                prix_dd=prod_row.prix_dd if prod_row else None,
+                prix_promotion=prod_row.prix_promotion if prod_row else None,
+                prix_club=prod_row.prix_club if prod_row else None,
+                ventes_qte_facturee=vente_row.qte_facturee_raw if vente_row else None,
+                ventes_uom_vente=vente_row.uom_vente if vente_row else None,
+                ventes_prix_unitaire=vente_row.prix_unitaire if vente_row else None,
+                ventes_total_facture=vente_row.total_facture if vente_row else None,
+                mapped_code=mapped,
+                is_duplicate=False,
+                ref_price=max_price_by_code.get(code) if r['bl_prix_unitaire'] < max_price_by_code.get(code, r['bl_prix_unitaire']) else None,
+            ))
+        else:
+            # Same product at a different BL price — suppress SalesBuzz columns
+            lignes.append(RapprochementLigne(
+                code_produit=bl_code,
+                libelle=r['libelle'],
+                bl_qte_unites=r['bl_qte_unites'],
+                bl_nb_colis=bl_nb_colis,
+                bl_prix_unitaire=r['bl_prix_unitaire'],
+                bl_montant_ttc=r['bl_montant_ttc'],
+                ventes_qte_colis=None,
+                colisage=colisage,
+                ventes_qte_unites=None,
+                difference_unites=None,
+                match=False,
+                prix_dd=prod_row.prix_dd if prod_row else None,
+                prix_promotion=prod_row.prix_promotion if prod_row else None,
+                prix_club=prod_row.prix_club if prod_row else None,
+                ventes_qte_facturee=None,
+                ventes_uom_vente=None,
+                ventes_prix_unitaire=None,
+                ventes_total_facture=None,
+                mapped_code=mapped,
+                is_duplicate=True,
+                ref_price=max_price_by_code.get(code) if r['bl_prix_unitaire'] < max_price_by_code.get(code, r['bl_prix_unitaire']) else None,
+            ))
+
+    return RapprochementResult(
+        nom_fdv=nom_livreur,
+        date=str(date_obj),
+        net_a_payer=round(net_a_payer, 2),
+        lignes=lignes,
+    )
+
+
+@router.post("/upload")
+async def upload_ventes(
+    file: UploadFile = File(...),
+    mode: Optional[str] = Query(default=None),  # 'skip' | 'replace'
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+) -> StreamingResponse:
+    content = await file.read()
+    filename = file.filename or ''
+
+    def event(data: dict) -> str:
+        return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+    def generate():
+        logger.info(f"Upload démarré : {filename} par {current_user.full_name} ({len(content) // 1024} KB)")
+        yield event({"progress": 5, "message": "Lecture du fichier..."})
+
+        try:
+            df = parse_file(content, filename)
+        except Exception as e:
+            logger.error(f"Upload échoué (lecture fichier) : {filename} — {e}")
+            yield event({"error": f"Impossible de lire le fichier : {e}"})
+            return
+
+        df = df.dropna(subset=['Date'])
+        if df.empty:
+            yield event({"error": "Aucune ligne valide trouvée dans le fichier"})
+            return
+
+        total_rows = len(df)
+        date_min = df['Date'].min().strftime('%d/%m/%Y')
+        date_max = df['Date'].max().strftime('%d/%m/%Y')
+        yield event({
+            "progress": 15,
+            "message": f"{total_rows:,} lignes trouvées...",
+            "file_info": {"total_rows": total_rows, "date_min": date_min, "date_max": date_max},
+        })
+
+        # Date overlap check
+        file_dates = list({d for d in df['Date'].dt.date if d is not None})
+        existing_dates = set(session.exec(
+            select(Vente.date_commande)
+            .where(Vente.date_commande.in_(file_dates))
+            .distinct()
+        ).all())
+        existing_dates.discard(None)
+
+        if existing_dates and mode is None:
+            overlap_sorted = sorted(existing_dates)
+            yield event({
+                "type": "overlap",
+                "overlap_min": overlap_sorted[0].strftime('%d/%m/%Y'),
+                "overlap_max": overlap_sorted[-1].strftime('%d/%m/%Y'),
+                "overlap_count": len(overlap_sorted),
+            })
+            return
+
+        if mode == 'replace' and existing_dates:
+            yield event({"progress": 20, "message": "Suppression des données existantes..."})
+            session.exec(sa_delete(Vente).where(Vente.date_commande.in_(list(existing_dates))))
+            session.commit()
+        elif mode == 'skip' and existing_dates:
+            df = df[~df['Date'].dt.date.isin(existing_dates)]
+            if df.empty:
+                yield event({"error": "Toutes les dates sont déjà présentes dans la base"})
+                return
+
+        yield event({"progress": 25, "message": "Préparation des enregistrements..."})
+
+        total = len(df)
+        if total == 0:
+            yield event({"error": "Aucune ligne valide à insérer"})
+            return
+
+        BATCH = 500
+        inserted = 0
+        for batch_start in range(0, total, BATCH):
+            batch_df = df.iloc[batch_start:batch_start + BATCH]
+            batch_ventes = []
+            for _, row in batch_df.iterrows():
+                date_val = row.get('Date')
+                if pd.isna(date_val):
+                    continue
+                row_month = date_val.strftime('%Y-%m')
+                batch_ventes.append(_row_to_vente(row, row_month, current_user.id))
+            session.add_all(batch_ventes)
+            session.flush()
+            del batch_ventes
+            inserted += len(batch_df)
+            progress = 30 + int(65 * inserted / total)
+            yield event({
+                "progress": progress,
+                "message": f"{inserted:,} / {total:,} lignes insérées...",
+            })
+
+        session.commit()
+
+        dominant_month = df['Date'].dt.strftime('%Y-%m').value_counts().idxmax()
+        msg = f"{total:,} lignes importées avec succès"
+        log_line = f"Upload terminé : {total:,} lignes importées ({dominant_month}) par {current_user.full_name}"
+
+        # Check for FDV codes in the file that have no user account
+        fdv_in_file = df[['Code-FDV', 'Nom-FDV']].dropna(subset=['Code-FDV']).drop_duplicates('Code-FDV')
+        existing_codes = set(session.exec(
+            select(User.employe_code).where(User.employe_code != None)
+        ).all())
+        missing_fdvs = [
+            {"code": _safe_str(row['Code-FDV'], 30), "nom": _safe_str(row['Nom-FDV'], 100)}
+            for _, row in fdv_in_file.iterrows()
+            if _safe_str(row['Code-FDV'], 30) not in existing_codes
+        ]
+
+        del df
+        logger.info(log_line)
+        yield event({
+            "progress": 100,
+            "done": True,
+            "message": msg,
+            "missing_fdvs": missing_fdvs,
+        })
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )

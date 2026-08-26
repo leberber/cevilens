@@ -1,0 +1,49 @@
+# Python / Backend
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+
+# Environment (keep .env.example if you have one)
+.env
+.env.local
+.env.*.local
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+
+# Data files
+data/
+*.xlsx
+*.xls
+*.csv
+
+# Backups
+backups/
+*.dump
+*.sql
+
+# Logs
+*.log
+logs/
+
+# Build artifacts
+*.tar.gz
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+backend/logs/

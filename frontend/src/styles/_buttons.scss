@@ -1,0 +1,94 @@
+// =============================================================================
+// BUTTONS — PrimeNG overrides + custom
+// =============================================================================
+
+.p-button {
+  border-radius: var(--radius-lg) !important;
+  font-weight: var(--font-weight-semibold);
+  transition: all var(--transition-fast);
+}
+
+.btn-block { width: 100%; justify-content: center; }
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-card);
+  color: var(--text-color-secondary);
+  font-size: 0.8rem;
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+
+  &--active {
+    background: var(--text-color);
+    border-color: var(--text-color);
+    color: var(--surface-ground);
+    font-weight: var(--font-weight-semibold);
+  }
+
+  @media (hover: hover) {
+    &:not(.filter-chip--active):hover {
+      border-color: var(--text-color-secondary);
+      color: var(--text-color);
+    }
+  }
+}
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-lg);
+  border: var(--border-width) solid var(--surface-border);
+  background: var(--surface-card);
+  color: var(--text-color-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+
+  i { font-size: 0.8rem; }
+
+  &:hover {
+    background: var(--surface-hover);
+    color: var(--text-color);
+    border-color: var(--primary-color);
+  }
+
+  &:active { transform: scale(0.98); }
+}
+
+.btn-add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-lg);
+  border: none;
+  background: var(--primary-gradient);
+  color: #fff;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  box-shadow: var(--shadow-add);
+  transition: transform var(--transition-smooth), box-shadow var(--transition-smooth);
+  white-space: nowrap;
+
+  i { font-size: 0.8rem; }
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-add-lg);
+  }
+
+  &:active { transform: scale(0.98); }
+}

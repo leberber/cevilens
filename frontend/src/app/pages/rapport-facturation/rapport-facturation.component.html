@@ -1,0 +1,318 @@
+<!-- ══════════════════ PAGE HEADER ══════════════════ -->
+<div class="page-header no-print">
+  <div class="page-header__top">
+
+    <div class="page-header__left">
+      <button class="btn-back" (click)="goBack()">
+        <i class="pi pi-arrow-left"></i>
+      </button>
+      <div>
+        <h1 class="page-header__title">Rapport de facturation</h1>
+        <p class="page-header__sub">
+          @if (rapport) {
+            {{ rapport.fdv }} &nbsp;·&nbsp; {{ periodLabel }}
+          } @else {
+            Sélectionnez la période et le prévendeur
+          }
+        </p>
+      </div>
+    </div>
+
+    <div class="page-header__filters">
+
+      <app-date-range-picker
+        [periodes]="periodes"
+        [dateFrom]="dateFrom"
+        [dateTo]="dateTo"
+        (rangeChange)="onRangeChange($event)"
+      />
+
+      <div class="filter-card">
+        <div class="filter-card__icon"><i class="pi pi-id-card"></i></div>
+        <div class="filter-card__body">
+          <span class="filter-card__label">Prévendeur</span>
+          <p-select
+            [options]="fdvs"
+            [(ngModel)]="selectedFdv"
+            placeholder="Sélectionner"
+            [filter]="true"
+            [showClear]="true"
+            (onChange)="onFdvChange()"
+            class="filter-card-select"
+            [disabled]="!dateFrom"
+          />
+        </div>
+      </div>
+
+      @if (selectedFdv) {
+        <button class="rf-clients-pill"
+          [class.rf-clients-pill--loading]="loadingClients"
+          (click)="!loadingClients && clientsPopover.toggle($event)">
+          @if (loadingClients) {
+            <i class="pi pi-spinner pi-spin"></i>
+            <span>Chargement…</span>
+          } @else {
+            <i class="pi pi-users"></i>
+            <span>{{ selectedClients.size }}<span class="rf-pill-sep">/{{ allClients.length }}</span></span>
+          }
+        </button>
+
+        <p-popover #clientsPopover>
+          <div class="rf-pop">
+            <div class="rf-pop__head">
+              <span class="rf-pop__title">Clients</span>
+              <div class="rf-pop__actions">
+                <button class="btn-text" (click)="selectAll()">Tous</button>
+                <span class="rf-pop__dot">·</span>
+                <button class="btn-text" (click)="deselectAll()">Aucun</button>
+              </div>
+            </div>
+            <div class="table-search rf-pop-search">
+              <div class="search-icon"><i class="pi pi-search"></i></div>
+              <input [(ngModel)]="clientSearch" placeholder="Rechercher un client…" />
+            </div>
+            <div class="rf-pop__list">
+              @for (c of filteredClients; track c) {
+                <div class="rf-client-item"
+                  [class.rf-client-item--on]="selectedClients.has(c)"
+                  (click)="toggleClient(c)">
+                  <span class="rf-avatar">{{ initials(c) }}</span>
+                  <span class="rf-client-name">{{ c }}</span>
+                  @if (selectedClients.has(c)) {
+                    <span class="rf-check"><i class="pi pi-check"></i></span>
+                  }
+                </div>
+              }
+              @if (filteredClients.length === 0) {
+                <p class="rf-no-results">Aucun résultat</p>
+              }
+            </div>
+          </div>
+        </p-popover>
+      }
+
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════ REPORT CARD ══════════════════ -->
+<div class="table-container rf-container">
+
+  <div class="rf-toolbar no-print">
+    <div class="rf-toolbar__left">
+      @if (rapport) {
+        <span class="rf-meta-tag"><i class="pi pi-user"></i> {{ rapport.fdv }}</span>
+        <span class="rf-meta-sep">·</span>
+        <span class="rf-meta-tag"><i class="pi pi-calendar"></i> {{ formatPeriodLabel(rapport.periode) }}</span>
+        <span class="rf-meta-sep">·</span>
+        <span class="rf-meta-tag rf-meta-tag--count">{{ rapport.clients.length }} clients</span>
+      }
+    </div>
+    <div class="rf-actions-bar">
+      @if (selectedFdv) {
+        <label class="rf-bo-toggle" [class.rf-bo-toggle--on]="excludeBackOffice">
+          <p-toggleswitch [(ngModel)]="excludeBackOffice" (onChange)="onExcludeChange()" />
+          <span>Exclure BO</span>
+          @if (boRatio) {
+            <span class="rf-bo-ratio">{{ boRatio }}</span>
+          }
+        </label>
+      }
+      @if (rapport) {
+        <div class="rf-actions-sep"></div>
+        <div class="rf-seg">
+          <button class="rf-seg__btn" [class.rf-seg__btn--active]="displayMode === 'brut'" (click)="displayMode = 'brut'">Brut</button>
+          <button class="rf-seg__btn" [class.rf-seg__btn--active]="displayMode === 'unites'" (click)="displayMode = 'unites'">Unités</button>
+        </div>
+        <div class="rf-actions-sep"></div>
+      }
+      @if (selectedFdv) {
+        <button class="rf-btn rf-btn--excel" (click)="exportZip()" [disabled]="selectedClients.size === 0 || exporting">
+          <i class="pi" [class.pi-download]="!exporting" [class.pi-spin]="exporting" [class.pi-spinner]="exporting"></i>
+          <span>{{ exporting ? 'Export…' : 'Excel' }}</span>
+        </button>
+      }
+      @if (rapport) {
+        <button class="rf-btn rf-btn--print" (click)="print()">
+          <i class="pi pi-print"></i>
+          <span>PDF</span>
+        </button>
+      }
+    </div>
+  </div>
+
+  <div class="rf-main">
+
+    @if (loading) {
+      <div class="rf-skeleton">
+        @for (_ of [1,2,3]; track $index; let bi = $index) {
+          <div class="rf-sk-block">
+            <div class="rf-sk-header">
+              <div class="rf-sk-avatar"></div>
+              <div class="rf-sk-name" [style.width]="bi === 0 ? '38%' : bi === 1 ? '52%' : '44%'"></div>
+            </div>
+            <div class="rf-sk-table">
+              <div class="rf-sk-row rf-sk-row--head">
+                @for (_ of [1,2,3,4,5,6]; track $index) {
+                  <div class="rf-sk-th"></div>
+                }
+              </div>
+              @for (_ of [1,2,3]; track $index; let ri = $index) {
+                <div class="rf-sk-row">
+                  <div class="rf-sk-date"></div>
+                  @for (_ of [1,2,3,4,5]; track $index; let ci = $index) {
+                    <div class="rf-sk-cell"
+                         [class.rf-sk-cell--empty]="(bi + ri + ci) % 3 === 0"
+                         [style.animation-delay]="((bi * 15 + ri * 5 + ci) % 24) * 55 + 'ms'"></div>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    } @else if (!rapport) {
+      <div class="table-empty rf-empty">
+        <i class="pi pi-file-pdf rf-empty__icon"></i>
+        <p>Le rapport apparaîtra ici</p>
+        <span>Sélectionnez la période et le prévendeur</span>
+      </div>
+    } @else {
+      <div class="rapport-print">
+
+        <!-- Cover page — print only, page 1 -->
+        <div class="rapport-cover print-only">
+
+          <!-- Header: logo + title + metadata -->
+          <div class="rc-header">
+            <div class="rc-header__left">
+              <img class="rc-header__logo" src="assets/logo.png" alt="Logo" />
+              <div class="rc-header__sep"></div>
+              <div>
+                <div class="rc-header__title">Rapport de Facturation</div>
+                <div class="rc-header__sub">{{ formatPeriodLabel(rapport.periode) }}</div>
+              </div>
+            </div>
+            <div class="rc-header__right">
+              <div class="rc-header__tag">
+                <span class="rc-header__tag-label">Prévendeur</span>
+                <span class="rc-header__tag-value">{{ rapport.fdv }}</span>
+              </div>
+              <div class="rc-header__tag">
+                <span class="rc-header__tag-label">Imprimé le</span>
+                <span class="rc-header__tag-value">{{ today | date:'dd/MM/yyyy' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- KPI cards -->
+          <div class="rc-kpi-row">
+            <div class="rc-kpi-card rc-kpi-card--accent">
+              <div class="rc-kpi-card__icon"><i class="pi pi-users"></i></div>
+              <div>
+                <span class="rc-kpi-card__num">{{ rapport.clients.length }}</span>
+                <span class="rc-kpi-card__label">Clients facturés</span>
+              </div>
+            </div>
+            <div class="rc-kpi-card">
+              <div class="rc-kpi-card__icon"><i class="pi pi-box"></i></div>
+              <div>
+                <span class="rc-kpi-card__num">{{ rapport.products.length }}</span>
+                <span class="rc-kpi-card__label">Références produits</span>
+              </div>
+            </div>
+            <div class="rc-kpi-card">
+              <div class="rc-kpi-card__icon"><i class="pi pi-calendar"></i></div>
+              <div>
+                <span class="rc-kpi-card__num">{{ rapport.weeks.length }}</span>
+                <span class="rc-kpi-card__label">Tournées</span>
+              </div>
+            </div>
+            <div class="rc-kpi-card">
+              <div class="rc-kpi-card__icon"><i class="pi pi-chart-bar"></i></div>
+              <div>
+                <span class="rc-kpi-card__num">{{ totalQty }}</span>
+                <span class="rc-kpi-card__label">Quantité totale</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Product breakdown, sorted biggest → smallest -->
+          <div class="rc-breakdown">
+            <div class="rc-breakdown__title">
+              <i class="pi pi-chart-bar"></i>
+              Répartition par produit
+            </div>
+            <div class="rc-breakdown__list">
+              @for (gt of grandTotals; track gt.product) {
+                <div class="rc-breakdown-row">
+                  <span class="rc-breakdown-row__name">{{ gt.product }}</span>
+                  <div class="rc-breakdown-row__bar-wrap">
+                    <div class="rc-breakdown-row__bar"
+                         [style.width.%]="gt.total / maxGrandTotal * 100"></div>
+                  </div>
+                  <div class="rc-breakdown-row__qty-cell">
+                    <span class="rc-breakdown-row__qty">{{ gt.total }}</span>
+                    @if (rapport!.products_meta[gt.product]?.uom_vente) {
+                      <span class="rc-breakdown-row__uom">{{ rapport!.products_meta[gt.product].uom_vente }}</span>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+          </div>
+
+        </div>
+
+        @for (client of rapport.clients; track client.nom_client) {
+          <div class="rapport-client">
+
+            <div class="rapport-client__header">
+              <span class="rc-avatar">{{ initials(client.nom_client) }}</span>
+              <strong class="rc-name">{{ client.nom_client }}</strong>
+              <span class="rc-mode-badge" [class.rc-mode-badge--units]="displayMode === 'unites'">
+                {{ displayMode === 'unites' ? 'Quantités en unités' : 'Quantités en colis' }}
+              </span>
+            </div>
+
+            <div class="rc-table-wrap">
+              <table class="rapport-table">
+                <thead>
+                  <tr>
+                    <th class="col-semaine">Semaine</th>
+                    @for (p of rapport.products; track p) {
+                      <th class="col-product" [style.border-top-color]="familleColor(p)"><span class="col-product-text">{{ p }}</span></th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (week of client.weeks; track week) {
+                    <tr>
+                      <td class="col-semaine">{{ week }}</td>
+                      @for (p of rapport.products; track p) {
+                        <td [class.has-value]="val(client.semaines[week]?.[p] ?? null, p) !== ''">
+                          {{ val(client.semaines[week]?.[p] ?? null, p) }}
+                        </td>
+                      }
+                    </tr>
+                  }
+                  <tr class="row-total">
+                    <td class="col-semaine">Total</td>
+                    @for (p of rapport.products; track p) {
+                      <td [class.has-value]="val(client.totaux[p] ?? null, p) !== ''">
+                        {{ val(client.totaux[p] ?? null, p) }}
+                      </td>
+                    }
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        }
+
+      </div>
+    }
+
+  </div>
+</div>

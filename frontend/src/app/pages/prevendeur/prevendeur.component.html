@@ -1,0 +1,335 @@
+<div class="pv-page">
+
+  <!-- ── Sticky header ──────────────────────────────────────────────── -->
+  <div class="pv-header">
+    <img src="assets/logo.png" alt="Logo" class="pv-header__logo" />
+    <div class="pv-header__left">
+      <div class="pv-header__name">{{ userName }}</div>
+      @if (data && !loading && activeTab === 'tournees') {
+        <div class="pv-header__meta">
+          <span>{{ data.routes.length }} routes</span>
+          <span class="pv-meta-sep">·</span>
+          <span>{{ data.total_clients }} clients</span>
+        </div>
+      }
+    </div>
+
+    @if (activeTab === 'tournees') {
+      <div class="pv-header__right">
+<div class="pv-period">
+          <button class="pv-period__btn" (click)="prevPeriod()" [disabled]="!canGoPrev">
+            <i class="pi pi-chevron-left"></i>
+          </button>
+          <span class="pv-period__label">{{ formatPeriod(selectedMois) }}</span>
+          <button class="pv-period__btn" (click)="nextPeriod()" [disabled]="!canGoNext">
+            <i class="pi pi-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    }
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       TAB: MES TOURNÉES
+  ══════════════════════════════════════════════════════════════════════ -->
+  @if (activeTab === 'tournees') {
+
+    <!-- Summary strip -->
+    @if (data && !loading) {
+      <div class="pv-summary">
+        <div class="pv-kpi">
+          <span class="pv-kpi__val">{{ data.total_clients }}</span>
+          <span class="pv-kpi__label">Clients</span>
+        </div>
+        <div class="pv-kpi-sep"></div>
+        <div class="pv-kpi">
+          <span class="pv-kpi__val">{{ formatMontant(totalMontant) }}</span>
+          <span class="pv-kpi__label">Montant DA</span>
+        </div>
+      </div>
+    }
+
+    <!-- Skeleton -->
+    @if (loading) {
+      <div class="pv-summary pv-summary--sk">
+        <div class="pv-sk-kpi"></div>
+        <div class="pv-sk-kpi"></div>
+        <div class="pv-sk-kpi"></div>
+      </div>
+      <div class="pv-routes">
+        @for (_ of skeletonRows; track $index; let i = $index) {
+          <div class="pv-sk-card" [style.animation-delay]="i * 60 + 'ms'"></div>
+        }
+      </div>
+    }
+
+    <!-- Routes -->
+    @if (data && !loading) {
+      @if (data.routes.length === 0) {
+        <div class="pv-empty">
+          <i class="pi pi-inbox"></i>
+          <p>Aucune donnée pour cette période</p>
+        </div>
+      } @else {
+        <div class="pv-routes">
+          @for (route of data.routes; track route.route; let ri = $index) {
+            <div class="pv-route">
+
+              <div class="pv-route__header">
+                <span class="pv-route__idx">{{ ri + 1 }}</span>
+                <i class="pi pi-map-marker"></i>
+                <span>{{ route.route }}</span>
+                <span class="pv-route__count">{{ route.clients.length }}</span>
+              </div>
+
+              @for (client of route.clients; track client.nom_client; let ci = $index) {
+                <div class="pv-client-card"
+                     [class.pv-client-card--open]="isExpanded(route.route + client.nom_client)"
+                     (click)="toggleClient(route.route + client.nom_client)">
+
+                  <div class="pv-client-head">
+                    <div class="pv-stop-num">{{ ci + 1 }}</div>
+<div class="pv-client-info">
+                      <div class="pv-client-name-row">
+                        <span class="pv-client-name">{{ client.nom_client }}</span>
+                        <span class="pv-client-total">{{ clientMontant(client) | number:'1.0-0' }} DA</span>
+                      </div>
+                      <div class="pv-client-tags">
+                        @for (f of clientFamilies(client); track f) {
+                          <span class="pv-fam-tag pv-fam-tag--{{ f }}">{{ f }}</span>
+                        }
+                        @if (client.derniere_visite) {
+                          <span class="pv-client-last">{{ client.derniere_visite }}</span>
+                        }
+                      </div>
+                      <!-- nom_sodichn inline edit -->
+                      <div class="pv-rc-row" (click)="$event.stopPropagation()">
+                        @if (editingKey === clientKey(route.route, client)) {
+                          <input class="pv-rc-input"
+                                 [(ngModel)]="editingValue"
+                                 placeholder="Nom registre commerce…"
+                                 (keydown.enter)="saveEdit(client, $event)"
+                                 (keydown.escape)="cancelEdit($event)"
+                                 (blur)="saveEdit(client, $event)" />
+                        } @else {
+                          <span class="pv-rc-value"
+                                [class.pv-rc-value--empty]="!client.nom_sodichn"
+                                (click)="startEdit(route.route, client, $event)">
+                            @if (savingKey === clientKey(route.route, client)) {
+                              <i class="pi pi-spin pi-spinner pv-rc-saving"></i>
+                            } @else {
+                              <i class="pi pi-pencil pv-rc-icon"></i>
+                            }
+                            {{ client.nom_sodichn || 'Nom RC…' }}
+                          </span>
+                        }
+                      </div>
+                    </div>
+                    <i class="pi pv-chevron"
+                       [class.pi-chevron-down]="!isExpanded(route.route + client.nom_client)"
+                       [class.pi-chevron-up]="isExpanded(route.route + client.nom_client)"></i>
+                  </div>
+
+                  @if (isExpanded(route.route + client.nom_client)) {
+                    <div class="pv-client-detail" (click)="$event.stopPropagation()">
+                      <div class="pv-table-wrap">
+                        <table class="pv-table">
+                          <thead>
+                            <tr>
+                              <th class="pv-th-date">Date</th>
+                              @for (p of data!.products; track p) {
+                                <th [class]="familleClass(p)">{{ p }}</th>
+                              }
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (week of client.weeks; track week) {
+                              <tr>
+                                <td class="pv-td-date">{{ week }}</td>
+                                @for (p of data!.products; track p) {
+                                  <td [class.pv-td--val]="val(client.semaines[week]?.[p] ?? null) !== ''">
+                                    {{ val(client.semaines[week]?.[p] ?? null) }}
+                                  </td>
+                                }
+                              </tr>
+                            }
+                            <tr class="pv-tr-total">
+                              <td class="pv-td-date">Total</td>
+                              @for (p of data!.products; track p) {
+                                <td [class.pv-td--val]="val(client.totaux[p] ?? null) !== ''">
+                                  <strong>{{ val(client.totaux[p] ?? null) }}</strong>
+                                </td>
+                              }
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  }
+
+                </div>
+              }
+
+            </div>
+          }
+        </div>
+      }
+    }
+  }
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       TAB: MES CLIENTS
+  ══════════════════════════════════════════════════════════════════════ -->
+  @if (activeTab === 'clients') {
+    <div class="pv-clients-page">
+      @if (!data || loading) {
+        <div class="pv-empty">
+          <i class="pi pi-spin pi-spinner"></i>
+          <p>Chargement…</p>
+        </div>
+      } @else if (allClients.length === 0) {
+        <div class="pv-empty">
+          <i class="pi pi-users"></i>
+          <p>Aucun client pour cette période</p>
+        </div>
+      } @else {
+        <div class="pvc-list">
+          @for (client of allClients; track client.nom_client; let i = $index) {
+            <div class="pvc-item">
+              <div class="pvc-avatar">{{ client.nom_client.charAt(0) }}</div>
+              <div class="pvc-info">
+                <span class="pvc-name">{{ client.nom_client }}</span>
+                <div class="pv-rc-row" (click)="$event.stopPropagation()">
+                  @if (editingKey === clientKey('clients', client)) {
+                    <input class="pv-rc-input"
+                           [(ngModel)]="editingValue"
+                           placeholder="Nom registre commerce…"
+                           (keydown.enter)="saveEdit(client, $event)"
+                           (keydown.escape)="cancelEdit($event)"
+                           (blur)="saveEdit(client, $event)" />
+                  } @else {
+                    <span class="pv-rc-value"
+                          [class.pv-rc-value--empty]="!client.nom_sodichn"
+                          (click)="startEdit('clients', client, $event)">
+                      @if (savingKey === clientKey('clients', client)) {
+                        <i class="pi pi-spin pi-spinner pv-rc-saving"></i>
+                      } @else {
+                        <i class="pi pi-pencil pv-rc-icon"></i>
+                      }
+                      {{ client.nom_sodichn || 'Nom RC…' }}
+                    </span>
+                  }
+                </div>
+              </div>
+              <span class="pvc-total">{{ clientMontant(client) | number:'1.0-0' }} DA</span>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       TAB: MES OBJECTIFS
+  ══════════════════════════════════════════════════════════════════════ -->
+  @if (activeTab === 'objectifs') {
+    <div class="pv-objectifs-page">
+      @if (loadingObjectifs) {
+        <div class="pv-empty"><i class="pi pi-spin pi-spinner"></i><p>Chargement…</p></div>
+      } @else if (objectifs.length === 0) {
+        <div class="pv-empty"><i class="pi pi-chart-bar"></i><p>Aucun objectif pour cette période</p></div>
+      } @else {
+        <div class="pvo-list">
+          @for (group of objectifsByFamille; track group.famille) {
+            <div class="pvo-groupe">
+              <div class="pvo-famille-header" (click)="toggleFamille(group.famille)">
+                <span class="pvo-famille-dot pvo-famille-dot--{{ group.famille }}"></span>
+                <span class="pvo-famille-name">{{ group.famille || 'Autre' }}</span>
+                <span class="pvo-famille-count">{{ group.items.length }}</span>
+                <span class="pvo-famille-pct"
+                      [class.pvo-pct--red]="group.pct < 60"
+                      [class.pvo-pct--orange]="group.pct >= 60 && group.pct < 85"
+                      [class.pvo-pct--green]="group.pct >= 85">{{ group.pct }}%</span>
+                <i class="pi pvo-famille-chevron"
+                   [class.pi-chevron-down]="collapsedFamilles.has(group.famille)"
+                   [class.pi-chevron-up]="!collapsedFamilles.has(group.famille)"></i>
+              </div>
+              @if (!collapsedFamilles.has(group.famille)) {
+                <div class="pvo-items-wrap">
+                @for (obj of group.items; track obj.code_produit) {
+                  <div class="pvo-item">
+                    <div class="pvo-top">
+                      <span class="pvo-name">{{ obj.nom_produit }}</span>
+                      <span class="pvo-pct"
+                            [class.pvo-pct--red]="obj.pct < 60"
+                            [class.pvo-pct--orange]="obj.pct >= 60 && obj.pct < 85"
+                            [class.pvo-pct--green]="obj.pct >= 85">{{ obj.pct }}%</span>
+                    </div>
+                    <div class="pvo-bar-track">
+                      <div class="pvo-bar-fill"
+                           [class.pvo-bar-fill--red]="obj.pct < 60"
+                           [class.pvo-bar-fill--orange]="obj.pct >= 60 && obj.pct < 85"
+                           [class.pvo-bar-fill--green]="obj.pct >= 85"
+                           [style.width.%]="obj.pct"></div>
+                    </div>
+                    <div class="pvo-numbers">
+                      <span><strong>{{ obj.actual | number:'1.0-0' }}</strong> <span class="pvo-unit">réalisé</span></span>
+                      <span><strong>{{ obj.objectif | number:'1.0-0' }}</strong> <span class="pvo-unit">objectif</span></span>
+                    </div>
+                  </div>
+                }
+                </div>
+              }
+            </div>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <!-- ══════════════════════════════════════════════════════════════════
+       TAB: MENU
+  ══════════════════════════════════════════════════════════════════════ -->
+  @if (activeTab === 'menu') {
+    <div class="pv-menu-page">
+
+      <div class="pvm-user-card">
+        <div class="pvm-avatar">{{ userName.charAt(0) }}</div>
+        <div class="pvm-user-info">
+          <span class="pvm-user-name">{{ userName }}</span>
+          <span class="pvm-user-role">Prévendeur</span>
+        </div>
+      </div>
+
+      <div class="pvm-section">
+        <button class="pvm-item pvm-item--danger" (click)="auth.logout()">
+          <i class="pi pi-sign-out"></i>
+          <span>Se déconnecter</span>
+          <i class="pi pi-chevron-right pvm-arrow"></i>
+        </button>
+      </div>
+
+    </div>
+  }
+
+  <!-- ── Bottom nav ──────────────────────────────────────────────────── -->
+  <nav class="pv-bottom-nav">
+    <button class="pv-nav-item" [class.pv-nav-item--active]="activeTab === 'tournees'" (click)="activeTab = 'tournees'">
+      <i class="pi pi-calendar"></i>
+      <span>Tournées</span>
+    </button>
+    <button class="pv-nav-item" [class.pv-nav-item--active]="activeTab === 'clients'" (click)="activeTab = 'clients'">
+      <i class="pi pi-users"></i>
+      <span>Clients</span>
+    </button>
+    <button class="pv-nav-item" [class.pv-nav-item--active]="activeTab === 'objectifs'" (click)="activeTab = 'objectifs'">
+      <i class="pi pi-chart-bar"></i>
+      <span>Objectifs</span>
+    </button>
+    <button class="pv-nav-item" [class.pv-nav-item--active]="activeTab === 'menu'" (click)="activeTab = 'menu'">
+      <i class="pi pi-bars"></i>
+      <span>Menu</span>
+    </button>
+  </nav>
+
+</div>

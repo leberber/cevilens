@@ -1,0 +1,211 @@
+// =============================================================================
+// CARDS
+// =============================================================================
+@use 'mixins' as *;
+
+.card {
+  @include surface-card;
+  padding: var(--space-6);
+
+  &--compact { padding: var(--space-4); }
+  &--flush   { padding: 0; overflow: hidden; }
+}
+
+// Stat card (dashboard KPIs)
+.stat-card {
+  @include surface-card;
+  padding: var(--space-5);
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+
+  &__icon {
+    @include flex-center;
+    @include square(2.75rem);
+    border-radius: var(--radius-lg);
+    flex-shrink: 0;
+    font-size: 1.25rem;
+
+    &--primary { background: var(--primary-100);                              color: var(--primary-color); }
+    &--success { background: rgba(var(--color-success-rgb),.12);              color: var(--color-success-dark); }
+    &--warning { background: rgba(var(--color-warning-rgb),.12);              color: var(--color-warning-dark); }
+    &--danger  { background: rgba(var(--color-error-rgb),.12);                color: var(--color-error-dark); }
+    &--info    { background: rgba(var(--color-info-rgb),.12);                 color: var(--color-info-dark); }
+    &--img     { background: transparent; padding: 0;
+      img { width: 2.75rem; height: 2.75rem; object-fit: contain; }
+    }
+  }
+
+  &__body  { flex: 1; min-width: 0; }
+  &__value { font-size: var(--font-size-2xl); font-weight: var(--font-weight-bold); line-height: 1; }
+  &__label { font-size: var(--font-size-sm); color: var(--text-color-secondary); margin-top: 0.2rem; }
+  &__sub   { font-size: var(--font-size-xs); color: var(--text-color-muted); margin-top: 0.15rem; }
+}
+
+.card-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-color-secondary);
+  margin: 0 0 0.75rem;
+}
+
+.card-section-header {
+  @include flex-between;
+  padding: 1rem 1.25rem;
+  border-bottom: var(--border-width) solid var(--surface-border);
+
+  .card-label { margin: 0; }
+}
+
+.section-header {
+  @include flex-between;
+  margin-bottom: 0.75rem;
+}
+
+.section-title {
+  margin: 0;
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-color);
+}
+
+.link-primary {
+  font-size: var(--font-size-sm);
+  color: var(--primary-color);
+  text-decoration: none;
+  &:hover { text-decoration: underline; }
+}
+
+// ── Form section cards (add/edit pages) ────────────────────────────────────────
+.form-card {
+  background: var(--surface-card);
+  border: var(--border-width) solid var(--surface-border);
+  border-radius: var(--radius-2xl);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.875rem 1.5rem;
+    border-bottom: var(--border-width) solid var(--surface-border);
+    background: var(--surface-ground);
+  }
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-md);
+    background: var(--primary-100);
+    color: var(--primary-color);
+    font-size: 0.875rem;
+    flex-shrink: 0;
+
+    &--teal   { background: rgba(20, 184, 166, .12);  color: #0d9488; }
+    &--indigo { background: rgba(99, 102, 241, .12);  color: #6366f1; }
+    &--amber  { background: rgba(245, 158, 11, .12);  color: #d97706; }
+    &--purple { background: rgba(168, 85, 247, .12);  color: #9333ea; }
+  }
+
+  &__title {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-color);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  &__body {
+    padding: 1.25rem 1.5rem 1rem;
+  }
+}
+
+// ── Back button ─────────────────────────────────────────────────────────────────
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 2.25rem;
+  padding: 0 0.875rem;
+  border-radius: var(--radius-lg);
+  border: var(--border-width) solid var(--surface-border);
+  background: var(--surface-card);
+  color: var(--text-color-secondary);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+  white-space: nowrap;
+
+  i { font-size: 0.75rem; }
+
+  &:hover {
+    background: var(--surface-hover);
+    color: var(--text-color);
+    border-color: var(--primary-color);
+  }
+}
+
+// ── Form card entry animation (shared by all form pages) ───────────────────────
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.form-card--anim {
+  animation: card-in 0.3s ease both;
+  animation-delay: calc(var(--card-i, 0) * 60ms);
+}
+
+// ── Livraison "restant" bar ───────────────────────────────────────────────────
+.livraison-restant-bar {
+  position: fixed;
+  bottom: 0;
+  left: var(--sidebar-w, 0);
+  right: 0;
+  z-index: 90;
+  background: var(--surface-card);
+  border-top: 1px solid var(--surface-border);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, .06);
+  padding: 0.65rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+
+  @media (max-width: 768px) {
+    left: 0;
+    bottom: calc(var(--mob-nav-h) + env(safe-area-inset-bottom));
+  }
+}
+
+// ── Fixed form footer (shared by all form pages) ────────────────────────────────
+.form-footer {
+  position: fixed;
+  bottom: 0;
+  left: var(--sidebar-w, 350px);
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  background: var(--surface-ground);
+  border-top: 1px solid var(--surface-border);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, .06);
+
+  @media (max-width: 768px) {
+    left: 0;
+    bottom: calc(var(--mob-nav-h) + env(safe-area-inset-bottom));
+  }
+}

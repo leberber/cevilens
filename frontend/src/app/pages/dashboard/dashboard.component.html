@@ -1,0 +1,452 @@
+<div class="db-root">
+
+  <!-- ── Header ──────────────────────────────────────────────────────────── -->
+  <div class="db-header">
+    <div class="db-header-main">
+      <div class="db-breadcrumb">
+        <div>
+          <button class="db-crumb" [class.db-crumb--dim]="selectedFamille" (click)="drillToRoot()">
+            Tableau de bord
+          </button>
+          @if (selectedFamille) {
+            <i class="pi pi-chevron-right db-crumb-sep"></i>
+            <span class="db-crumb db-crumb--leaf">{{ capitalize(selectedFamille.nom) }}</span>
+          }
+        </div>
+        <div class="db-distributeur-label">
+          @if (selectedDistributeur) {
+            <button class="db-dist-name" (click)="toggleDistMenu()" title="Changer de distributeur">
+              {{ selectedDistributeur }}
+            </button>
+            <button class="db-dist-clear" (click)="clearDistributeur()" title="Voir tous les distributeurs">
+              <i class="pi pi-times"></i>
+            </button>
+          } @else {
+            <button class="db-dist-name db-dist-name--empty" (click)="toggleDistMenu()" title="Filtrer par distributeur">
+              Tous les distributeurs
+            </button>
+          }
+          @if (distributeurs.length > 0 && showDistMenu) {
+            <div class="db-dist-menu">
+              @for (d of distributeurs; track d) {
+                <button class="db-dist-item"
+                        [class.db-dist-item--active]="selectedDistributeur === d"
+                        (click)="selectDistributeur(d)">
+                  {{ d }}
+                </button>
+              }
+            </div>
+          }
+        </div>
+        @if (totalObjectif) {
+          <div class="db-global-achieve">
+            <span class="db-global-achieve__num" [ngClass]="totalObjClass">{{ totalObjPct }}%</span>
+            <span class="db-global-achieve__sub">{{ totalDisplay }} / {{ totalObjDisplay }} obj.</span>
+            @if (_globalCa) {
+              <span class="db-global-achieve__ca">{{ formatCa(_globalCa) }}</span>
+            }
+          </div>
+        }
+      </div>
+      <div class="db-header-right">
+        <div class="db-canal-seg">
+          <button class="db-canal-btn" [class.db-canal-btn--active]="displayMode === 'packs'" (click)="setDisplayMode('packs')">Packs</button>
+          <button class="db-canal-btn" [class.db-canal-btn--active]="displayMode === 'tonnes'" (click)="setDisplayMode('tonnes')">Tonnes</button>
+        </div>
+        <div class="db-canal-seg">
+          <button class="db-canal-btn" [class.db-canal-btn--active]="selectedCanal === 'VD'" (click)="setCanal('VD')">Direct (VD)</button>
+          <button class="db-canal-btn" [class.db-canal-btn--active]="selectedCanal === 'VH'" (click)="setCanal('VH')">Horeca (VH)</button>
+        </div>
+        <div class="db-period">
+          <button class="db-period-btn" (click)="prevPeriod()" [disabled]="!canGoPrev">
+            <i class="pi pi-chevron-left"></i>
+          </button>
+          <span class="db-period-label">{{ formatPeriod(selectedPeriode) }}</span>
+          <button class="db-period-btn" (click)="nextPeriod()" [disabled]="!canGoNext">
+            <i class="pi pi-chevron-right"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Prevendeur filter pills with totals -->
+    @if (data?.prevendeurs?.length) {
+      <div class="db-filter-row">
+        <button class="db-filter-pill" [class.db-filter-pill--active]="!selectedFdv" (click)="selectFdv(null)">
+          <span class="db-filter-pill__name">Tous</span>
+          <span class="db-filter-pill__total">{{ totalDisplay }}</span>
+        </button>
+        @for (pv of data!.prevendeurs; track pv.code) {
+          @let rank = fdvRank(pv.code);
+          <button class="db-filter-pill" [class.db-filter-pill--active]="selectedFdv === pv.code"
+                  (click)="selectFdv(pv.code)">
+            @if (rank >= 0) {
+              <span class="db-filter-pill__medal"
+                    [class.db-filter-pill__medal--gold]="rank === 0"
+                    [class.db-filter-pill__medal--silver]="rank === 1"
+                    [class.db-filter-pill__medal--bronze]="rank === 2">{{ rank + 1 }}</span>
+            }
+            <span class="db-filter-pill__route">{{ routeCode(pv.code) }}</span>
+            <span class="db-filter-pill__name">{{ pv.nom }}</span>
+            <span class="db-filter-pill__total">{{ displayVal(pv.total, _globalObjectif, _globalObjectifTonne) }}</span>
+            @if (data!.objectif_packs_per_route) {
+              <div class="db-filter-pill__progress" [ngClass]="pvObjClass(pv)">
+                <div class="db-filter-pill__bar-track">
+                  <div class="db-filter-pill__bar-fill" [style.width.%]="pvSimplePct(pv)"></div>
+                </div>
+                <span class="db-filter-pill__pct">{{ pvSimplePct(pv) }}%</span>
+              </div>
+              <span class="db-filter-pill__vs">
+                / obj. <span class="db-filter-pill__obj-val">{{ formatNum(data!.objectif_packs_per_route) }}</span>
+                <i class="pi pi-info-circle db-filter-pill__info"
+                   (click)="togglePillTooltip($event, pv.code)"></i>
+              </span>
+            }
+          </button>
+        }
+      </div>
+    }
+  </div>
+
+  <!-- ── KPI family grid ──────────────────────────────────────────────────── -->
+  <div class="db-kpi-grid" [class.db-kpi-grid--selection]="selectedFamille" [class.db-kpi-grid--compact]="compactCards">
+    @if (loading) {
+      @for (_ of skeletonRows; track $index; let i = $index) {
+        <div class="db-kpi-sk" [style.animation-delay]="i * 80 + 'ms'">
+          <div class="db-kpi-sk__label"></div>
+          <div class="db-kpi-sk__value"></div>
+          <div class="db-kpi-sk__prev"></div>
+          <div class="db-kpi-sk__bar"></div>
+          <div class="db-kpi-sk__weeks">
+            <div class="db-kpi-sk__week"></div>
+            <div class="db-kpi-sk__week"></div>
+            <div class="db-kpi-sk__week"></div>
+            <div class="db-kpi-sk__week"></div>
+          </div>
+          <div class="db-kpi-sk__spark"></div>
+        </div>
+      }
+    }
+    @if (!loading && data && data.familles.length === 0) {
+      <div class="db-no-data"><i class="pi pi-inbox"></i><span>Aucune donnée pour cette période</span></div>
+    }
+    @if (data) {
+      @for (f of data.familles; track f.nom) {
+        <button class="db-kpi-card"
+                [class.db-kpi-card--active]="selectedFamille?.nom === f.nom"
+                [style.--fc]="familyColor(f.nom)"
+                [style.--fbg]="familyBg(f.nom)"
+                (click)="selectFamille(f)">
+          <div class="db-kpi-card__top">
+            <span class="db-kpi-card__label">{{ capitalize(f.nom) || 'Autres' }}</span>
+            <div class="db-kpi-card__top-right">
+              @if (f.delta_pct !== null) {
+                <span class="db-kpi-badge"
+                      [class.db-kpi-badge--up]="f.delta_pct > 0"
+                      [class.db-kpi-badge--down]="f.delta_pct < 0"
+                      [class.db-kpi-badge--flat]="f.delta_pct === 0">
+                  <i class="pi" [class.pi-arrow-up-right]="f.delta_pct > 0" [class.pi-arrow-down-right]="f.delta_pct <= 0"></i>
+                  {{ formatDelta(f.delta_pct) }}
+                </span>
+              }
+              <button class="db-pin-btn"
+                      [class.db-pin-btn--active]="pinnedFamilies.has(f.nom)"
+                      (click)="togglePin(f.nom, $event)"
+                      [title]="pinnedFamilies.has(f.nom) ? 'Retirer de la comparaison' : 'Ajouter à la comparaison'">
+                <i class="pi" [class.pi-bookmark-fill]="pinnedFamilies.has(f.nom)" [class.pi-bookmark]="!pinnedFamilies.has(f.nom)"></i>
+              </button>
+              <i class="pi pi-chevron-right db-kpi-card__arrow"
+                 [class.db-kpi-card__arrow--open]="selectedFamille?.nom === f.nom"></i>
+            </div>
+          </div>
+
+          <div class="db-kpi-card__body">
+            <span class="db-kpi-card__value">{{ displayVal(displayValues[f.nom], f.objectif_packs, f.objectif_tonne) }}</span>
+            <span class="db-kpi-card__unit">{{ unitLabel }}</span>
+          </div>
+
+          @if (f.ca) {
+            <div class="db-kpi-card__ca">{{ formatCa(f.ca) }}</div>
+          }
+
+          <div class="db-kpi-card__prev">
+            vs {{ formatNum(f.total_prev) }} mois préc.
+          </div>
+
+          @if (f.objectif_packs) {
+            <div class="db-kpi-obj">
+              <div class="db-kpi-obj__bar-track">
+                <div class="db-kpi-obj__bar-fill"
+                     [style.width.%]="Math.min(objPct(f), 100)"
+                     [style.background]="familyColor(f.nom)"></div>
+              </div>
+              <span class="db-kpi-obj__label">
+                {{ objPct(f) }}% <span class="db-kpi-obj__sub">/ {{ displayObjVal(f.objectif_packs, f.objectif_tonne) }} obj.</span>
+              </span>
+            </div>
+          }
+
+          <!-- Weekly breakdown -->
+          <div class="db-kpi-card__weeks">
+            @for (lbl of WEEK_LABELS; track lbl; let i = $index) {
+              <div class="db-kpi-card__week">
+                <span class="db-kpi-card__week-val">{{ formatNum(f.weeks[i]) }}</span>
+                <span class="db-kpi-card__week-lbl">{{ lbl }}</span>
+              </div>
+            }
+          </div>
+
+          <svg class="db-kpi-card__spark" viewBox="0 0 120 28" preserveAspectRatio="none">
+            <path [attr.d]="areaPath(f.weeks, 120, 28)"
+                  [attr.fill]="familyColor(f.nom)" fill-opacity="0.18"/>
+            <path [attr.d]="linePath(f.weeks, 120, 28)"
+                  fill="none" [attr.stroke]="familyColor(f.nom)" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </button>
+      }
+    }
+  </div>
+
+  <!-- ── Pin bar (combined totals for pinned families) ───────────────────── -->
+  <div class="db-pin-bar" [style.display]="hasPinned ? 'flex' : 'none'">
+    <div class="db-pin-bar__families">
+      @for (nom of pinnedFamiliesArray; track nom) {
+        <span class="db-pin-bar__tag" [style.color]="familyColor(nom)" [style.background]="familyBg(nom)">
+          {{ capitalize(nom) }}
+          <button class="db-pin-bar__tag-rm" (click)="togglePin(nom, $event)"><i class="pi pi-times"></i></button>
+        </span>
+      }
+    </div>
+    <div class="db-pin-bar__totals">
+      <span class="db-pin-bar__value">{{ pinnedTotalDisplay }}</span>
+      <span class="db-pin-bar__unit">{{ unitLabel }}</span>
+      @if (pinnedHasObjectif) {
+        <span class="db-pin-bar__sep">|</span>
+        <span class="db-pin-bar__pct" [ngClass]="pinnedObjClass">{{ pinnedObjPct }}%</span>
+        <span class="db-pin-bar__obj-sub">/ {{ pinnedObjDisplay }} obj.</span>
+      }
+      @if (pinnedCa) {
+        <span class="db-pin-bar__sep">|</span>
+        <span class="db-pin-bar__ca">{{ formatCa(pinnedCa) }}</span>
+      }
+    </div>
+    <button class="db-pin-bar__clear" (click)="clearPinned()" title="Effacer la sélection">
+      <i class="pi pi-times"></i>
+    </button>
+  </div>
+
+  <!-- ── Collapse handle ──────────────────────────────────────────────────── -->
+  @if (!loading) {
+    <div class="db-collapse-handle" (click)="compactCards = !compactCards" [title]="compactCards ? 'Agrandir les cartes' : 'Réduire les cartes'">
+      <div class="db-collapse-handle__line"></div>
+      <i class="pi db-collapse-handle__icon"
+         [class.pi-chevron-up]="!compactCards"
+         [class.pi-chevron-down]="compactCards"></i>
+      <div class="db-collapse-handle__line"></div>
+    </div>
+  }
+
+  <!-- ── Bottom: sf/product bars (left) + FDV performance (right) ─────────── -->
+  <div class="db-middle" [class.db-middle--loading]="loading">
+
+    <!-- Reusable tree template: subfamilies + products -->
+    <ng-template #familyTree let-f="f" let-inline="inline">
+      <div class="db-tree" [class.db-tree--overview]="inline"
+           [class.db-tree--selection]="selectedProduct"
+           [style.--fc]="familyColor(f.nom)" [style.--fbg]="familyBg(f.nom)">
+        @for (sf of f.sous_familles; track sf.nom) {
+          <button class="db-tree-sf" (click)="toggleSfCollapse(sf.nom)">
+            <i class="pi db-tree-sf-chevron"
+               [class.pi-chevron-down]="!collapsedSfs.has(sf.nom)"
+               [class.pi-chevron-right]="collapsedSfs.has(sf.nom)"></i>
+            <span class="db-tree-sf-name">{{ sf.nom }}</span>
+            <span class="db-tree-sf-total">
+              {{ displayVal(sf.total, sf.objectif_packs, sf.objectif_tonne) }}
+              @if (sf.objectif_packs) {
+                <span class="db-tree-sf-total__obj">/ {{ displayObjVal(sf.objectif_packs, sf.objectif_tonne) }} obj.</span>
+              }
+            </span>
+            @if (sf.objectif_packs) {
+              <span class="db-tree-sf-obj" [class.db-tree-sf-obj--ok]="sfObjPct(sf) >= 100">
+                {{ sfObjPct(sf) }}%
+              </span>
+            }
+          </button>
+          @if (!collapsedSfs.has(sf.nom)) {
+            @for (p of sf.produits; track p.nom; let i = $index) {
+              <div class="db-tree-prod"
+                   [class.db-tree-prod--active]="selectedProduct === p"
+                   (click)="selectProduct(p)">
+                <span class="db-tree-prod-name" [title]="p.nom">{{ p.nom }}</span>
+                <div class="db-bar-track">
+                  <div class="db-bar-fill"
+                       [style.width.%]="(inline || barsReady) ? prodPct(p, sf) : 0"
+                       [style.background]="prodColor(i)"
+                       [style.transition-delay.ms]="i * 40"></div>
+                </div>
+                <span class="db-bar-num">
+                  {{ displayVal(p.total, p.objectif_packs, p.objectif_tonne) }}
+                  @if (p.objectif_packs) {
+                    <span class="db-bar-num__obj">/ {{ displayObjVal(p.objectif_packs, p.objectif_tonne) }}</span>
+                  }
+                </span>
+                @if (p.objectif_packs) {
+                  <span class="db-prod-obj-pct" [style.color]="prodObjColor(p)">{{ prodObjPct(p) }}%</span>
+                }
+              </div>
+            }
+          }
+        }
+      </div>
+    </ng-template>
+
+    <!-- Left: tree view — sf headers (collapsible) + products -->
+    <div class="db-panel">
+      @if (loading) {
+        <div class="db-panel-sk">
+          @for (_ of skeletonRows; track $index; let i = $index) {
+            <div class="db-panel-sk__sf" [style.animation-delay]="i * 80 + 'ms'"></div>
+            <div class="db-panel-sk__prod" [style.animation-delay]="i * 80 + 20 + 'ms'">
+              <div class="db-panel-sk__prod-name"></div>
+              <div class="db-panel-sk__prod-bar"></div>
+              <div class="db-panel-sk__prod-num"></div>
+            </div>
+            <div class="db-panel-sk__prod" [style.animation-delay]="i * 80 + 40 + 'ms'">
+              <div class="db-panel-sk__prod-name"></div>
+              <div class="db-panel-sk__prod-bar"></div>
+              <div class="db-panel-sk__prod-num"></div>
+            </div>
+          }
+        </div>
+      } @else if (selectedFamille) {
+        <div class="db-panel-head">
+          <span class="db-panel-title">{{ capitalize(selectedFamille.nom) }} — Détail</span>
+          <span class="db-panel-total">{{ formatNum(selectedFamille.total) }}</span>
+        </div>
+        <ng-container [ngTemplateOutlet]="familyTree"
+                      [ngTemplateOutletContext]="{ f: selectedFamille, inline: false }">
+        </ng-container>
+      } @else if (selectedFdv) {
+        <div class="db-panel-head">
+          <span class="db-panel-title">{{ selectedFdvName }}</span>
+          <span class="db-panel-total">{{ overviewFamilles.length }} familles</span>
+        </div>
+        <div class="db-overview">
+          @for (f of overviewFamilles; track f.nom) {
+            <button class="db-ov-fam-head"
+                    [style.--fc]="familyColor(f.nom)"
+                    (click)="toggleOverviewFamille(f.nom)">
+              <i class="pi db-ov-fam-chevron"
+                 [class.pi-chevron-down]="!collapsedOverviewFamilles.has(f.nom)"
+                 [class.pi-chevron-right]="collapsedOverviewFamilles.has(f.nom)"></i>
+              <span class="db-ov-fam-name">{{ capitalize(f.nom) }}</span>
+              @if (f.objectif_packs) {
+                <span class="db-ov-fam-obj" [class.db-ov-fam-obj--ok]="objPct(f) >= 100">{{ objPct(f) }}%</span>
+              }
+              <span class="db-ov-fam-total">{{ formatNum(f.total) }}</span>
+            </button>
+            @if (!collapsedOverviewFamilles.has(f.nom)) {
+              <ng-container [ngTemplateOutlet]="familyTree"
+                            [ngTemplateOutletContext]="{ f: f, inline: true }">
+              </ng-container>
+            }
+          }
+        </div>
+      } @else {
+        <div class="db-panel-empty">
+          <i class="pi pi-chart-bar"></i>
+          <p>Sélectionnez une famille</p>
+        </div>
+      }
+    </div>
+
+    <!-- Right: FDV performance scorecard (always visible) -->
+    <div class="db-panel">
+      @if (loading) {
+        <div class="db-panel-sk">
+          @for (_ of skeletonRows; track $index; let i = $index) {
+            <div class="db-panel-sk__fdv" [style.animation-delay]="i * 80 + 'ms'">
+              <div class="db-panel-sk__fdv-rank"></div>
+              <div class="db-panel-sk__fdv-name"></div>
+              <div class="db-panel-sk__fdv-bar"></div>
+              <div class="db-panel-sk__fdv-val"></div>
+            </div>
+          }
+        </div>
+      } @else {
+      <div class="db-panel-head">
+        <span class="db-panel-title">{{ fdvPerfTitle }}</span>
+        <span class="db-panel-total">{{ fdvPerfItems.length }} prévendeurs</span>
+      </div>
+      @if (fdvPerfItems.length === 0) {
+        <div class="db-panel-empty">
+          <i class="pi pi-users"></i>
+          <p>Aucune donnée</p>
+        </div>
+      } @else {
+        <div class="db-fdv-perf">
+          @for (item of fdvPerfItems; track item.code; let i = $index) {
+            <div class="db-fdv-row"
+                 [class.db-fdv-row--active]="selectedFdv === item.code"
+                 (click)="selectFdv(item.code)">
+              <span class="db-fdv-rank"
+                    [class.db-fdv-rank--gold]="i === 0"
+                    [class.db-fdv-rank--silver]="i === 1"
+                    [class.db-fdv-rank--bronze]="i === 2">{{ i + 1 }}</span>
+              <span class="db-fdv-name">{{ item.nom }}</span>
+              <div class="db-fdv-bar-track">
+                <div class="db-fdv-bar-fill" [style.width.%]="(item.total / fdvPerfMax) * 100"></div>
+              </div>
+              @if (selectedProduct?.objectif_packs_tournee) {
+                <span class="db-fdv-nums">
+                  {{ formatNum(item.total) }}<span class="db-fdv-nums__obj">/{{ formatNum(selectedProduct!.objectif_packs_tournee) }}</span>
+                </span>
+                <span class="db-fdv-obj-pct"
+                      [class.db-fdv-obj-pct--ok]="fdvObjPct(item, selectedProduct!.objectif_packs_tournee!) >= 100">
+                  {{ fdvObjPct(item, selectedProduct!.objectif_packs_tournee!) }}%
+                </span>
+              } @else {
+                <span class="db-fdv-val">{{ formatNum(item.total) }}</span>
+              }
+            </div>
+          }
+        </div>
+      }
+      } <!-- end @else loading -->
+    </div>
+
+  </div>
+
+</div>
+
+@if (hoveredFdv) {
+  <div class="db-tt"
+       [style.top.px]="tooltipTop"
+       (click)="$event.stopPropagation()">
+
+    <div class="db-tt__header">
+      <span class="db-tt__fdv-name">{{ hoveredFdvName }}</span>
+      <span class="db-tt__total-count">{{ hoveredFdvRates.length }} produits</span>
+      <span class="db-tt__total-pct" [style.color]="rateColor(hoveredFdvTotalPct)">moy. {{ hoveredFdvTotalPct }}%</span>
+    </div>
+
+    <div class="db-tt__grid">
+      @for (r of hoveredFdvRates; track r.nom) {
+        <div class="db-tt__prod" [style.--rc]="rateColor(r.pct)">
+          <div class="db-tt__prod-top">
+            <span class="db-tt__prod-sf">{{ r.sf }}</span>
+            <span class="db-tt__prod-pct">{{ r.pct }}%</span>
+          </div>
+          <div class="db-tt__prod-name" [title]="r.nom">{{ r.nom }}</div>
+          <div class="db-tt__prod-bar-track">
+            <div class="db-tt__prod-bar-fill" [style.width.%]="r.pct"></div>
+          </div>
+          <div class="db-tt__prod-nums">
+            {{ formatNum(r.sold) }}<span class="db-tt__prod-obj"> / {{ formatNum(r.obj) }}</span>
+          </div>
+        </div>
+      }
+    </div>
+
+  </div>
+}
