@@ -2,6 +2,7 @@ import { Component, OnInit, inject, TemplateRef, ViewChild } from '@angular/core
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { Toast } from 'primeng/toast';
 import { sortItems, toggleSort } from '../../core/utils/sort.util';
 
 import { UsersService } from '../../core/services/users.service';
@@ -20,7 +21,7 @@ import { ROLE_LABELS, ROLE_BADGES } from '../../core/constants/roles';
 @Component({
   selector: 'app-utilisateurs',
   standalone: true,
-  imports: [CommonModule, FormsModule, PageLayoutComponent, ConfirmDialogComponent],
+  imports: [CommonModule, FormsModule, Toast, PageLayoutComponent, ConfirmDialogComponent],
   templateUrl: './utilisateurs.component.html',
 })
 export class UtilisateursComponent implements OnInit {
