@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.api.api_v1.endpoints import clients, auth, users, config, ventes, produits, rapports, prevendeur, admin, objectifs, objectifs_in, entrees_in, mappings, rapprochement_sessions
+from app.api.api_v1.endpoints import clients, auth, users, config, ventes, produits, rapports, prevendeur, admin, objectifs, mappings, distributors
 from app.api.deps import get_current_user
 
 api_router = APIRouter()
@@ -8,16 +8,14 @@ api_router = APIRouter()
 api_router.include_router(auth.router,  prefix="/auth",  tags=["Auth"])
 
 # Protected — valid JWT required
-api_router.include_router(users.router,   prefix="/users",   tags=["Users"],   dependencies=[Depends(get_current_user)])
-api_router.include_router(clients.router, prefix="/clients", tags=["Clients"], dependencies=[Depends(get_current_user)])
-api_router.include_router(config.router,  prefix="/config",  tags=["Config"],  dependencies=[Depends(get_current_user)])
-api_router.include_router(ventes.router,   prefix="/ventes",   tags=["Ventes"],   dependencies=[Depends(get_current_user)])
-api_router.include_router(produits.router,  prefix="/produits",  tags=["Produits"],  dependencies=[Depends(get_current_user)])
-api_router.include_router(rapports.router,    prefix="/rapports",    tags=["Rapports"],    dependencies=[Depends(get_current_user)])
-api_router.include_router(prevendeur.router,  prefix="/prevendeur",  tags=["Prevendeur"],  dependencies=[Depends(get_current_user)])
-api_router.include_router(admin.router,       prefix="/admin",       tags=["Admin"])
-api_router.include_router(objectifs.router,    prefix="/objectifs",    tags=["Objectifs"],   dependencies=[Depends(get_current_user)])
-api_router.include_router(objectifs_in.router, prefix="/objectifs-in", tags=["ObjectifsIn"], dependencies=[Depends(get_current_user)])
-api_router.include_router(entrees_in.router,   prefix="/entrees-in",   tags=["EntreesIn"],   dependencies=[Depends(get_current_user)])
-api_router.include_router(mappings.router,     prefix="/mappings",     tags=["Mappings"],    dependencies=[Depends(get_current_user)])
-api_router.include_router(rapprochement_sessions.router, prefix="/rapprochement-sessions", tags=["RapprochementSessions"], dependencies=[Depends(get_current_user)])
+api_router.include_router(users.router,        prefix="/users",        tags=["Users"],        dependencies=[Depends(get_current_user)])
+api_router.include_router(clients.router,      prefix="/clients",      tags=["Clients"],      dependencies=[Depends(get_current_user)])
+api_router.include_router(config.router,       prefix="/config",       tags=["Config"],       dependencies=[Depends(get_current_user)])
+api_router.include_router(ventes.router,       prefix="/ventes",       tags=["Ventes"],       dependencies=[Depends(get_current_user)])
+api_router.include_router(produits.router,     prefix="/produits",     tags=["Produits"],     dependencies=[Depends(get_current_user)])
+api_router.include_router(rapports.router,     prefix="/rapports",     tags=["Rapports"],     dependencies=[Depends(get_current_user)])
+api_router.include_router(prevendeur.router,   prefix="/prevendeur",   tags=["Prevendeur"],   dependencies=[Depends(get_current_user)])
+api_router.include_router(distributors.router, prefix="/distributors", tags=["Distributors"], dependencies=[Depends(get_current_user)])
+api_router.include_router(admin.router,        prefix="/admin",        tags=["Admin"])
+api_router.include_router(objectifs.router,    prefix="/objectifs",    tags=["Objectifs"],    dependencies=[Depends(get_current_user)])
+api_router.include_router(mappings.router,     prefix="/mappings",     tags=["Mappings"],     dependencies=[Depends(get_current_user)])

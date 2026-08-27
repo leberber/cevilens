@@ -23,7 +23,11 @@
             </button>
           } @else {
             <button class="db-dist-name db-dist-name--empty" (click)="toggleDistMenu()" title="Filtrer par distributeur">
-              Tous les distributeurs
+              @if (isPlatformAdmin) {
+                Tous les distributeurs
+              } @else {
+                📍 {{ userDistributorName || 'Chargement...' }}
+              }
             </button>
           }
           @if (distributeurs.length > 0 && showDistMenu) {

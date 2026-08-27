@@ -9,6 +9,8 @@ import {
   FdvItem,
 } from '../../core/services/prevendeur.service';
 import { VentesService } from '../../core/services/ventes.service';
+import { AuthService } from '../../core/services/auth.service';
+import { DistributorService } from '../../core/services/distributor.service';
 import { getFamilyColor, getFamilyBg, CHART_COLORS } from '../../core/constants/colors';
 
 
@@ -22,7 +24,11 @@ import { getFamilyColor, getFamilyBg, CHART_COLORS } from '../../core/constants/
 export class DashboardComponent implements OnInit, OnDestroy {
   private svc = inject(PrevendeurService);
   private ventesService = inject(VentesService);
+  private auth = inject(AuthService);
+  private distributorService = inject(DistributorService);
 
+  isPlatformAdmin = false;
+  userDistributorName = '';
   loading = true;
   data: DrilldownData | null = null;
   selectedPeriode = '';
@@ -76,9 +82,25 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private loadInitial() {
     this.loading = true;
-    this.ventesService.getDistinct('nom_distributeur').subscribe(vals => {
-      this.distributeurs = vals;
-    });
+    const currentUser = this.auth.currentUser();
+    this.isPlatformAdmin = currentUser?.role === 'platform_admin' || currentUser?.role === 'admin';
+
+    // Load distributor name for non-admin users
+    if (!this.isPlatformAdmin && currentUser?.distributor_id) {
+      this.distributorService.getDistributor(currentUser.distributor_id).subscribe({
+        next: (dist) => {
+          this.userDistributorName = `${dist.code} - ${dist.nom}`;
+        },
+        error: () => { this.userDistributorName = ''; },
+      });
+      this.distributeurs = [];
+      this.selectedDistributeur = null;
+    } else {
+      this.ventesService.getDistinct('nom_distributeur').subscribe(vals => {
+        this.distributeurs = vals;
+      });
+    }
+
     const now = new Date();
     const guess = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     this.selectedPeriode = guess;

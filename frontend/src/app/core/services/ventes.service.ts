@@ -57,91 +57,9 @@ export interface VentePage {
   items: VenteRead[];
 }
 
-export interface RapprochementLigne {
-  code_produit: string;
-  libelle: string;
-  bl_qte_unites: number;
-  bl_nb_colis: number | null;
-  bl_prix_unitaire: number;
-  bl_montant_ttc: number;
-  ventes_qte_colis: number | null;
-  colisage: number | null;
-  ventes_qte_unites: number | null;
-  difference_unites: number | null;
-  match: boolean;
-  prix_dd: number | null;
-  prix_promotion: number | null;
-  prix_club: number | null;
-  ventes_qte_facturee: number | null;
-  ventes_uom_vente: string | null;
-  ventes_prix_unitaire: number | null;
-  ventes_total_facture: number | null;
-  mapped_code: string | null;
-  is_duplicate: boolean;
-  ref_price: number | null;
-}
-
 export interface BlMapping {
   bl_code: string;
   code_produit: string;
-}
-
-export interface RapprochementResult {
-  nom_fdv: string;
-  date: string;
-  net_a_payer: number;
-  lignes: RapprochementLigne[];
-}
-
-export interface SessionLigneCreate {
-  code_produit: string;
-  libelle: string;
-  bl_qte_unites: number;
-  bl_nb_colis: number | null;
-  bl_prix_unitaire: number;
-  bl_montant_ttc: number;
-  net_ligne: number;
-  ventes_qte_colis: number | null;
-  match: boolean;
-  is_duplicate: boolean;
-  ref_price: number | null;
-  prix_promotion: number | null;
-  qty_promo: number;
-  qty_gros: number;
-  promo_prix_override: number | null;
-}
-
-export interface SessionCreate {
-  nom_livreur: string;
-  date_bl: string;
-  source: string | null;
-  net_a_payer: number;
-  net_ajuste: number;
-  total_discount: number;
-  montant_recu: number | null;
-  difference: number | null;
-  lignes: SessionLigneCreate[];
-}
-
-export interface SessionRead {
-  id: number;
-  nom_livreur: string;
-  date_bl: string;
-  source: string | null;
-  net_a_payer: number;
-  net_ajuste: number;
-  total_discount: number;
-  montant_recu: number | null;
-  difference: number | null;
-  created_at: string;
-}
-
-export interface SessionLigneRead extends SessionLigneCreate {
-  id: number;
-}
-
-export interface SessionReadDetail extends SessionRead {
-  lignes: SessionLigneRead[];
 }
 
 export interface UploadResponse {
@@ -252,14 +170,6 @@ export class VentesService {
     return this.http.post<UploadResponse>('/api/v1/ventes/upload', form);
   }
 
-  rapprochementBL(file: File, nom_livreur: string, source?: string) {
-    const form = new FormData();
-    form.append('file', file);
-    let p = new HttpParams().set('nom_livreur', nom_livreur);
-    if (source) p = p.set('source', source);
-    return this.http.post<RapprochementResult>('/api/v1/ventes/rapprochement-bl', form, { params: p });
-  }
-
   getMappings() {
     return this.http.get<BlMapping[]>('/api/v1/mappings');
   }
@@ -272,34 +182,4 @@ export class VentesService {
     return this.http.delete(`/api/v1/mappings/${encodeURIComponent(bl_code)}`);
   }
 
-  checkSession(nom_livreur: string, date_bl: string) {
-    return this.http.get<{ exists: boolean; session: SessionRead | null }>(
-      `/api/v1/rapprochement-sessions/check`,
-      { params: { nom_livreur, date_bl } }
-    );
-  }
-
-  saveSession(payload: SessionCreate) {
-    return this.http.post<SessionRead>('/api/v1/rapprochement-sessions', payload);
-  }
-
-  updateSession(id: number, payload: SessionCreate) {
-    return this.http.put<SessionRead>(`/api/v1/rapprochement-sessions/${id}`, payload);
-  }
-
-  patchSessionMontant(id: number, versement: number) {
-    return this.http.patch<SessionRead>(`/api/v1/rapprochement-sessions/${id}/montant`, { versement });
-  }
-
-  listSessions() {
-    return this.http.get<SessionRead[]>('/api/v1/rapprochement-sessions');
-  }
-
-  getSessionDetail(id: number) {
-    return this.http.get<SessionReadDetail>(`/api/v1/rapprochement-sessions/${id}`);
-  }
-
-  deleteSession(id: number) {
-    return this.http.delete(`/api/v1/rapprochement-sessions/${id}`);
-  }
 }

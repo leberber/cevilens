@@ -15,12 +15,22 @@ export class AuthService {
 
   get token(): string | null { return localStorage.getItem(TOKEN_KEY); }
   get isLoggedIn(): boolean  { return !!this.currentUser(); }
+  get isPlatformAdmin(): boolean {
+    const r = this.currentUser()?.role;
+    return r === 'platform_admin' || r === 'admin';
+  }
+  get isAdmin(): boolean {
+    const r = this.currentUser()?.role;
+    return r === 'platform_admin' || r === 'distributor_admin' || r === 'admin';
+  }
   get isAdminOrEmploye(): boolean {
     const r = this.currentUser()?.role;
-    return r === 'admin' || r === 'employe';
+    return r === 'platform_admin' || r === 'distributor_admin' || r === 'superviseur' || r === 'admin';
   }
-  get isAdmin(): boolean    { return this.currentUser()?.role === 'admin'; }
-  get isPrevender(): boolean  { return this.currentUser()?.role === 'prevender'; }
+  get isPrevender(): boolean {
+    const r = this.currentUser()?.role;
+    return r === 'prevendeur' || r === 'prevender';
+  }
 
   login(username: string, password: string) {
     const body = new URLSearchParams({ username, password });
@@ -55,12 +65,13 @@ export class AuthService {
         return null;
       }
       return {
-        id:         +payload.sub,
-        phone:      payload.phone,
-        full_name:  payload.full_name,
-        role:       payload.role as UserRole,
-        is_active:  true,
-        created_at: '',
+        id:             +payload.sub,
+        phone:          payload.phone,
+        full_name:      payload.full_name,
+        role:           payload.role as UserRole,
+        distributor_id: payload.distributor_id,
+        is_active:      true,
+        created_at:     '',
       };
     } catch {
       localStorage.removeItem(TOKEN_KEY);

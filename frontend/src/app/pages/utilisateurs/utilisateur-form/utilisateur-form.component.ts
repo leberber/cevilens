@@ -12,6 +12,7 @@ import { MessageService } from 'primeng/api';
 import { UsersService } from '../../../core/services/users.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { VentesService } from '../../../core/services/ventes.service';
+import { DistributorService } from '../../../core/services/distributor.service';
 import { User, UserCreate, UserUpdate, UserRole } from '../../../core/models/user.model';
 
 @Component({
@@ -22,29 +23,31 @@ import { User, UserCreate, UserUpdate, UserRole } from '../../../core/models/use
   templateUrl: './utilisateur-form.component.html',
 })
 export class UtilisateurFormComponent implements OnInit {
-  private usersService   = inject(UsersService);
-  private ventesService  = inject(VentesService);
-  private messageService = inject(MessageService);
-  private fb             = inject(FormBuilder);
-  private router         = inject(Router);
-  private route          = inject(ActivatedRoute);
-  auth                   = inject(AuthService);
+  private usersService      = inject(UsersService);
+  private ventesService     = inject(VentesService);
+  private distributorService = inject(DistributorService);
+  private messageService    = inject(MessageService);
+  private fb                = inject(FormBuilder);
+  private router            = inject(Router);
+  private route             = inject(ActivatedRoute);
+  auth                      = inject(AuthService);
 
   editingId: number | null = null;
   saving = false;
-  distributeurs: string[] = [];
+  distributors: any[] = [];
 
   get distributeurOptions() {
     return [
       { label: '— Aucune restriction —', value: null },
-      ...this.distributeurs.map(d => ({ label: d, value: d })),
+      ...this.distributors.map(d => ({ label: `${d.code} - ${d.nom}`, value: d.id })),
     ];
   }
 
   private readonly allRoleOptions = [
-    { label: 'Admin',     value: 'admin',     adminOnly: true  },
-    { label: 'Employé',   value: 'employe',   adminOnly: true  },
-    { label: 'Prévendeur', value: 'prevender', adminOnly: false },
+    { label: '🔑 Platform Admin',      value: 'platform_admin',     adminOnly: true  },
+    { label: '📦 Distributor Admin',   value: 'distributor_admin',  adminOnly: true  },
+    { label: '👮 Superviseur',         value: 'superviseur',        adminOnly: true  },
+    { label: '🚚 Prévendeur',          value: 'prevendeur',         adminOnly: false },
   ];
 
   get roleOptions() {
@@ -54,24 +57,27 @@ export class UtilisateurFormComponent implements OnInit {
   }
 
   readonly roleBadgeMap: Record<string, string> = {
-    admin:     'badge badge--danger',
-    employe:   'badge badge--warning',
-    prevender: 'badge badge--info',
+    platform_admin:    'badge badge--danger',
+    distributor_admin: 'badge badge--warning',
+    superviseur:       'badge badge--secondary',
+    prevendeur:        'badge badge--info',
   };
 
   private readonly roleIcons: Record<string, string> = {
-    admin:     'pi-shield',
-    employe:   'pi-briefcase',
-    prevender: 'pi-send',
+    platform_admin:    'pi-shield-alt',
+    distributor_admin: 'pi-building',
+    superviseur:       'pi-users',
+    prevendeur:        'pi-send',
   };
 
   private readonly roleLabels: Record<string, string> = {
-    admin:     'Admin',
-    employe:   'Employé',
-    prevender: 'Prévendeur',
+    platform_admin:    'Platform Admin',
+    distributor_admin: 'Distributor Admin',
+    superviseur:       'Superviseur',
+    prevendeur:        'Prévendeur',
   };
 
-  get currentRole(): string { return this.form.get('role')?.value ?? 'employe'; }
+  get currentRole(): string { return this.form.get('role')?.value ?? 'superviseur'; }
   get roleIcon(): string    { return this.roleIcons[this.currentRole]  ?? 'pi-user'; }
   get roleBadgeClass(): string { return this.roleBadgeMap[this.currentRole] ?? 'badge'; }
   get roleDisplayLabel(): string { return this.roleLabels[this.currentRole] ?? ''; }
@@ -80,15 +86,22 @@ export class UtilisateurFormComponent implements OnInit {
     phone:            ['', Validators.required],
     full_name:        ['', Validators.required],
     password:         [''],
-    role:             ['employe' as UserRole, Validators.required],
+    role:             ['superviseur' as UserRole, Validators.required],
     is_active:        [true],
     employe_code:     [null as string | null],
-    nom_distributeur: [null as string | null],
+    distributor_id:   [null as number | null],
   });
 
   ngOnInit() {
-    this.ventesService.getDistinct('nom_distributeur').subscribe(vals => {
-      this.distributeurs = vals;
+    this.distributorService.listDistributors().subscribe({
+      next: (dists) => {
+        console.log('Distributors loaded:', dists);
+        this.distributors = dists;
+      },
+      error: (err) => {
+        console.error('Failed to load distributors:', err);
+        this.messageService.add({ severity: 'warn', summary: 'Avertissement', detail: 'Impossible de charger les distributeurs', life: 3000 });
+      },
     });
 
     const idParam = this.route.snapshot.paramMap.get('id');
@@ -104,7 +117,7 @@ export class UtilisateurFormComponent implements OnInit {
           is_active: u.is_active,
           password: '',
           employe_code: u.employe_code ?? null,
-          nom_distributeur: u.nom_distributeur ?? null,
+          distributor_id: u.distributor_id ?? null,
         });
       } else {
         this.router.navigate(['/utilisateurs']);
@@ -124,7 +137,7 @@ export class UtilisateurFormComponent implements OnInit {
         this.form.patchValue({
           full_name:    prefill.full_name    ?? '',
           employe_code: prefill.employe_code ?? null,
-          role:         prefill.role         ?? 'employe',
+          role:         prefill.role         ?? 'superviseur',
         });
       }
     }
@@ -142,7 +155,7 @@ export class UtilisateurFormComponent implements OnInit {
         role: v.role as UserRole,
         is_active: v.is_active!,
         employe_code: v.employe_code || null,
-        nom_distributeur: v.nom_distributeur || null,
+        distributor_id: v.distributor_id || null,
       };
       if (v.password) body.password = v.password;
       this.usersService.update(this.editingId, body).subscribe({
@@ -156,7 +169,7 @@ export class UtilisateurFormComponent implements OnInit {
         password: v.password!,
         role: v.role as UserRole,
         employe_code: v.employe_code || null,
-        nom_distributeur: v.nom_distributeur || null,
+        distributor_id: v.distributor_id || null,
       };
       this.usersService.create(body).subscribe({
         next: () => this.done('Utilisateur créé'),

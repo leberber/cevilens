@@ -42,6 +42,7 @@ class Vente(SQLModel, table=True):
     nom_sup: Optional[str] = Field(default=None, max_length=100)
 
     # Distribution
+    distributor_id: Optional[int] = Field(default=None, foreign_key="distributeurs.id", index=True)
     buid: Optional[str] = Field(default=None, max_length=30)
     code_distributeur: Optional[str] = Field(default=None, max_length=30)
     nom_distributeur: Optional[str] = Field(default=None, max_length=100)
@@ -103,6 +104,7 @@ class VenteRead(SQLModel):
     code_fdv: Optional[str] = None
     nom_fdv: Optional[str] = None
     canal: Optional[str] = None
+    distributor_id: Optional[int] = None
     code_distributeur: Optional[str] = None
     nom_distributeur: Optional[str] = None
     buid: Optional[str] = None

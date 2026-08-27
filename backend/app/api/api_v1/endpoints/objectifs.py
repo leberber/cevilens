@@ -6,11 +6,11 @@ from fastapi import APIRouter, Body, Depends, File, Query, UploadFile
 from sqlalchemy import func, distinct
 from sqlmodel import Session, select
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_distributor
 from app.database import get_session
 from app.models.objectif import Objectif
 from app.models.produit import Produit
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.vente import Vente
 
 router = APIRouter()
@@ -20,14 +20,14 @@ router = APIRouter()
 def next_missing_month(
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
+    current_distributor = Depends(get_current_distributor),
 ) -> Any:
     # Single query: get the latest (annee, mois) in one pass
-    row = session.exec(
-        select(Objectif.annee, Objectif.mois)
-        .where(Objectif.mois.isnot(None), Objectif.annee.isnot(None))
-        .order_by(Objectif.annee.desc(), Objectif.mois.desc())
-        .limit(1)
-    ).first()
+    q = select(Objectif.annee, Objectif.mois).where(Objectif.mois.isnot(None), Objectif.annee.isnot(None))
+    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        q = q.where(Objectif.distributor_id == current_distributor.id)
+    q = q.order_by(Objectif.annee.desc(), Objectif.mois.desc()).limit(1)
+    row = session.exec(q).first()
     if not row:
         today = date.today()
         return {"mois": today.month, "annee": today.year}
@@ -43,19 +43,19 @@ def routes_count(
     annee: int = Query(..., ge=2020),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
+    current_distributor = Depends(get_current_distributor),
 ) -> Any:
     annee_mois = f"{annee}-{mois:02d}"
 
     def _count_by_canal(am: str) -> dict:
-        rows = session.exec(
-            select(Vente.canal, func.count(distinct(Vente.code_fdv)))
-            .where(
-                Vente.annee_mois == am,
-                Vente.canal.in_(["VD", "VH"]),
-                Vente.code_fdv.isnot(None),
-            )
-            .group_by(Vente.canal)
-        ).all()
+        q = select(Vente.canal, func.count(distinct(Vente.code_fdv))).where(
+            Vente.annee_mois == am,
+            Vente.canal.in_(["VD", "VH"]),
+            Vente.code_fdv.isnot(None),
+        )
+        if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+            q = q.where(Vente.distributor_id == current_distributor.id)
+        rows = session.exec(q.group_by(Vente.canal)).all()
         return {canal: int(cnt) for canal, cnt in rows}
 
     counts = _count_by_canal(annee_mois)
@@ -64,12 +64,10 @@ def routes_count(
 
     fallback_mois = None
     if vd == 0 and vh == 0:
-        latest = session.exec(
-            select(Vente.annee_mois)
-            .where(Vente.canal.isnot(None), Vente.code_fdv.isnot(None))
-            .order_by(Vente.annee_mois.desc())
-            .limit(1)
-        ).first()
+        q_latest = select(Vente.annee_mois).where(Vente.canal.isnot(None), Vente.code_fdv.isnot(None))
+        if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+            q_latest = q_latest.where(Vente.distributor_id == current_distributor.id)
+        latest = session.exec(q_latest.order_by(Vente.annee_mois.desc()).limit(1)).first()
         if latest and latest != annee_mois:
             fallback_mois = latest
             fb = _count_by_canal(latest)
@@ -86,6 +84,7 @@ def batch_upsert(
     body: list = Body(...),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
+    current_distributor = Depends(get_current_distributor),
 ) -> Any:
     now = datetime.now(timezone.utc)
 
@@ -98,9 +97,10 @@ def batch_upsert(
               for p in session.exec(select(Produit).where(Produit.code_dd.isnot(None))).all()}
 
     # Load all existing objectifs for this period in one query
-    existing = session.exec(
-        select(Objectif).where(Objectif.mois == mois, Objectif.annee == annee)
-    ).all()
+    q = select(Objectif).where(Objectif.mois == mois, Objectif.annee == annee)
+    if current_distributor:
+        q = q.where(Objectif.distributor_id == current_distributor.id)
+    existing = session.exec(q).all()
     obj_map = {o.code_produit: o for o in existing}
 
     for item in body:
@@ -128,6 +128,7 @@ def batch_upsert(
         elif any(v is not None for v in (tonne_vd, packs_vd, packs_vd_t, tonne_vh, packs_vh, packs_vh_t)):
             session.add(Objectif(
                 code_produit=code, mois=mois, annee=annee,
+                distributor_id=current_distributor.id if current_distributor else None,
                 objectif_tonne_vd=tonne_vd,
                 objectif_packs_vd=packs_vd,
                 objectif_packs_vd_tournee=packs_vd_t,
@@ -151,6 +152,7 @@ def list_objectifs(
     code_distributeur: Optional[str] = Query(None),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
+    current_distributor = Depends(get_current_distributor),
 ) -> Any:
     # Single join: produits LEFT/INNER joined with objectifs for this period
     base = (
@@ -162,6 +164,8 @@ def list_objectifs(
         (Objectif.mois == mois) &
         (Objectif.annee == annee)
     )
+    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        join_condition = join_condition & (Objectif.distributor_id == current_distributor.id)
     if code_distributeur:
         join_condition = join_condition & (Objectif.code_distributeur == code_distributeur)
 

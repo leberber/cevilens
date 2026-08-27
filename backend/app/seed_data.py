@@ -14,12 +14,13 @@ def seed_admin(session: Session) -> None:
         phone=settings.ADMIN_PHONE,
         full_name=settings.ADMIN_FULL_NAME,
         hashed_password=hash_password(settings.ADMIN_PASSWORD),
-        role=UserRole.ADMIN,
+        role=UserRole.PLATFORM_ADMIN,
         is_active=True,
+        distributor_id=None,
     )
     session.add(admin)
     session.commit()
-    print(f"[seed] Admin créé : {settings.ADMIN_PHONE} / {settings.ADMIN_PASSWORD}")
+    print(f"[seed] Platform Admin créé : {settings.ADMIN_PHONE} / {settings.ADMIN_PASSWORD}")
 
 
 def run_all(session: Session) -> None:

@@ -73,8 +73,8 @@
                 <td>
                   <code class="font-mono text-muted">{{ formatPhone(u.phone) }}</code>
                 </td>
-                <td><span [class]="roleBadge[u.role]">{{ roleLabel[u.role] }}</span></td>
-                <td><span class="text-muted">{{ u.nom_distributeur ?? '—' }}</span></td>
+                <td><span [class]="roleBadge[u.role]" [ngClass]="{'text-muted': u.role === 'prevendeur' || u.role === 'prevender'}" [style.font-size.%]="(u.role === 'prevendeur' || u.role === 'prevender') ? 90 : 100">{{ roleLabel[u.role] }}</span></td>
+                <td><span class="text-muted">{{ getDistributorName(u.distributor_id) }}</span></td>
                 <td>
                   @if (u.is_active) {
                     <span class="badge badge--success">Actif</span>

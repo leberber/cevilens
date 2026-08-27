@@ -6,7 +6,6 @@ import { AuthService } from '../../core/services/auth.service';
 interface UploadResult { success: boolean; message: string; }
 interface OverlapInfo { overlap_min: string; overlap_max: string; overlap_count: number; }
 interface FileInfo { total_rows: number; date_min: string; date_max: string; }
-interface MissingFdv { code: string; nom: string; }
 
 @Component({
   selector: 'app-upload',
@@ -26,7 +25,6 @@ export class UploadComponent {
   result          = signal<UploadResult | null>(null);
   overlap         = signal<OverlapInfo | null>(null);
   fileInfo        = signal<FileInfo | null>(null);
-  missingFdvs     = signal<MissingFdv[]>([]);
   private pendingFile: File | null = null;
 
   onDragOver(e: DragEvent)  { e.preventDefault(); this.dragOver.set(true); }
@@ -51,7 +49,6 @@ export class UploadComponent {
     this.result.set(null);
     this.overlap.set(null);
     this.fileInfo.set(null);
-    this.missingFdvs.set([]);
     this.progress.set(0);
     this.progressMessage.set('');
     this.streamUpload(file, mode);
@@ -111,22 +108,10 @@ export class UploadComponent {
     if (data.done) {
       this.loading.set(false);
       this.result.set({ success: true, message: data.message });
-      if (data.missing_fdvs?.length) {
-        this.missingFdvs.set(data.missing_fdvs);
-      }
     }
   }
 
   skip()    { if (this.pendingFile) this.startUpload(this.pendingFile, 'skip'); }
   replace() { if (this.pendingFile) this.startUpload(this.pendingFile, 'replace'); }
   cancel()  { this.overlap.set(null); this.pendingFile = null; }
-
-  createUser(fdv: MissingFdv) {
-    sessionStorage.setItem('utilisateur_prefill', JSON.stringify({
-      full_name: fdv.nom,
-      employe_code: fdv.code,
-      role: 'prevender'
-    }));
-    window.open('/utilisateurs/nouveau', '_blank');
-  }
 }

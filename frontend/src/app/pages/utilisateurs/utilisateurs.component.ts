@@ -9,6 +9,7 @@ import { sortItems, toggleSort } from '../../core/utils/sort.util';
 
 import { UsersService } from '../../core/services/users.service';
 import { AuthService } from '../../core/services/auth.service';
+import { DistributorService } from '../../core/services/distributor.service';
 import { User } from '../../core/models/user.model';
 
 @Component({
@@ -20,12 +21,15 @@ import { User } from '../../core/models/user.model';
 })
 export class UtilisateursComponent implements OnInit {
   private usersService        = inject(UsersService);
+  private distributorService  = inject(DistributorService);
   private messageService      = inject(MessageService);
   private confirmationService = inject(ConfirmationService);
   private router              = inject(Router);
   auth                        = inject(AuthService);
 
   users: User[] = [];
+  distributors: any[] = [];
+  distributorMap: Map<number, string> = new Map();
   loading = false;
   searchQuery = '';
   sortCol = 'full_name';
@@ -34,11 +38,21 @@ export class UtilisateursComponent implements OnInit {
   editingPhoneId: number | null = null;
   editingPhoneValue = '';
 
-  readonly roleLabel: Record<string, string> = { admin: 'Admin', employe: 'Employé', prevender: 'Prévendeur' };
+  readonly roleLabel: Record<string, string> = {
+    platform_admin: '🔑 Platform Admin',
+    distributor_admin: '📦 Distributor Admin',
+    superviseur: '👮 Superviseur',
+    prevendeur: '🚚 Prévendeur',
+    admin: 'Admin',
+    prevender: 'Prévendeur',
+  };
   readonly roleBadge: Record<string, string> = {
-    admin:     'badge badge--danger',
-    employe:   'badge badge--warning',
-    prevender: 'badge badge--info',
+    platform_admin:    'badge badge--danger',
+    distributor_admin: 'badge badge--warning',
+    superviseur:       'badge badge--info',
+    prevendeur:        '',
+    admin:             'badge badge--danger',
+    prevender:         '',
   };
 
   get sorted(): User[] {
@@ -52,7 +66,16 @@ export class UtilisateursComponent implements OnInit {
     this.sortCol = s.col; this.sortDir = s.dir;
   }
 
-  ngOnInit() { this.load(); }
+  ngOnInit() {
+    this.distributorService.listDistributors().subscribe({
+      next: (dists) => {
+        this.distributors = dists;
+        this.distributorMap = new Map(dists.map(d => [d.id, `${d.code} - ${d.nom}`]));
+      },
+      error: () => console.error('Failed to load distributors'),
+    });
+    this.load();
+  }
 
   load() {
     this.loading = true;
@@ -113,6 +136,11 @@ export class UtilisateursComponent implements OnInit {
   }
 
   isSelf(u: User): boolean { return u.id === this.auth.currentUser()?.id; }
+
+  getDistributorName(distributorId: number | null | undefined): string {
+    if (!distributorId) return '—';
+    return this.distributorMap.get(distributorId) ?? '—';
+  }
 
   private toast(severity: string, detail: string) {
     this.messageService.add({ severity, summary: severity === 'error' ? 'Erreur' : 'Succès', detail, life: 4000 });

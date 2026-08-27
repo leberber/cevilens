@@ -6,9 +6,10 @@ from datetime import datetime, timezone
 
 class Objectif(SQLModel, table=True):
     __tablename__ = "objectifs"
-    __table_args__ = (UniqueConstraint("code_produit", "mois", "annee"),)
+    __table_args__ = (UniqueConstraint("code_produit", "mois", "annee", "distributor_id"),)
 
     id: Optional[int] = Field(default=None, primary_key=True)
+    distributor_id: Optional[int] = Field(default=None, foreign_key="distributeurs.id", index=True)
     code_produit: str = Field(max_length=30, index=True)
     mois: int   # 1–12
     annee: int  # 2025 …

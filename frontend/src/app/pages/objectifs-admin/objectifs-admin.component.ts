@@ -2,7 +2,6 @@ import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Select } from 'primeng/select';
-import { PrevendeurService } from '../../core/services/prevendeur.service';
 import { VentesService } from '../../core/services/ventes.service';
 import { ObjectifsBaseComponent, BaseRow, FamGroupe } from '../../core/base/objectifs-base';
 import { PeriodStepperComponent } from '../../shared/period-stepper/period-stepper.component';
@@ -28,7 +27,6 @@ interface ObjectifRow extends BaseRow {
   styleUrl: './objectifs-admin.component.scss',
 })
 export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow> {
-  private prevSvc = inject(PrevendeurService);
   private ventesService = inject(VentesService);
 
   canal: 'VD' | 'VH' = 'VD';
@@ -125,7 +123,6 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
       next: () => {
         this.isSaving = false;
         this.editMode = false;
-        this.prevSvc.clearDrilldownCache();
         this.load();
         this.loadNextMissing();
       },

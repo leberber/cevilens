@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { LayoutComponent } from './layout/layout.component';
-import { authGuard, adminOrEmployeGuard, adminGuard, rootGuard, prevenderOnlyGuard, notPrevenderGuard } from './core/guards/auth.guard';
+import { authGuard, adminOrEmployeGuard, adminGuard, rootGuard, prevenderOnlyGuard, notPrevenderGuard, platformAdminGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
   { path: 'login', loadComponent: () => import('./pages/login/login.component').then(m => m.LoginComponent) },
@@ -10,8 +10,10 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: '', canActivate: [rootGuard], children: [] },
-      { path: 'dashboard',  canActivate: [notPrevenderGuard], loadComponent: () => import('./pages/dashboard/dashboard.component').then(m => m.DashboardComponent) },
-      { path: 'analytics',  canActivate: [notPrevenderGuard], loadComponent: () => import('./pages/analytics/analytics.component').then(m => m.AnalyticsComponent) },
+      { path: 'dashboard',         canActivate: [notPrevenderGuard], loadComponent: () => import('./pages/dashboard/dashboard.component').then(m => m.DashboardComponent) },
+      { path: 'analytics',         canActivate: [notPrevenderGuard], loadComponent: () => import('./pages/analytics/analytics.component').then(m => m.AnalyticsComponent) },
+      { path: 'admin',             canActivate: [platformAdminGuard], loadComponent: () => import('./pages/admin-dashboard/admin-dashboard.component').then(m => m.AdminDashboardComponent) },
+      { path: 'distributors',      canActivate: [platformAdminGuard], loadComponent: () => import('./pages/distributors/distributors.component').then(m => m.DistributorsComponent) },
 
       { path: 'ventes',   canActivate: [adminOrEmployeGuard], loadComponent: () => import('./pages/ventes/ventes.component').then(m => m.VentesComponent) },
       { path: 'produits',              canActivate: [adminOrEmployeGuard], loadComponent: () => import('./pages/produits/produits.component').then(m => m.ProduitsComponent) },

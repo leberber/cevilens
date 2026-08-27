@@ -20,6 +20,12 @@ export const adminGuard: CanActivateFn = () => {
   return auth.isAdmin ? true : router.createUrlTree(['/dashboard']);
 };
 
+export const platformAdminGuard: CanActivateFn = () => {
+  const auth   = inject(AuthService);
+  const router = inject(Router);
+  return auth.isPlatformAdmin ? true : router.createUrlTree(['/dashboard']);
+};
+
 // Redirects prevenders away to their own page
 export const notPrevenderGuard: CanActivateFn = () => {
   const auth   = inject(AuthService);

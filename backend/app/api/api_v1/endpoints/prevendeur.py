@@ -12,7 +12,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func, case as sa_case, text
 from sqlmodel import Session, select
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_current_distributor
 from app.database import get_session
 from app.models.client import Client
 from app.models.user import User, UserRole
@@ -231,14 +231,13 @@ def prevendeur_facturation(
 @router.get("/admin/stats")
 def prevendeur_admin_stats(
     current_user: User = Depends(get_current_user),
+    current_distributor = Depends(get_current_distributor),
     session: Session = Depends(get_session),
 ) -> Any:
-    prevendeurs = session.exec(
-        select(User)
-        .where(User.role == UserRole.PREVENDER)
-        .where(User.is_active == True)
-        .order_by(User.full_name)
-    ).all()
+    q = select(User).where(User.role == UserRole.PREVENDEUR).where(User.is_active == True)
+    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        q = q.where(User.distributor_id == current_distributor.id)
+    prevendeurs = session.exec(q.order_by(User.full_name)).all()
 
     fdv_codes = [pv.employe_code for pv in prevendeurs if pv.employe_code]
     if not fdv_codes:
@@ -340,14 +339,13 @@ def prevendeur_admin_stats(
 @router.get("/admin/stats/export")
 def export_clients_excel(
     current_user: User = Depends(get_current_user),
+    current_distributor = Depends(get_current_distributor),
     session: Session = Depends(get_session),
 ):
-    prevendeurs = session.exec(
-        select(User)
-        .where(User.role == UserRole.PREVENDER)
-        .where(User.is_active == True)
-        .order_by(User.full_name)
-    ).all()
+    q = select(User).where(User.role == UserRole.PREVENDEUR).where(User.is_active == True)
+    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        q = q.where(User.distributor_id == current_distributor.id)
+    prevendeurs = session.exec(q.order_by(User.full_name)).all()
 
     fdv_codes = [pv.employe_code for pv in prevendeurs if pv.employe_code]
     if not fdv_codes:
@@ -450,20 +448,20 @@ def prevendeur_admin_drilldown(
     canal: Optional[str] = Query(None),   # "VD" or "VH"
     nom_distributeur: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
+    current_distributor = Depends(get_current_distributor),
     session: Session = Depends(get_session),
 ) -> Any:
-    all_periods = session.exec(
-        select(Vente.annee_mois).distinct().order_by(Vente.annee_mois.desc())
-    ).all()
+    q_periods = select(Vente.annee_mois).distinct().order_by(Vente.annee_mois.desc())
+    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        q_periods = q_periods.where(Vente.distributor_id == current_distributor.id)
+    all_periods = session.exec(q_periods).all()
     all_periods_list = list(all_periods)
 
     # Prevendeurs list with their totals for the current period (always unfiltered)
-    prevendeurs_db = session.exec(
-        select(User)
-        .where(User.role == UserRole.PREVENDER)
-        .where(User.is_active == True)
-        .order_by(User.full_name)
-    ).all()
+    q_pv = select(User).where(User.role == UserRole.PREVENDEUR).where(User.is_active == True)
+    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        q_pv = q_pv.where(User.distributor_id == current_distributor.id)
+    prevendeurs_db = session.exec(q_pv.order_by(User.full_name)).all()
     fdv_name_map = {p.employe_code: p.full_name for p in prevendeurs_db if p.employe_code}
 
     # Normalize qte_livree: UN rows → divide by colisage; pack rows (CARTON, FARDEAU, …) → keep as-is
@@ -483,6 +481,8 @@ def prevendeur_admin_drilldown(
         .where(Vente.code_fdv.isnot(None))
         .group_by(Vente.code_fdv)
     )
+    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        fdv_totals_q = fdv_totals_q.where(Vente.distributor_id == current_distributor.id)
     if canal:
         fdv_totals_q = fdv_totals_q.where(Vente.canal == canal)
     if nom_distributeur:
@@ -513,6 +513,8 @@ def prevendeur_admin_drilldown(
         ).outerjoin(Produit, Vente.code_produit == Produit.code_produit).where(
             Vente.annee_mois == periode, Vente.statut_commande == 'Facturé'
         )
+        if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+            q = q.where(Vente.distributor_id == current_distributor.id)
         if code_fdv:
             q = q.where(Vente.code_fdv == code_fdv)
         if canal:
@@ -532,6 +534,8 @@ def prevendeur_admin_drilldown(
             .where(Vente.annee_mois.in_(trend_periods))
             .where(Vente.statut_commande == 'Facturé')
         )
+        if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+            q6 = q6.where(Vente.distributor_id == current_distributor.id)
         if code_fdv:
             q6 = q6.where(Vente.code_fdv == code_fdv)
         if canal:
@@ -660,6 +664,8 @@ def prevendeur_admin_drilldown(
         .outerjoin(Produit, Vente.code_produit == Produit.code_produit)
         .where(Vente.annee_mois == annee_mois, Vente.statut_commande == 'Facturé', Vente.code_fdv.isnot(None), Vente.code_produit.isnot(None))
     )
+    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        _fdv_prod_q = _fdv_prod_q.where(Vente.distributor_id == current_distributor.id)
     if canal:
         _fdv_prod_q = _fdv_prod_q.where(Vente.canal == canal)
     _fdv_prod_q = _fdv_prod_q.group_by(Vente.code_fdv, Vente.code_produit)
@@ -702,6 +708,8 @@ def prevendeur_admin_drilldown(
         .where(Vente.prix_unitaire.isnot(None))
         .group_by(Vente.famille)
     )
+    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        _ca_q = _ca_q.where(Vente.distributor_id == current_distributor.id)
     if code_fdv:
         _ca_q = _ca_q.where(Vente.code_fdv == code_fdv)
     if canal:
@@ -715,6 +723,8 @@ def prevendeur_admin_drilldown(
             .where(Vente.prix_unitaire.isnot(None))
             .group_by(Vente.famille)
         )
+        if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+            _ca_prev_q = _ca_prev_q.where(Vente.distributor_id == current_distributor.id)
         if code_fdv:
             _ca_prev_q = _ca_prev_q.where(Vente.code_fdv == code_fdv)
         if canal:
@@ -839,11 +849,13 @@ def prevendeur_admin_analytics(
     commune: Optional[str] = Query(None),
     unite: str = Query('tonnes'),
     current_user: User = Depends(get_current_user),
+    current_distributor = Depends(get_current_distributor),
     session: Session = Depends(get_session),
 ) -> Any:
-    all_periods = session.exec(
-        select(Vente.annee_mois).distinct().order_by(Vente.annee_mois.desc())
-    ).all()
+    q_periods = select(Vente.annee_mois).distinct().order_by(Vente.annee_mois.desc())
+    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        q_periods = q_periods.where(Vente.distributor_id == current_distributor.id)
+    all_periods = session.exec(q_periods).all()
     all_periods_list = list(all_periods)
 
     if unite == 'tonnes':
@@ -863,6 +875,8 @@ def prevendeur_admin_analytics(
     def apply_filters(q, include_famille=True, include_commune=True):
         q = q.outerjoin(Produit, Vente.code_produit == Produit.code_produit)
         q = q.where(Vente.annee_mois == annee_mois, Vente.statut_commande == 'Facturé')
+        if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+            q = q.where(Vente.distributor_id == current_distributor.id)
         if include_famille and famille:
             q = q.where(Vente.famille.ilike(famille))
         if fdv:
@@ -895,7 +909,7 @@ def prevendeur_admin_analytics(
     fdv_name_map = {
         p.employe_code: p.full_name
         for p in session.exec(
-            select(User).where(User.role == UserRole.PREVENDER, User.is_active == True)
+            select(User).where(User.role == UserRole.PREVENDEUR, User.is_active == True)
         ).all()
         if p.employe_code
     }
@@ -920,6 +934,8 @@ def prevendeur_admin_analytics(
         def trend_q(q):
             q = q.outerjoin(Produit, Vente.code_produit == Produit.code_produit)
             q = q.where(Vente.annee_mois.in_(trend_periods), Vente.statut_commande == 'Facturé')
+            if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+                q = q.where(Vente.distributor_id == current_distributor.id)
             if famille:
                 q = q.where(Vente.famille.ilike(famille))
             if fdv:
@@ -986,6 +1002,9 @@ def prevendeur_admin_analytics(
         "v.statut_commande = 'Facturé'",
         "v.commune IS NOT NULL",
     ]
+    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        loc_conditions.append("v.distributor_id = :loc_distributor_id")
+        loc_params["loc_distributor_id"] = current_distributor.id
     if famille:
         loc_conditions.append("LOWER(v.famille) = LOWER(:loc_famille)")
         loc_params["loc_famille"] = famille

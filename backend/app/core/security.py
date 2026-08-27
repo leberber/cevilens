@@ -24,6 +24,7 @@ def create_access_token(user) -> str:
         "phone":     user.phone,
         "full_name": user.full_name,
         "role":      user.role.value,
+        "distributor_id": user.distributor_id,
         "exp":       expire,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
