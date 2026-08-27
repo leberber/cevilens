@@ -11,6 +11,7 @@ import { PeriodStepperComponent } from '../../shared/period-stepper/period-stepp
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ImportDialogComponent } from '../../shared/components/import-dialog/import-dialog.component';
 import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
+import { FileUploadHelper } from '../../core/services/file-upload.helper';
 
 interface ObjectifRow extends BaseRow {
   objectif_tonne_vd:          number | null;
@@ -37,6 +38,7 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
   private canalHelper = inject(CanalHelper);
   private sortHelper = inject(SortHelper);
   private aggregateHelper = inject(AggregateHelper);
+  private fileUploadHelper = inject(FileUploadHelper);
 
   canal: 'VD' | 'VH' = 'VD';
   importCanal: 'VD' | 'VH' = 'VD';
@@ -146,8 +148,7 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
   confirmImport(): void {
     if (!this.importFile) return;
     this.isImporting = true;
-    const fd = new FormData();
-    fd.append('file', this.importFile);
+    const fd = this.fileUploadHelper.createFormData(this.importFile);
 
     type ImportRow = { code_produit: string | null; nom_produit?: string; tonne: number | null; packs: number | null; packs_tournee: number | null };
 
