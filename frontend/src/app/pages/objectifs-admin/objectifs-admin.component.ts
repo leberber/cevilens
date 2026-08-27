@@ -9,7 +9,6 @@ import { AggregateHelper } from '../../core/services/aggregate.helper';
 import { ObjectifsBaseComponent, BaseRow, FamGroupe } from '../../core/base/objectifs-base';
 import { PeriodStepperComponent } from '../../shared/period-stepper/period-stepper.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
-import { ImportDialogComponent } from '../../shared/components/import-dialog/import-dialog.component';
 import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
 import { FileUploadHelper } from '../../core/services/file-upload.helper';
 
@@ -29,7 +28,7 @@ interface ObjectifRow extends BaseRow {
 @Component({
   selector: 'app-objectifs-admin',
   standalone: true,
-  imports: [CommonModule, FormsModule, Select, PeriodStepperComponent, ConfirmDialogComponent, ImportDialogComponent, PageLayoutComponent],
+  imports: [CommonModule, FormsModule, Select, PeriodStepperComponent, ConfirmDialogComponent, PageLayoutComponent],
   templateUrl: './objectifs-admin.component.html',
   styleUrl: './objectifs-admin.component.scss',
 })
