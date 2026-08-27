@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { of, tap } from 'rxjs';
+import { HttpParamsBuilder } from './http-params.builder';
 
 export interface PrevClient {
   nom_client: string;
@@ -126,6 +127,7 @@ export interface PrevAdminStat {
 @Injectable({ providedIn: 'root' })
 export class PrevendeurService {
   private http = inject(HttpClient);
+  private paramsBuilder = inject(HttpParamsBuilder);
   private drilldownCache = new Map<string, DrilldownData>();
 
   getPeriodes() {
@@ -133,7 +135,7 @@ export class PrevendeurService {
   }
 
   getFacturation(annee_mois: string) {
-    const p = new HttpParams().set('annee_mois', annee_mois);
+    const p = this.paramsBuilder.build({ annee_mois });
     return this.http.get<PrevFacturation>('/api/v1/prevendeur/facturation', { params: p });
   }
 
@@ -142,7 +144,7 @@ export class PrevendeurService {
   }
 
   getObjectifs(annee_mois: string) {
-    const p = new HttpParams().set('annee_mois', annee_mois);
+    const p = this.paramsBuilder.build({ annee_mois });
     return this.http.get<PrevObjectifItem[]>('/api/v1/prevendeur/objectifs', { params: p });
   }
 
@@ -159,10 +161,7 @@ export class PrevendeurService {
     const cached = this.drilldownCache.get(key);
     if (cached) return of(cached);
 
-    let p = new HttpParams().set('annee_mois', annee_mois);
-    if (code_fdv) p = p.set('code_fdv', code_fdv);
-    if (canal) p = p.set('canal', canal);
-    if (nom_distributeur) p = p.set('nom_distributeur', nom_distributeur);
+    const p = this.paramsBuilder.build({ annee_mois, code_fdv, canal, nom_distributeur });
     return this.http.get<DrilldownData>('/api/v1/prevendeur/admin/drilldown', { params: p }).pipe(
       tap(data => {
         if (this.drilldownCache.size >= 50) this.drilldownCache.clear();

@@ -1,5 +1,6 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
+import { HttpParamsBuilder } from './http-params.builder';
 
 export interface VenteRead {
   id: number;
@@ -100,30 +101,10 @@ export interface VenteListParams {
 @Injectable({ providedIn: 'root' })
 export class VentesService {
   private http = inject(HttpClient);
+  private paramsBuilder = inject(HttpParamsBuilder);
 
   list(params: VenteListParams = {}) {
-    let p = new HttpParams();
-    if (params.page)        p = p.set('page', params.page);
-    if (params.per_page)    p = p.set('per_page', params.per_page);
-    if (params.annee_mois)  p = p.set('annee_mois', params.annee_mois);
-    if (params.date_from)   p = p.set('date_from', params.date_from);
-    if (params.date_to)     p = p.set('date_to', params.date_to);
-    if (params.famille)          p = p.set('famille', params.famille);
-    if (params.sous_famille)     p = p.set('sous_famille', params.sous_famille);
-    if (params.type_commande)    p = p.set('type_commande', params.type_commande);
-    if (params.categorie_client) p = p.set('categorie_client', params.categorie_client);
-    if (params.statut_commande)  p = p.set('statut_commande', params.statut_commande);
-    if (params.wilaya)           p = p.set('wilaya', params.wilaya);
-    if (params.zone)             p = p.set('zone', params.zone);
-    if (params.region)           p = p.set('region', params.region);
-    if (params.source)           p = p.set('source', params.source);
-    if (params.canal)            p = p.set('canal', params.canal);
-    if (params.route)            p = p.set('route', params.route);
-    if (params.nom_fdv)          p = p.set('nom_fdv', params.nom_fdv);
-    if (params.nom_livreur)      p = p.set('nom_livreur', params.nom_livreur);
-    if (params.nom_distributeur) p = p.set('nom_distributeur', params.nom_distributeur);
-    if (params.nom_client)       p = p.set('nom_client', params.nom_client);
-    if (params.search)           p = p.set('search', params.search);
+    const p = this.paramsBuilder.build(params);
     return this.http.get<VentePage>('/api/v1/ventes', { params: p });
   }
 
@@ -136,31 +117,22 @@ export class VentesService {
   }
 
   getFamilles(date_from?: string, date_to?: string) {
-    let p = new HttpParams();
-    if (date_from) p = p.set('date_from', date_from);
-    if (date_to)   p = p.set('date_to', date_to);
+    const p = this.paramsBuilder.build({ date_from, date_to });
     return this.http.get<string[]>('/api/v1/ventes/familles', { params: p });
   }
 
   getFdvs(date_from?: string, date_to?: string) {
-    let p = new HttpParams();
-    if (date_from) p = p.set('date_from', date_from);
-    if (date_to)   p = p.set('date_to', date_to);
+    const p = this.paramsBuilder.build({ date_from, date_to });
     return this.http.get<string[]>('/api/v1/ventes/fdvs', { params: p });
   }
 
   getClients(date_from?: string, date_to?: string, nom_fdv?: string) {
-    let p = new HttpParams();
-    if (date_from) p = p.set('date_from', date_from);
-    if (date_to)   p = p.set('date_to', date_to);
-    if (nom_fdv)   p = p.set('nom_fdv', nom_fdv);
+    const p = this.paramsBuilder.build({ date_from, date_to, nom_fdv });
     return this.http.get<string[]>('/api/v1/ventes/clients', { params: p });
   }
 
   getDistinct(field: string, date_from?: string, date_to?: string) {
-    let p = new HttpParams();
-    if (date_from) p = p.set('date_from', date_from);
-    if (date_to)   p = p.set('date_to', date_to);
+    const p = this.paramsBuilder.build({ date_from, date_to });
     return this.http.get<string[]>(`/api/v1/ventes/distinct/${field}`, { params: p });
   }
 
