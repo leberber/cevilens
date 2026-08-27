@@ -13,6 +13,7 @@ import { DistributorService } from '../../core/services/distributor.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { UtilityService } from '../../core/services/utility.service';
 import { SearchFilterHelper } from '../../core/services/search-filter.helper';
+import { ConfirmDialogHelper } from '../../core/services/confirm-dialog.helper';
 import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { User } from '../../core/models/user.model';
@@ -30,6 +31,7 @@ export class UtilisateursComponent implements OnInit {
   private notification        = inject(NotificationService);
   private utility             = inject(UtilityService);
   private searchFilter        = inject(SearchFilterHelper);
+  private confirmDialogHelper = inject(ConfirmDialogHelper);
   private router              = inject(Router);
   auth                        = inject(AuthService);
   roleService                 = inject(RoleService);
@@ -90,8 +92,9 @@ export class UtilisateursComponent implements OnInit {
   }
 
   confirmDelete(u: User): void {
-    this.userToDelete = u;
-    this.showConfirmDelete = true;
+    const state = this.confirmDialogHelper.createDeleteConfirm(u, u.full_name);
+    this.userToDelete = state.item;
+    this.showConfirmDelete = state.visible;
   }
 
   onDeleteConfirmed(): void {
