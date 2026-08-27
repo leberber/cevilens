@@ -53,4 +53,41 @@ export class FormatService {
   emptyIfNull(v: number | null): string {
     return v ? String(v) : '';
   }
+
+  /**
+   * Format number to French locale with thousands separator
+   * 1234567 → "1 234 567" or "1 234 567,89"
+   */
+  toLocaleString(n: number | null, decimals?: number): string {
+    if (n == null) return '—';
+    if (decimals !== undefined) {
+      return n.toLocaleString('fr-FR', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+      });
+    }
+    return n.toLocaleString('fr-FR');
+  }
+
+  /**
+   * Sort strings with locale-aware comparison
+   * "école" vs "éléphant" → proper alphabetical order
+   */
+  localeCompare(a: string | null, b: string | null): number {
+    if (a == null && b == null) return 0;
+    if (a == null) return -1;
+    if (b == null) return 1;
+    return String(a).localeCompare(String(b), 'fr-FR');
+  }
+
+  /**
+   * Compare numbers with null handling
+   * null treated as smallest value
+   */
+  compareNumbers(a: number | null, b: number | null, direction: 1 | -1 = 1): number {
+    if (a == null && b == null) return 0;
+    if (a == null) return -1;
+    if (b == null) return 1;
+    return (a - b) * direction;
+  }
 }
