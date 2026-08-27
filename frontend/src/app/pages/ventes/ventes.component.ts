@@ -9,6 +9,7 @@ import { VentesService, VenteRead } from '../../core/services/ventes.service';
 import { ColumnStateService, ColDef } from '../../core/services/column-state.service';
 import { PaginationHelper } from '../../core/services/pagination.helper';
 import { FamilleColorService } from '../../core/services/famille-color.service';
+import { DateHelper } from '../../core/services/date.helper';
 import { SkeletonLoaderComponent } from '../../shared/components/skeleton-loader/skeleton-loader.component';
 import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
 import { DateRangePickerComponent } from '../../shared/components/date-range-picker.component';
@@ -28,6 +29,7 @@ export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
   private columnState = inject(ColumnStateService);
   private pagination = inject(PaginationHelper);
   private familleColorService = inject(FamilleColorService);
+  private dateHelper = inject(DateHelper);
   private router = inject(Router);
 
   @ViewChild('tableWrapper') tableWrapper!: ElementRef<HTMLElement>;
@@ -123,18 +125,12 @@ export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
     this.ventesService.getPeriodes().subscribe(periodes => {
       this.periodes = periodes;
       if (periodes.length) {
-        this.dateFrom = periodes[0] + '-01';
-        this.dateTo   = this.lastDayOf(periodes[0]);
+        this.dateFrom = this.dateHelper.getFirstDayOfMonth(periodes[0]);
+        this.dateTo   = this.dateHelper.getLastDayOfMonth(periodes[0]);
         this.loadFdvsAndClients();
         this.reset();
       }
     });
-  }
-
-  private lastDayOf(period: string): string {
-    const [y, m] = period.split('-').map(Number);
-    const d = new Date(y, m, 0).getDate();
-    return `${period}-${String(d).padStart(2, '0')}`;
   }
 
   ngAfterViewInit() {
