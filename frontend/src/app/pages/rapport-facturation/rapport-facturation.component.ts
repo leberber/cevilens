@@ -12,6 +12,7 @@ import { VentesService } from '../../core/services/ventes.service';
 import { RapportsService, RapportFacturation } from '../../core/services/rapports.service';
 import { DateHelper } from '../../core/services/date.helper';
 import { ExportHelper } from '../../core/services/export.helper';
+import { FormatService } from '../../core/services/format.service';
 import { DateRangePickerComponent, DateRange } from '../../shared/components/date-range-picker.component';
 import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
 
@@ -29,6 +30,7 @@ export class RapportFacturationComponent implements OnInit {
   private rapportSvc = inject(RapportsService);
   private dateHelper = inject(DateHelper);
   private exportHelper = inject(ExportHelper);
+  private formatService = inject(FormatService);
 
   @ViewChild('toolbarContent') toolbarContent!: TemplateRef<any>;
 
@@ -45,7 +47,7 @@ export class RapportFacturationComponent implements OnInit {
   get filteredClients(): string[] {
     const q = this.clientSearch.trim().toLowerCase();
     const list = q ? this.allClients.filter(c => c.toLowerCase().includes(q)) : this.allClients;
-    return [...list].sort((a, b) => a.localeCompare(b, 'fr'));
+    return [...list].sort((a, b) => this.formatService.localeCompare(a, b));
   }
 
   initials(name: string): string {
@@ -66,7 +68,7 @@ export class RapportFacturationComponent implements OnInit {
     if (!this._sourceStats) return '';
     const bo = this._sourceStats['BackOffice']?.lignes ?? 0;
     const total = Object.values(this._sourceStats).reduce((s, v) => s + v.lignes, 0);
-    return `${bo.toLocaleString('fr-FR')} / ${total.toLocaleString('fr-FR')}`;
+    return `${this.formatService.toLocaleString(bo)} / ${this.formatService.toLocaleString(total)}`;
   }
 
   ngOnInit(): void {
