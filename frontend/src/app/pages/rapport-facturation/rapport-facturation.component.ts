@@ -10,6 +10,8 @@ import { ToggleSwitch } from 'primeng/toggleswitch';
 
 import { VentesService } from '../../core/services/ventes.service';
 import { RapportsService, RapportFacturation } from '../../core/services/rapports.service';
+import { DateHelper } from '../../core/services/date.helper';
+import { ExportHelper } from '../../core/services/export.helper';
 import { DateRangePickerComponent, DateRange } from '../../shared/components/date-range-picker.component';
 import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
 
@@ -25,6 +27,8 @@ export class RapportFacturationComponent implements OnInit {
   private route      = inject(ActivatedRoute);
   private ventesSvc  = inject(VentesService);
   private rapportSvc = inject(RapportsService);
+  private dateHelper = inject(DateHelper);
+  private exportHelper = inject(ExportHelper);
 
   @ViewChild('toolbarContent') toolbarContent!: TemplateRef<any>;
 
@@ -77,8 +81,8 @@ export class RapportFacturationComponent implements OnInit {
         this.dateFrom = initFrom;
         this.dateTo   = initTo;
       } else if (periodes.length) {
-        this.dateFrom = periodes[0] + '-01';
-        this.dateTo   = this.lastDayOf(periodes[0]);
+        this.dateFrom = this.dateHelper.getFirstDayOfMonth(periodes[0]);
+        this.dateTo   = this.dateHelper.getLastDayOfMonth(periodes[0]);
       }
       this.loadFdvs();
       if (initFdv) {
@@ -88,11 +92,6 @@ export class RapportFacturationComponent implements OnInit {
           .subscribe(d => this._sourceStats = d);
       }
     });
-  }
-
-  private lastDayOf(period: string): string {
-    const [y, m] = period.split('-').map(Number);
-    return `${period}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
   }
 
   onRangeChange(range: DateRange): void {
@@ -168,15 +167,12 @@ export class RapportFacturationComponent implements OnInit {
   exportZip(): void {
     const clients = [...this.selectedClients];
     if (!clients.length || this.exporting) return;
+    const filename = `export_${this.selectedFdv}_${this.dateFrom}_${this.dateTo}.zip`;
+    const obs = this.rapportSvc.exportClientsZip(this.dateFrom, this.dateTo, this.selectedFdv, clients, this.displayMode, this.source);
     this.exporting = true;
-    this.rapportSvc.exportClientsZip(this.dateFrom, this.dateTo, this.selectedFdv, clients, this.displayMode, this.source).subscribe({
+    obs.subscribe({
       next: blob => {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `export_${this.selectedFdv}_${this.dateFrom}_${this.dateTo}.zip`;
-        a.click();
-        URL.revokeObjectURL(url);
+        this.exportHelper.downloadBlob(blob, filename);
         this.exporting = false;
       },
       error: () => { this.exporting = false; },
