@@ -12,6 +12,7 @@ import { RoleService } from '../../core/services/role.service';
 import { DistributorService } from '../../core/services/distributor.service';
 import { NotificationService } from '../../core/services/notification.service';
 import { UtilityService } from '../../core/services/utility.service';
+import { SearchFilterHelper } from '../../core/services/search-filter.helper';
 import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { User } from '../../core/models/user.model';
@@ -28,6 +29,7 @@ export class UtilisateursComponent implements OnInit {
   private distributorService  = inject(DistributorService);
   private notification        = inject(NotificationService);
   private utility             = inject(UtilityService);
+  private searchFilter        = inject(SearchFilterHelper);
   private router              = inject(Router);
   auth                        = inject(AuthService);
   roleService                 = inject(RoleService);
@@ -53,8 +55,7 @@ export class UtilisateursComponent implements OnInit {
   readonly roleBadge = ROLE_BADGES;
 
   get sorted(): User[] {
-    const q = this.searchQuery.toLowerCase();
-    const filtered = q ? this.users.filter(u => u.full_name.toLowerCase().includes(q) || u.phone.toLowerCase().includes(q)) : this.users;
+    const filtered = this.searchFilter.filterByFields(this.users, this.searchQuery, ['full_name', 'phone']);
     return sortItems(filtered, this.sortCol as keyof User, this.sortDir);
   }
 
