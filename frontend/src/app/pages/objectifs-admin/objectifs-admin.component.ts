@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { Select } from 'primeng/select';
 import { VentesService } from '../../core/services/ventes.service';
 import { CanalHelper } from '../../core/services/canal.helper';
+import { SortHelper } from '../../core/services/sort.helper';
+import { AggregateHelper } from '../../core/services/aggregate.helper';
 import { ObjectifsBaseComponent, BaseRow, FamGroupe } from '../../core/base/objectifs-base';
 import { PeriodStepperComponent } from '../../shared/period-stepper/period-stepper.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
@@ -33,6 +35,8 @@ interface ObjectifRow extends BaseRow {
 export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow> {
   private ventesService = inject(VentesService);
   private canalHelper = inject(CanalHelper);
+  private sortHelper = inject(SortHelper);
+  private aggregateHelper = inject(AggregateHelper);
 
   canal: 'VD' | 'VH' = 'VD';
   importCanal: 'VD' | 'VH' = 'VD';
@@ -250,31 +254,28 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
 
   get sortedRows(): ObjectifRow[] {
     if (!this.sortCol) return this.rows;
-    const dir = this.sortDir;
-    const col = this.sortCol;
     const tonne  = (r: ObjectifRow) => this.editMode ? r._tonne  : this.canalHelper.selectByCanal(this.canal, r.objectif_tonne_vd, r.objectif_tonne_vh);
     const packs  = (r: ObjectifRow) => this.editMode ? r._packs  : this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd, r.objectif_packs_vh);
     const packsT = (r: ObjectifRow) => this.editMode ? r._packs_tournee : this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee);
-    return [...this.rows].sort((a, b) => {
-      let va: any, vb: any;
-      switch (col) {
-        case 'famille':     va = a.famille;      vb = b.famille;      break;
-        case 'code':        va = a.code_produit; vb = b.code_produit; break;
-        case 'produit':     va = a.nom_produit;  vb = b.nom_produit;  break;
-        case 'tonne':       va = tonne(a);       vb = tonne(b);       break;
-        case 'tonne_route': va = this.routeCount ? (tonne(a) ?? 0) / this.routeCount : 0;
-                            vb = this.routeCount ? (tonne(b) ?? 0) / this.routeCount : 0; break;
-        case 'packs':       va = packs(a);       vb = packs(b);       break;
-        case 'packs_route': va = packsT(a);      vb = packsT(b);      break;
-        case 'updated_by':  va = a.updated_by;   vb = b.updated_by;   break;
-        case 'updated_at':  va = a.updated_at;   vb = b.updated_at;   break;
-        default: return 0;
-      }
-      if (va == null && vb == null) return 0;
-      if (va == null) return -1;
-      if (vb == null) return 1;
-      return (typeof va === 'string' ? va.localeCompare(vb) : va - vb) * dir;
-    });
+
+    const selectors: Record<string, (r: ObjectifRow) => any> = {
+      famille: (r) => r.famille,
+      code: (r) => r.code_produit,
+      produit: (r) => r.nom_produit,
+      tonne: (r) => tonne(r),
+      tonne_route: (r) => this.routeCount ? (tonne(r) ?? 0) / this.routeCount : 0,
+      packs: (r) => packs(r),
+      packs_route: (r) => packsT(r),
+      updated_by: (r) => r.updated_by,
+      updated_at: (r) => r.updated_at,
+    };
+
+    const selector = selectors[this.sortCol];
+    if (!selector) return this.rows;
+
+    return [...this.rows].sort((a, b) =>
+      this.sortHelper.compare(selector(a), selector(b), 'auto', this.sortDir)
+    );
   }
 
   // ── Per-route helpers ─────────────────────────────────────────────────────────
@@ -304,18 +305,15 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
   }
 
   sumTonne(rows: ObjectifRow[]): number | null {
-    const vals = rows.map(r => this.rowTonne(r)).filter(v => v != null) as number[];
-    return vals.length ? vals.reduce((a, b) => a + b, 0) : null;
+    return this.aggregateHelper.sum(rows, r => this.rowTonne(r));
   }
 
   sumPacks(rows: ObjectifRow[]): number | null {
-    const vals = rows.map(r => this.rowPacks(r)).filter(v => v != null) as number[];
-    return vals.length ? vals.reduce((a, b) => a + b, 0) : null;
+    return this.aggregateHelper.sum(rows, r => this.rowPacks(r));
   }
 
   sumPacksTournee(rows: ObjectifRow[]): number | null {
-    const vals = rows.map(r => this.rowPacksTournee(r)).filter(v => v != null) as number[];
-    return vals.length ? vals.reduce((a, b) => a + b, 0) : null;
+    return this.aggregateHelper.sum(rows, r => this.rowPacksTournee(r));
   }
 
   get filledProducts(): number {
