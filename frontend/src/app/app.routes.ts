@@ -16,14 +16,8 @@ export const routes: Routes = [
       { path: 'distributors',      canActivate: [platformAdminGuard], loadComponent: () => import('./pages/distributors/distributors.component').then(m => m.DistributorsComponent) },
 
       { path: 'ventes',   canActivate: [adminOrEmployeGuard], loadComponent: () => import('./pages/ventes/ventes.component').then(m => m.VentesComponent) },
-      { path: 'produits',              canActivate: [adminOrEmployeGuard], loadComponent: () => import('./pages/produits/produits.component').then(m => m.ProduitsComponent) },
       { path: 'rapport-facturation',   canActivate: [adminOrEmployeGuard], loadComponent: () => import('./pages/rapport-facturation/rapport-facturation.component').then(m => m.RapportFacturationComponent) },
       { path: 'upload',   canActivate: [adminOrEmployeGuard], loadComponent: () => import('./pages/upload/upload.component').then(m => m.UploadComponent) },
-
-      { path: 'clients',              canActivate: [adminOrEmployeGuard], loadComponent: () => import('./pages/clients/clients.component').then(m => m.ClientsComponent) },
-      { path: 'clients/carte',        canActivate: [adminOrEmployeGuard], loadComponent: () => import('./pages/clients/clients-map/clients-map.component').then(m => m.ClientsMapComponent) },
-      { path: 'clients/nouveau',      canActivate: [adminOrEmployeGuard], loadComponent: () => import('./pages/clients/client-form/client-form.component').then(m => m.ClientFormComponent) },
-      { path: 'clients/:id/modifier', canActivate: [adminOrEmployeGuard], loadComponent: () => import('./pages/clients/client-form/client-form.component').then(m => m.ClientFormComponent) },
 
       { path: 'utilisateurs',              canActivate: [adminOrEmployeGuard], loadComponent: () => import('./pages/utilisateurs/utilisateurs.component').then(m => m.UtilisateursComponent) },
       { path: 'utilisateurs/nouveau',      canActivate: [adminOrEmployeGuard], loadComponent: () => import('./pages/utilisateurs/utilisateur-form/utilisateur-form.component').then(m => m.UtilisateurFormComponent) },

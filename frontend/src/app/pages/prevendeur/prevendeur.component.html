@@ -5,7 +5,7 @@
     <img src="assets/logo.png" alt="Logo" class="pv-header__logo" />
     <div class="pv-header__left">
       <div class="pv-header__name">{{ userName }}</div>
-      @if (data && !loading && activeTab === 'tournees') {
+      @if (data && !loading() && activeTab === 'tournees') {
         <div class="pv-header__meta">
           <span>{{ data.routes.length }} routes</span>
           <span class="pv-meta-sep">·</span>
@@ -35,7 +35,7 @@
   @if (activeTab === 'tournees') {
 
     <!-- Summary strip -->
-    @if (data && !loading) {
+    @if (data && !loading()) {
       <div class="pv-summary">
         <div class="pv-kpi">
           <span class="pv-kpi__val">{{ data.total_clients }}</span>
@@ -50,7 +50,7 @@
     }
 
     <!-- Skeleton -->
-    @if (loading) {
+    @if (loading()) {
       <div class="pv-summary pv-summary--sk">
         <div class="pv-sk-kpi"></div>
         <div class="pv-sk-kpi"></div>
@@ -64,7 +64,7 @@
     }
 
     <!-- Routes -->
-    @if (data && !loading) {
+    @if (data && !loading()) {
       @if (data.routes.length === 0) {
         <div class="pv-empty">
           <i class="pi pi-inbox"></i>
@@ -182,7 +182,7 @@
   ══════════════════════════════════════════════════════════════════════ -->
   @if (activeTab === 'clients') {
     <div class="pv-clients-page">
-      @if (!data || loading) {
+      @if (!data || loading()) {
         <div class="pv-empty">
           <i class="pi pi-spin pi-spinner"></i>
           <p>Chargement…</p>
@@ -234,7 +234,7 @@
   ══════════════════════════════════════════════════════════════════════ -->
   @if (activeTab === 'objectifs') {
     <div class="pv-objectifs-page">
-      @if (loadingObjectifs) {
+      @if (loadingObjectifs()) {
         <div class="pv-empty"><i class="pi pi-spin pi-spinner"></i><p>Chargement…</p></div>
       } @else if (objectifs.length === 0) {
         <div class="pv-empty"><i class="pi pi-chart-bar"></i><p>Aucun objectif pour cette période</p></div>

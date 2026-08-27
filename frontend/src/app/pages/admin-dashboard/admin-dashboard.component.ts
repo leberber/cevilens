@@ -3,18 +3,22 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../core/services/auth.service';
+import { RoleService } from '../../core/services/role.service';
+import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
 import { User, UserRole } from '../../core/models/user.model';
+import { ROLE_LABELS } from '../../core/constants/roles';
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, PageLayoutComponent],
   templateUrl: './admin-dashboard.component.html',
   styleUrl: './admin-dashboard.component.scss',
 })
 export class AdminDashboardComponent implements OnInit {
   private http = inject(HttpClient);
   private authService = inject(AuthService);
+  private roleService = inject(RoleService);
   private router = inject(Router);
 
   users: User[] = [];
@@ -23,17 +27,9 @@ export class AdminDashboardComponent implements OnInit {
 
   readonly roles: UserRole[] = ['platform_admin', 'distributor_admin', 'superviseur', 'prevendeur'];
 
-  roleLabels: Record<UserRole, string> = {
-    platform_admin: '🔑 Platform Admin',
-    distributor_admin: '📦 Distributor Admin',
-    superviseur: '👮 Superviseur',
-    prevendeur: '🚚 Prevendeur',
-    // Legacy
-    admin: '🔑 Admin (Legacy)',
-    prevender: '🚚 Prevendeur (Legacy)',
-  };
+  readonly roleLabels = ROLE_LABELS;
 
-  roleColors: Record<UserRole, string> = {
+  readonly roleColors: Record<UserRole | string, string> = {
     platform_admin: '#ff6b6b',
     distributor_admin: '#4ecdc4',
     superviseur: '#45b7d1',
@@ -44,7 +40,7 @@ export class AdminDashboardComponent implements OnInit {
 
   ngOnInit() {
     // Only platform admin can view this
-    if (this.authService.currentUser()?.role !== 'platform_admin' && this.authService.currentUser()?.role !== 'admin') {
+    if (!this.roleService.isPlatformAdmin()) {
       this.router.navigate(['/dashboard']);
       return;
     }
@@ -67,11 +63,11 @@ export class AdminDashboardComponent implements OnInit {
     });
   }
 
-  getRoleLabel(role: UserRole): string {
+  getRoleLabel(role: UserRole | string): string {
     return this.roleLabels[role] || role;
   }
 
-  getRoleColor(role: UserRole): string {
+  getRoleColor(role: UserRole | string): string {
     return this.roleColors[role] || '#999';
   }
 

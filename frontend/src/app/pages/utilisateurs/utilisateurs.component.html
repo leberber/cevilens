@@ -1,20 +1,13 @@
 <p-toast />
-<p-confirmdialog />
 
-<div class="page-content">
+<app-page-layout
+  icon="pi-shield"
+  title="Fonctionnaires"
+  [subtitle]="users.length + ' fonctionnaires enregistrés'"
+  [toolbar]="toolbarContent">
 
-  <div class="page-header">
-    <div style="display:flex;align-items:center;gap:0.75rem">
-      <div class="page-icon"><i class="pi pi-shield"></i></div>
-      <div>
-        <h1 class="page-header__title">Fonctionnaires</h1>
-        <p class="page-header__sub">{{ users.length }} fonctionnaires enregistrés</p>
-      </div>
-    </div>
-  </div>
-
-  <div class="table-container">
-
+  <!-- Toolbar Template -->
+  <ng-template #toolbarContent>
     <div class="table-header">
       <div class="table-header-left">
         <div class="table-search">
@@ -29,8 +22,9 @@
         </button>
       </div>
     </div>
+  </ng-template>
 
-    <div class="table-wrapper">
+  <div class="table-wrapper">
       @if (loading) {
         @for (_ of [1,2,3,4,5]; track $index) {
           <div style="padding:0.65rem 1rem;border-bottom:1px solid var(--border-color-light)">
@@ -100,6 +94,15 @@
       }
     </div>
 
-  </div>
+</app-page-layout>
 
-</div>
+<!-- Delete confirmation dialog -->
+<app-confirm-dialog
+  [visible]="showConfirmDelete"
+  title="Supprimer un utilisateur"
+  [message]="'Êtes-vous sûr de vouloir supprimer \"' + (userToDelete?.full_name ?? '') + '\" ?'"
+  confirmLabel="Supprimer"
+  cancelLabel="Annuler"
+  (onConfirmed)="onDeleteConfirmed()"
+  (onCancelled)="onDeleteCancelled()">
+</app-confirm-dialog>

@@ -1,10 +1,14 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Select } from 'primeng/select';
 import { VentesService } from '../../core/services/ventes.service';
+import { CanalHelper } from '../../core/services/canal.helper';
 import { ObjectifsBaseComponent, BaseRow, FamGroupe } from '../../core/base/objectifs-base';
 import { PeriodStepperComponent } from '../../shared/period-stepper/period-stepper.component';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
+import { ImportDialogComponent } from '../../shared/components/import-dialog/import-dialog.component';
+import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
 
 interface ObjectifRow extends BaseRow {
   objectif_tonne_vd:          number | null;
@@ -22,12 +26,13 @@ interface ObjectifRow extends BaseRow {
 @Component({
   selector: 'app-objectifs-admin',
   standalone: true,
-  imports: [CommonModule, FormsModule, Select, PeriodStepperComponent],
+  imports: [CommonModule, FormsModule, Select, PeriodStepperComponent, ConfirmDialogComponent, ImportDialogComponent, PageLayoutComponent],
   templateUrl: './objectifs-admin.component.html',
   styleUrl: './objectifs-admin.component.scss',
 })
 export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow> {
   private ventesService = inject(VentesService);
+  private canalHelper = inject(CanalHelper);
 
   canal: 'VD' | 'VH' = 'VD';
   importCanal: 'VD' | 'VH' = 'VD';
@@ -36,6 +41,9 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
   routesVD = 0;
   routesVH = 0;
   routesFallbackMois: string | null = null;
+
+  // Template references for PageLayout
+  @ViewChild('toolbarContent') toolbarContent!: TemplateRef<any>;
 
   private snapshot = new Map<string, { tonne: number | null; packs: number | null; packs_tournee: number | null }>();
 
@@ -93,9 +101,9 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
         this.rows = data.map(d => ({ ...d, _tonne: null, _packs: null, _packs_tournee: null }));
         this.snapshot.clear();
         for (const r of this.rows) {
-          const tonne        = this.canal === 'VD' ? r.objectif_tonne_vd         : r.objectif_tonne_vh;
-          const packs        = this.canal === 'VD' ? r.objectif_packs_vd         : r.objectif_packs_vh;
-          const packs_tournee = this.canal === 'VD' ? r.objectif_packs_vd_tournee : r.objectif_packs_vh_tournee;
+          const tonne        = this.canalHelper.selectByCanal(this.canal, r.objectif_tonne_vd, r.objectif_tonne_vh);
+          const packs        = this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd, r.objectif_packs_vh);
+          const packs_tournee = this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee);
           this.snapshot.set(r.code_produit, { tonne, packs, packs_tournee });
           r._tonne = tonne; r._packs = packs; r._packs_tournee = packs_tournee;
         }
@@ -143,9 +151,9 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
       if (this.importCanal !== this.canal) {
         this.canal = this.importCanal;
         for (const r of this.rows) {
-          r._tonne         = this.canal === 'VD' ? r.objectif_tonne_vd         : r.objectif_tonne_vh;
-          r._packs         = this.canal === 'VD' ? r.objectif_packs_vd         : r.objectif_packs_vh;
-          r._packs_tournee = this.canal === 'VD' ? r.objectif_packs_vd_tournee : r.objectif_packs_vh_tournee;
+          r._tonne         = this.canalHelper.selectByCanal(this.canal, r.objectif_tonne_vd, r.objectif_tonne_vh);
+          r._packs         = this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd, r.objectif_packs_vh);
+          r._packs_tournee = this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee);
         }
       }
       let imported = 0;
@@ -184,9 +192,9 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
               this.rows = rows.map(d => ({ ...d, _packs: null, _packs_tournee: null }));
               this.snapshot.clear();
               for (const r of this.rows) {
-                const t  = this.importCanal === 'VD' ? r.objectif_tonne_vd         : r.objectif_tonne_vh;
-                const p  = this.importCanal === 'VD' ? r.objectif_packs_vd         : r.objectif_packs_vh;
-                const pt = this.importCanal === 'VD' ? r.objectif_packs_vd_tournee : r.objectif_packs_vh_tournee;
+                const t  = this.canalHelper.selectByCanal(this.importCanal, r.objectif_tonne_vd, r.objectif_tonne_vh);
+                const p  = this.canalHelper.selectByCanal(this.importCanal, r.objectif_packs_vd, r.objectif_packs_vh);
+                const pt = this.canalHelper.selectByCanal(this.importCanal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee);
                 this.snapshot.set(r.code_produit, { tonne: t, packs: p, packs_tournee: pt });
                 r._tonne = t; r._packs = p; r._packs_tournee = pt;
               }
@@ -212,9 +220,9 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
         for (const r of this.rows) {
           const prev = map.get(r.code_produit) as any;
           if (prev) {
-            r._tonne         = this.canal === 'VD' ? prev.objectif_tonne_vd         : prev.objectif_tonne_vh;
-            r._packs         = this.canal === 'VD' ? prev.objectif_packs_vd         : prev.objectif_packs_vh;
-            r._packs_tournee = this.canal === 'VD' ? prev.objectif_packs_vd_tournee : prev.objectif_packs_vh_tournee;
+            r._tonne         = this.canalHelper.selectByCanal(this.canal, prev.objectif_tonne_vd, prev.objectif_tonne_vh);
+            r._packs         = this.canalHelper.selectByCanal(this.canal, prev.objectif_packs_vd, prev.objectif_packs_vh);
+            r._packs_tournee = this.canalHelper.selectByCanal(this.canal, prev.objectif_packs_vd_tournee, prev.objectif_packs_vh_tournee);
           }
         }
       },
@@ -244,9 +252,9 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
     if (!this.sortCol) return this.rows;
     const dir = this.sortDir;
     const col = this.sortCol;
-    const tonne  = (r: ObjectifRow) => this.editMode ? r._tonne  : (this.canal === 'VD' ? r.objectif_tonne_vd  : r.objectif_tonne_vh);
-    const packs  = (r: ObjectifRow) => this.editMode ? r._packs  : (this.canal === 'VD' ? r.objectif_packs_vd  : r.objectif_packs_vh);
-    const packsT = (r: ObjectifRow) => this.editMode ? r._packs_tournee : (this.canal === 'VD' ? r.objectif_packs_vd_tournee : r.objectif_packs_vh_tournee);
+    const tonne  = (r: ObjectifRow) => this.editMode ? r._tonne  : this.canalHelper.selectByCanal(this.canal, r.objectif_tonne_vd, r.objectif_tonne_vh);
+    const packs  = (r: ObjectifRow) => this.editMode ? r._packs  : this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd, r.objectif_packs_vh);
+    const packsT = (r: ObjectifRow) => this.editMode ? r._packs_tournee : this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee);
     return [...this.rows].sort((a, b) => {
       let va: any, vb: any;
       switch (col) {
@@ -284,15 +292,15 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
 
   // ── Aggregates ────────────────────────────────────────────────────────────────
   private rowTonne(r: ObjectifRow): number | null {
-    return this.editMode ? r._tonne : (this.canal === 'VD' ? r.objectif_tonne_vd : r.objectif_tonne_vh);
+    return this.editMode ? r._tonne : this.canalHelper.selectByCanal(this.canal, r.objectif_tonne_vd, r.objectif_tonne_vh);
   }
 
   private rowPacks(r: ObjectifRow): number | null {
-    return this.editMode ? r._packs : (this.canal === 'VD' ? r.objectif_packs_vd : r.objectif_packs_vh);
+    return this.editMode ? r._packs : this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd, r.objectif_packs_vh);
   }
 
   private rowPacksTournee(r: ObjectifRow): number | null {
-    return this.editMode ? r._packs_tournee : (this.canal === 'VD' ? r.objectif_packs_vd_tournee : r.objectif_packs_vh_tournee);
+    return this.editMode ? r._packs_tournee : this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee);
   }
 
   sumTonne(rows: ObjectifRow[]): number | null {
@@ -319,4 +327,23 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
   get totalProducts(): number { return this.rows.length; }
 
   get canalLabel(): string { return this.canal === 'VD' ? 'Direct (VD)' : 'Horeca (VH)'; }
+
+  // ── Template helpers (for cleaner HTML) ───────────────────────────────────
+  getRowTonne(row: ObjectifRow): number | null {
+    return this.rowTonne(row);
+  }
+
+  getRowPacks(row: ObjectifRow): number | null {
+    return this.rowPacks(row);
+  }
+
+  getRowPacksTournee(row: ObjectifRow): number | null {
+    return this.rowPacksTournee(row);
+  }
+
+  getFilledCount(): number {
+    return this.rows.filter(r =>
+      this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd, r.objectif_packs_vh) != null
+    ).length;
+  }
 }

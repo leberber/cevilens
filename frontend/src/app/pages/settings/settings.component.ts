@@ -1,19 +1,20 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
-import { MessageService } from 'primeng/api';
 
 import { ConfigService } from '../../core/services/config.service';
+import { NotificationService } from '../../core/services/notification.service';
+import { FormSubmitHelper } from '../../core/services/form-submit.helper';
 
 @Component({
   selector: 'app-settings',
   standalone: true,
   imports: [ReactiveFormsModule],
-  providers: [MessageService],
   templateUrl: './settings.component.html',
 })
 export class SettingsComponent implements OnInit {
   private configService  = inject(ConfigService);
-  private messageService = inject(MessageService);
+  private notification   = inject(NotificationService);
+  private formSubmit     = inject(FormSubmitHelper);
   private fb             = inject(FormBuilder);
 
   loading = false;
@@ -25,35 +26,25 @@ export class SettingsComponent implements OnInit {
   });
 
   ngOnInit() {
-    this.loading = true;
-    this.configService.get<{ consigne_plastique: number; consigne_bois: number }>('pricing').subscribe({
-      next: data => {
-        this.form.patchValue(data);
-        this.loading = false;
-      },
-      error: () => {
-        this.loading = false;
-        this.toast('error', 'Impossible de charger la configuration');
-      },
-    });
+    this.formSubmit.load(
+      this.configService.get<{ consigne_plastique: number; consigne_bois: number }>('pricing'),
+      (loading) => (this.loading = loading),
+      {
+        onSuccess: (data) => this.form.patchValue(data),
+        errorMessage: 'Impossible de charger la configuration',
+      }
+    );
   }
 
   save() {
-    if (this.form.invalid) return;
-    this.saving = true;
-    this.configService.put('pricing', this.form.value).subscribe({
-      next: () => {
-        this.saving = false;
-        this.toast('success', 'Configuration enregistrée');
-      },
-      error: e => {
-        this.saving = false;
-        this.toast('error', e.error?.detail ?? 'Erreur lors de la sauvegarde');
-      },
-    });
-  }
-
-  private toast(severity: string, detail: string) {
-    this.messageService.add({ severity, summary: severity === 'error' ? 'Erreur' : 'Succès', detail, life: 4000 });
+    this.formSubmit.submit(
+      this.form,
+      (saving) => (this.saving = saving),
+      this.configService.put('pricing', this.form.value),
+      {
+        successMessage: 'Configuration enregistrée',
+        errorMessage: 'Erreur lors de la sauvegarde',
+      }
+    );
   }
 }

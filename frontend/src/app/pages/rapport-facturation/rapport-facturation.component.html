@@ -1,102 +1,85 @@
-<!-- ══════════════════ PAGE HEADER ══════════════════ -->
-<div class="page-header no-print">
-  <div class="page-header__top">
+<app-page-layout
+  icon="pi-file-pdf"
+  title="Rapport de facturation"
+  [subtitle]="rapport ? (rapport.fdv + ' · ' + periodLabel) : 'Sélectionnez la période et le prévendeur'"
+  [toolbar]="toolbarContent">
 
-    <div class="page-header__left">
-      <button class="btn-back" (click)="goBack()">
-        <i class="pi pi-arrow-left"></i>
-      </button>
-      <div>
-        <h1 class="page-header__title">Rapport de facturation</h1>
-        <p class="page-header__sub">
-          @if (rapport) {
-            {{ rapport.fdv }} &nbsp;·&nbsp; {{ periodLabel }}
-          } @else {
-            Sélectionnez la période et le prévendeur
-          }
-        </p>
+  <!-- Toolbar Template -->
+  <ng-template #toolbarContent>
+    <app-date-range-picker
+      [periodes]="periodes"
+      [dateFrom]="dateFrom"
+      [dateTo]="dateTo"
+      (rangeChange)="onRangeChange($event)"
+    />
+
+    <div class="filter-card">
+      <div class="filter-card__icon"><i class="pi pi-id-card"></i></div>
+      <div class="filter-card__body">
+        <span class="filter-card__label">Prévendeur</span>
+        <p-select
+          [options]="fdvs"
+          [(ngModel)]="selectedFdv"
+          placeholder="Sélectionner"
+          [filter]="true"
+          [showClear]="true"
+          (onChange)="onFdvChange()"
+          class="filter-card-select"
+          [disabled]="!dateFrom"
+        />
       </div>
     </div>
 
-    <div class="page-header__filters">
+    @if (selectedFdv) {
+      <button class="rf-clients-pill"
+        [class.rf-clients-pill--loading]="loadingClients"
+        (click)="!loadingClients && clientsPopover.toggle($event)">
+        @if (loadingClients) {
+          <i class="pi pi-spinner pi-spin"></i>
+          <span>Chargement…</span>
+        } @else {
+          <i class="pi pi-users"></i>
+          <span>{{ selectedClients.size }}<span class="rf-pill-sep">/{{ allClients.length }}</span></span>
+        }
+      </button>
 
-      <app-date-range-picker
-        [periodes]="periodes"
-        [dateFrom]="dateFrom"
-        [dateTo]="dateTo"
-        (rangeChange)="onRangeChange($event)"
-      />
-
-      <div class="filter-card">
-        <div class="filter-card__icon"><i class="pi pi-id-card"></i></div>
-        <div class="filter-card__body">
-          <span class="filter-card__label">Prévendeur</span>
-          <p-select
-            [options]="fdvs"
-            [(ngModel)]="selectedFdv"
-            placeholder="Sélectionner"
-            [filter]="true"
-            [showClear]="true"
-            (onChange)="onFdvChange()"
-            class="filter-card-select"
-            [disabled]="!dateFrom"
-          />
-        </div>
-      </div>
-
-      @if (selectedFdv) {
-        <button class="rf-clients-pill"
-          [class.rf-clients-pill--loading]="loadingClients"
-          (click)="!loadingClients && clientsPopover.toggle($event)">
-          @if (loadingClients) {
-            <i class="pi pi-spinner pi-spin"></i>
-            <span>Chargement…</span>
-          } @else {
-            <i class="pi pi-users"></i>
-            <span>{{ selectedClients.size }}<span class="rf-pill-sep">/{{ allClients.length }}</span></span>
-          }
-        </button>
-
-        <p-popover #clientsPopover>
-          <div class="rf-pop">
-            <div class="rf-pop__head">
-              <span class="rf-pop__title">Clients</span>
-              <div class="rf-pop__actions">
-                <button class="btn-text" (click)="selectAll()">Tous</button>
-                <span class="rf-pop__dot">·</span>
-                <button class="btn-text" (click)="deselectAll()">Aucun</button>
-              </div>
-            </div>
-            <div class="table-search rf-pop-search">
-              <div class="search-icon"><i class="pi pi-search"></i></div>
-              <input [(ngModel)]="clientSearch" placeholder="Rechercher un client…" />
-            </div>
-            <div class="rf-pop__list">
-              @for (c of filteredClients; track c) {
-                <div class="rf-client-item"
-                  [class.rf-client-item--on]="selectedClients.has(c)"
-                  (click)="toggleClient(c)">
-                  <span class="rf-avatar">{{ initials(c) }}</span>
-                  <span class="rf-client-name">{{ c }}</span>
-                  @if (selectedClients.has(c)) {
-                    <span class="rf-check"><i class="pi pi-check"></i></span>
-                  }
-                </div>
-              }
-              @if (filteredClients.length === 0) {
-                <p class="rf-no-results">Aucun résultat</p>
-              }
+      <p-popover #clientsPopover>
+        <div class="rf-pop">
+          <div class="rf-pop__head">
+            <span class="rf-pop__title">Clients</span>
+            <div class="rf-pop__actions">
+              <button class="btn-text" (click)="selectAll()">Tous</button>
+              <span class="rf-pop__dot">·</span>
+              <button class="btn-text" (click)="deselectAll()">Aucun</button>
             </div>
           </div>
-        </p-popover>
-      }
+          <div class="table-search rf-pop-search">
+            <div class="search-icon"><i class="pi pi-search"></i></div>
+            <input [(ngModel)]="clientSearch" placeholder="Rechercher un client…" />
+          </div>
+          <div class="rf-pop__list">
+            @for (c of filteredClients; track c) {
+              <div class="rf-client-item"
+                [class.rf-client-item--on]="selectedClients.has(c)"
+                (click)="toggleClient(c)">
+                <span class="rf-avatar">{{ initials(c) }}</span>
+                <span class="rf-client-name">{{ c }}</span>
+                @if (selectedClients.has(c)) {
+                  <span class="rf-check"><i class="pi pi-check"></i></span>
+                }
+              </div>
+            }
+            @if (filteredClients.length === 0) {
+              <p class="rf-no-results">Aucun résultat</p>
+            }
+          </div>
+        </div>
+      </p-popover>
+    }
+  </ng-template>
 
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════ REPORT CARD ══════════════════ -->
-<div class="table-container rf-container">
+  <!-- ══════════════════ REPORT CARD ══════════════════ -->
+  <div class="rf-container">
 
   <div class="rf-toolbar no-print">
     <div class="rf-toolbar__left">
@@ -315,4 +298,5 @@
     }
 
   </div>
-</div>
+
+</app-page-layout>

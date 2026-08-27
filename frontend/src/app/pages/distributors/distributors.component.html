@@ -1,10 +1,9 @@
-<div class="distributors-page">
-  <div class="page-header">
-    <h1>Distributors</h1>
-    <p>Manage all distributors in the system</p>
-  </div>
+<app-page-layout
+  icon="pi-sitemap"
+  title="Distributors"
+  subtitle="Manage all distributors in the system">
 
-  @if (loading) {
+  @if (loading()) {
     <div class="loading">Loading...</div>
   } @else if (error) {
     <div class="error">{{ error }}</div>
@@ -13,33 +12,32 @@
       <p>No distributors found</p>
     </div>
   } @else {
-    <div class="table-container">
-      <table class="distributors-table">
-        <thead>
+    <table class="distributors-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Code</th>
+          <th>Name</th>
+          <th>Status</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (distributor of distributors; track distributor.id) {
           <tr>
-            <th>ID</th>
-            <th>Code</th>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Created</th>
+            <td>{{ distributor.id }}</td>
+            <td><strong>{{ distributor.code }}</strong></td>
+            <td>{{ distributor.nom }}</td>
+            <td>
+              <span class="badge" [class.active]="distributor.is_active">
+                {{ distributor.is_active ? '✓ Active' : '✗ Inactive' }}
+              </span>
+            </td>
+            <td>{{ distributor.created_at | date: 'short' }}</td>
           </tr>
-        </thead>
-        <tbody>
-          @for (distributor of distributors; track distributor.id) {
-            <tr>
-              <td>{{ distributor.id }}</td>
-              <td><strong>{{ distributor.code }}</strong></td>
-              <td>{{ distributor.nom }}</td>
-              <td>
-                <span class="badge" [class.active]="distributor.is_active">
-                  {{ distributor.is_active ? '✓ Active' : '✗ Inactive' }}
-                </span>
-              </td>
-              <td>{{ distributor.created_at | date: 'short' }}</td>
-            </tr>
-          }
-        </tbody>
-      </table>
-    </div>
+        }
+      </tbody>
+    </table>
   }
-</div>
+
+</app-page-layout>

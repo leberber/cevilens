@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, TemplateRef, ViewChild } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { DatePipe } from '@angular/common';
@@ -11,11 +11,12 @@ import { ToggleSwitch } from 'primeng/toggleswitch';
 import { VentesService } from '../../core/services/ventes.service';
 import { RapportsService, RapportFacturation } from '../../core/services/rapports.service';
 import { DateRangePickerComponent, DateRange } from '../../shared/components/date-range-picker.component';
+import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
 
 @Component({
   selector: 'app-rapport-facturation',
   standalone: true,
-  imports: [FormsModule, DatePipe, TooltipModule, Select, Popover, ToggleSwitch, DateRangePickerComponent],
+  imports: [FormsModule, DatePipe, TooltipModule, Select, Popover, ToggleSwitch, DateRangePickerComponent, PageLayoutComponent],
   templateUrl: './rapport-facturation.component.html',
   styleUrl: './rapport-facturation.component.scss',
 })
@@ -25,6 +26,7 @@ export class RapportFacturationComponent implements OnInit {
   private ventesSvc  = inject(VentesService);
   private rapportSvc = inject(RapportsService);
 
+  @ViewChild('toolbarContent') toolbarContent!: TemplateRef<any>;
 
   periodes: string[] = [];
   fdvs: string[] = [];

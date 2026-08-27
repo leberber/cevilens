@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, HostListener, inject } from '@angular/core';
+import { Component, OnInit, OnDestroy, HostListener, inject, computed } from '@angular/core';
 import { CommonModule, NgClass } from '@angular/common';
 import {
   PrevendeurService,
@@ -10,7 +10,8 @@ import {
 } from '../../core/services/prevendeur.service';
 import { VentesService } from '../../core/services/ventes.service';
 import { AuthService } from '../../core/services/auth.service';
-import { DistributorService } from '../../core/services/distributor.service';
+import { RoleService } from '../../core/services/role.service';
+import { DistributorContextService } from '../../core/services/distributor-context.service';
 import { getFamilyColor, getFamilyBg, CHART_COLORS } from '../../core/constants/colors';
 
 
@@ -25,10 +26,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private svc = inject(PrevendeurService);
   private ventesService = inject(VentesService);
   private auth = inject(AuthService);
-  private distributorService = inject(DistributorService);
+  private roleService = inject(RoleService);
+  private distributorContext = inject(DistributorContextService);
 
   isPlatformAdmin = false;
-  userDistributorName = '';
   loading = true;
   data: DrilldownData | null = null;
   selectedPeriode = '';
@@ -63,6 +64,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   readonly WEEK_LABELS = ['S1', 'S2', 'S3', 'S4'];
   readonly Math = Math;
 
+  // Computed signal for distributor name
+  userDistributorName = computed(() => this.distributorContext.formattedName() ?? '');
+
   ngOnInit() {
     this.loadInitial();
   }
@@ -82,23 +86,16 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   private loadInitial() {
     this.loading = true;
-    const currentUser = this.auth.currentUser();
-    this.isPlatformAdmin = currentUser?.role === 'platform_admin' || currentUser?.role === 'admin';
+    this.isPlatformAdmin = this.roleService.isPlatformAdmin();
 
-    // Load distributor name for non-admin users
-    if (!this.isPlatformAdmin && currentUser?.distributor_id) {
-      this.distributorService.getDistributor(currentUser.distributor_id).subscribe({
-        next: (dist) => {
-          this.userDistributorName = `${dist.code} - ${dist.nom}`;
-        },
-        error: () => { this.userDistributorName = ''; },
-      });
-      this.distributeurs = [];
-      this.selectedDistributeur = null;
-    } else {
+    // Load distributor list only for platform admins
+    if (this.isPlatformAdmin) {
       this.ventesService.getDistinct('nom_distributeur').subscribe(vals => {
         this.distributeurs = vals;
       });
+    } else {
+      this.distributeurs = [];
+      this.selectedDistributeur = null;
     }
 
     const now = new Date();

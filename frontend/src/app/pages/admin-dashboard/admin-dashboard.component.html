@@ -1,8 +1,7 @@
-<div class="admin-dashboard">
-  <div class="page-header">
-    <h1>👨‍💼 Admin Dashboard</h1>
-    <p>Platform Administration - Manage all users and roles</p>
-  </div>
+<app-page-layout
+  icon="pi-users"
+  title="Admin Dashboard"
+  subtitle="Platform Administration - Manage all users and roles">
 
   <!-- Role Summary Cards -->
   <div class="role-summary">
@@ -72,4 +71,5 @@
       <p>Total Users: <strong>{{ users.length }}</strong></p>
     </div>
   }
-</div>
+
+</app-page-layout>

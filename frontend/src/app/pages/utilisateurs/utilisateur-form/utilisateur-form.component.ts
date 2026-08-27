@@ -7,30 +7,36 @@ import { InputText } from 'primeng/inputtext';
 import { Password } from 'primeng/password';
 import { Select } from 'primeng/select';
 import { ToggleSwitch } from 'primeng/toggleswitch';
-import { MessageService } from 'primeng/api';
 
 import { UsersService } from '../../../core/services/users.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { RoleService } from '../../../core/services/role.service';
 import { VentesService } from '../../../core/services/ventes.service';
 import { DistributorService } from '../../../core/services/distributor.service';
+import { NotificationService } from '../../../core/services/notification.service';
+import { FormSubmitHelper } from '../../../core/services/form-submit.helper';
+import { UtilityService } from '../../../core/services/utility.service';
+import { APP_CONFIG } from '../../../core/constants/app.constants';
 import { User, UserCreate, UserUpdate, UserRole } from '../../../core/models/user.model';
 
 @Component({
   selector: 'app-utilisateur-form',
   standalone: true,
   imports: [CommonModule, FormsModule, ReactiveFormsModule, Toast, InputText, Password, Select, ToggleSwitch],
-  providers: [MessageService],
   templateUrl: './utilisateur-form.component.html',
 })
 export class UtilisateurFormComponent implements OnInit {
   private usersService      = inject(UsersService);
   private ventesService     = inject(VentesService);
   private distributorService = inject(DistributorService);
-  private messageService    = inject(MessageService);
+  private notification      = inject(NotificationService);
+  private formSubmit        = inject(FormSubmitHelper);
+  private utility           = inject(UtilityService);
   private fb                = inject(FormBuilder);
   private router            = inject(Router);
   private route             = inject(ActivatedRoute);
   auth                      = inject(AuthService);
+  private roleService       = inject(RoleService);
 
   editingId: number | null = null;
   saving = false;
@@ -51,7 +57,7 @@ export class UtilisateurFormComponent implements OnInit {
   ];
 
   get roleOptions() {
-    return this.auth.isAdmin
+    return this.roleService.isAdmin()
       ? this.allRoleOptions
       : this.allRoleOptions.filter(r => !r.adminOnly);
   }
@@ -83,7 +89,7 @@ export class UtilisateurFormComponent implements OnInit {
   get roleDisplayLabel(): string { return this.roleLabels[this.currentRole] ?? ''; }
 
   form = this.fb.group({
-    phone:            ['', Validators.required],
+    phone:            ['', [Validators.required, (c) => this.utility.isValidPhone(c.value ?? '') ? null : { invalidPhone: true }]],
     full_name:        ['', Validators.required],
     password:         [''],
     role:             ['superviseur' as UserRole, Validators.required],
@@ -93,16 +99,17 @@ export class UtilisateurFormComponent implements OnInit {
   });
 
   ngOnInit() {
-    this.distributorService.listDistributors().subscribe({
-      next: (dists) => {
-        console.log('Distributors loaded:', dists);
-        this.distributors = dists;
-      },
-      error: (err) => {
-        console.error('Failed to load distributors:', err);
-        this.messageService.add({ severity: 'warn', summary: 'Avertissement', detail: 'Impossible de charger les distributeurs', life: 3000 });
-      },
-    });
+    this.formSubmit.load(
+      this.distributorService.listDistributors(),
+      () => {}, // No loading state needed for this
+      {
+        onSuccess: (dists) => {
+          console.log('Distributors loaded:', dists);
+          this.distributors = dists;
+        },
+        errorMessage: 'Impossible de charger les distributeurs',
+      }
+    );
 
     const idParam = this.route.snapshot.paramMap.get('id');
     if (idParam) {
@@ -144,8 +151,6 @@ export class UtilisateurFormComponent implements OnInit {
   }
 
   save() {
-    if (this.form.invalid) return;
-    this.saving = true;
     const v = this.form.value;
 
     if (this.editingId) {
@@ -158,10 +163,16 @@ export class UtilisateurFormComponent implements OnInit {
         distributor_id: v.distributor_id || null,
       };
       if (v.password) body.password = v.password;
-      this.usersService.update(this.editingId, body).subscribe({
-        next: () => this.done('Utilisateur modifié'),
-        error: e => this.err(e),
-      });
+      this.formSubmit.submit(
+        this.form,
+        (saving) => (this.saving = saving),
+        this.usersService.update(this.editingId, body),
+        {
+          successMessage: 'Utilisateur modifié',
+          navigateTo: '/utilisateurs',
+          navigateDelay: APP_CONFIG.NAVIGATION_DELAY,
+        }
+      );
     } else {
       const body: UserCreate = {
         phone: v.phone!,
@@ -171,21 +182,17 @@ export class UtilisateurFormComponent implements OnInit {
         employe_code: v.employe_code || null,
         distributor_id: v.distributor_id || null,
       };
-      this.usersService.create(body).subscribe({
-        next: () => this.done('Utilisateur créé'),
-        error: e => this.err(e),
-      });
+      this.formSubmit.submit(
+        this.form,
+        (saving) => (this.saving = saving),
+        this.usersService.create(body),
+        {
+          successMessage: 'Utilisateur créé',
+          navigateTo: '/utilisateurs',
+          navigateDelay: APP_CONFIG.NAVIGATION_DELAY,
+        }
+      );
     }
-  }
-
-  private done(detail: string) {
-    this.messageService.add({ severity: 'success', summary: 'Succès', detail, life: 3000 });
-    setTimeout(() => this.router.navigate(['/utilisateurs']), 1000);
-  }
-
-  private err(e: any) {
-    this.saving = false;
-    this.messageService.add({ severity: 'error', summary: 'Erreur', detail: e.error?.detail ?? 'Erreur', life: 4000 });
   }
 
   cancel() { this.router.navigate(['/utilisateurs']); }

@@ -1,87 +1,78 @@
-<!-- Page header -->
-<div class="page-header">
-  <div class="page-header__top">
-    <div class="page-header__left">
-      <div class="page-icon"><i class="pi pi-chart-line"></i></div>
-      <div>
-        <h1 class="page-header__title">Ventes</h1>
-        <p class="page-header__sub">
-          @if (total > 0) { {{ total | number }} lignes au total } @else { Consultez les données de vente par période }
-        </p>
+<!-- Page Layout -->
+<app-page-layout
+  icon="pi-chart-line"
+  title="Ventes"
+  [subtitle]="total > 0 ? (total | number) + ' lignes au total' : 'Consultez les données de vente par période'"
+  [actions]="headerActions"
+  [toolbar]="toolbarContent">
+
+  <!-- Header Actions Template -->
+  <ng-template #headerActions>
+    <app-date-range-picker
+      [periodes]="periodes"
+      [dateFrom]="dateFrom"
+      [dateTo]="dateTo"
+      (rangeChange)="onRangeChange($event)"
+    />
+    <div class="filter-card">
+      <div class="filter-card__icon"><i class="pi pi-id-card"></i></div>
+      <div class="filter-card__body">
+        <span class="filter-card__label">Prévendeur</span>
+        <p-select
+          [options]="fdvs"
+          [(ngModel)]="selectedFdv"
+          placeholder="Tous"
+          [filter]="true"
+          [showClear]="true"
+          (onChange)="onFdvChange()"
+          class="filter-card-select"
+          panelStyleClass="filter-card-panel"
+        />
+      </div>
+      @if (selectedFdv) {
+        <button class="btn-rapport" pTooltip="Rapport de facturation" (click)="goToRapport()">
+          <i class="pi pi-file-pdf"></i>
+        </button>
+      }
+    </div>
+
+    <div class="filter-card">
+      <div class="filter-card__icon"><i class="pi pi-building"></i></div>
+      <div class="filter-card__body">
+        <span class="filter-card__label">Client</span>
+        <p-select
+          [options]="clients"
+          [(ngModel)]="selectedClient"
+          placeholder="Tous"
+          [filter]="true"
+          [showClear]="true"
+          (onChange)="onFilterChange()"
+          class="filter-card-select"
+          panelStyleClass="filter-card-panel"
+        />
       </div>
     </div>
-    <div class="page-header__filters">
-      <app-date-range-picker
-        [periodes]="periodes"
-        [dateFrom]="dateFrom"
-        [dateTo]="dateTo"
-        (rangeChange)="onRangeChange($event)"
-      />
-      <div class="filter-card">
-        <div class="filter-card__icon"><i class="pi pi-id-card"></i></div>
-        <div class="filter-card__body">
-          <span class="filter-card__label">Prévendeur</span>
-          <p-select
-            [options]="fdvs"
-            [(ngModel)]="selectedFdv"
-            placeholder="Tous"
-            [filter]="true"
-            [showClear]="true"
-            (onChange)="onFdvChange()"
-            class="filter-card-select"
-            panelStyleClass="filter-card-panel"
-          />
-        </div>
-        @if (selectedFdv) {
-          <button class="btn-rapport" pTooltip="Rapport de facturation" (click)="goToRapport()">
-            <i class="pi pi-file-pdf"></i>
-          </button>
-        }
-      </div>
 
-      <div class="filter-card">
-        <div class="filter-card__icon"><i class="pi pi-building"></i></div>
-        <div class="filter-card__body">
-          <span class="filter-card__label">Client</span>
-          <p-select
-            [options]="clients"
-            [(ngModel)]="selectedClient"
-            placeholder="Tous"
-            [filter]="true"
-            [showClear]="true"
-            (onChange)="onFilterChange()"
-            class="filter-card-select"
-            panelStyleClass="filter-card-panel"
-          />
-        </div>
-      </div>
-
-      <div class="filter-card">
-        <div class="filter-card__icon"><i class="pi pi-sitemap"></i></div>
-        <div class="filter-card__body">
-          <span class="filter-card__label">Distributeur</span>
-          <p-select
-            [options]="distributeurs"
-            [(ngModel)]="selectedDistributeur"
-            placeholder="Tous"
-            [filter]="true"
-            [showClear]="true"
-            (onChange)="onDistributeurChange()"
-            class="filter-card-select"
-            panelStyleClass="filter-card-panel"
-          />
-        </div>
+    <div class="filter-card">
+      <div class="filter-card__icon"><i class="pi pi-sitemap"></i></div>
+      <div class="filter-card__body">
+        <span class="filter-card__label">Distributeur</span>
+        <p-select
+          [options]="distributeurs"
+          [(ngModel)]="selectedDistributeur"
+          placeholder="Tous"
+          [filter]="true"
+          [showClear]="true"
+          (onChange)="onDistributeurChange()"
+          class="filter-card-select"
+          panelStyleClass="filter-card-panel"
+        />
       </div>
     </div>
-  </div>
-</div>
+  </ng-template>
 
-<!-- Table Container -->
-<div class="table-container">
-
-  <!-- Toolbar -->
-  <div class="prod-toolbar">
-
+  <!-- Toolbar Template -->
+  <ng-template #toolbarContent>
     <!-- Active column filter chips -->
     @if (activeFilterCount > 0) {
       <div class="active-filters-bar">
@@ -147,9 +138,7 @@
         </button>
       </div>
     </div>
-
-
-  </div>
+  </ng-template>
 
   <!-- Table -->
   <div class="table-wrapper" #tableWrapper>
@@ -187,26 +176,20 @@
         </thead>
         <tbody>
           @if (loading) {
-            @for (_ of skeletonRows; track $index; let ri = $index) {
-              <tr class="sk-row">
-                @for (col of visibleColumns; track col.field; let ci = $index) {
-                  <td [style.min-width]="col.width">
-                    <div class="sk-cell"
-                         [style.width]="skWidths[(ri + ci) % skWidths.length]"
-                         [style.animation-delay]="((ri * 3 + ci) % 18) * 60 + 'ms'"></div>
-                  </td>
-                }
-              </tr>
-            }
+            <tr class="sk-row">
+              <td [attr.colspan]="visibleColumns.length">
+                <app-skeleton-loader [rows]="12" [columns]="visibleColumns.length" [widths]="skWidths"></app-skeleton-loader>
+              </td>
+            </tr>
           } @else {
             @for (row of rows; track $index; let i = $index) {
               <tr class="table-row-animate" [style.--row-delay]="i < 20 ? i * 15 + 'ms' : '0ms'">
                 @for (col of visibleColumns; track col.field) {
                   <td [style.min-width]="col.width">
-                    @if (col.field === 'famille' && row[col.field]) {
+                    @if (col.field === 'famille' && row.famille) {
                       <span class="famille-pill" [ngStyle]="getFamilleStyle(row.famille)">{{ row.famille }}</span>
                     } @else {
-                      {{ row[col.field] ?? '—' }}
+                      {{ getRowValue(row, col.field) }}
                     }
                   </td>
                 }
@@ -264,4 +247,4 @@
     }
   </div>
 
-</div>
+</app-page-layout>

@@ -1,8 +1,13 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PrevendeurService, PrevFacturation, PrevClient, PrevObjectifItem } from '../../core/services/prevendeur.service';
 import { AuthService } from '../../core/services/auth.service';
+import { FormatService } from '../../core/services/format.service';
+import { LoadingManager } from '../../core/services/loading-manager.service';
+import { PeriodService } from '../../core/services/period.service';
+import { toggleInSet, isInSet } from '../../core/utils/set-toggle.util';
+import { groupBy, calculatePercentage } from '../../core/utils/data-transform.util';
 
 @Component({
   selector: 'app-prevendeur',
@@ -13,16 +18,19 @@ import { AuthService } from '../../core/services/auth.service';
 })
 export class PrevendeurComponent implements OnInit {
   private svc = inject(PrevendeurService);
+  private format = inject(FormatService);
+  private loadingManager = inject(LoadingManager);
+  private period = inject(PeriodService);
   auth = inject(AuthService);
 
   periodes: string[] = [];
   selectedMois = '';
-  loading = false;
+  loading = signal(false);
   data: PrevFacturation | null = null;
   activeTab: 'tournees' | 'clients' | 'objectifs' | 'menu' = 'tournees';
   expandedClients = new Set<string>();
   objectifs: PrevObjectifItem[] = [];
-  loadingObjectifs = false;
+  loadingObjectifs = signal(false);
   collapsedFamilles = new Set<string>();
   editingKey: string | null = null;
   editingValue = '';
@@ -42,51 +50,49 @@ export class PrevendeurComponent implements OnInit {
 
   load() {
     if (!this.selectedMois) return;
-    this.loading = true;
     this.data = null;
     this.expandedClients.clear();
-    this.svc.getFacturation(this.selectedMois).subscribe({
-      next: d => { this.data = d; this.loading = false; },
-      error: () => { this.loading = false; },
-    });
+    this.loadingManager.load(
+      this.loading,
+      this.svc.getFacturation(this.selectedMois),
+      d => { this.data = d; }
+    );
     this.loadObjectifs();
   }
 
   loadObjectifs() {
     if (!this.selectedMois) return;
-    this.loadingObjectifs = true;
-    this.svc.getObjectifs(this.selectedMois).subscribe({
-      next: d => {
+    this.loadingManager.load(
+      this.loadingObjectifs,
+      this.svc.getObjectifs(this.selectedMois),
+      d => {
         this.objectifs = d;
         this.collapsedFamilles = new Set(d.map(o => o.famille || 'autre'));
-        this.loadingObjectifs = false;
-      },
-      error: () => { this.loadingObjectifs = false; },
-    });
+      }
+    );
   }
 
   prevPeriod() {
-    const i = this.periodes.indexOf(this.selectedMois);
-    if (i < this.periodes.length - 1) { this.selectedMois = this.periodes[i + 1]; this.load(); }
+    const prev = this.period.getPrevious(this.periodes, this.selectedMois);
+    if (prev) { this.selectedMois = prev; this.load(); }
   }
 
   nextPeriod() {
-    const i = this.periodes.indexOf(this.selectedMois);
-    if (i > 0) { this.selectedMois = this.periodes[i - 1]; this.load(); }
+    const next = this.period.getNext(this.periodes, this.selectedMois);
+    if (next) { this.selectedMois = next; this.load(); }
   }
 
-  get canGoPrev(): boolean { return this.periodes.indexOf(this.selectedMois) < this.periodes.length - 1; }
-  get canGoNext(): boolean { return this.periodes.indexOf(this.selectedMois) > 0; }
+  get canGoPrev(): boolean { return this.period.canGoPrevious(this.periodes, this.selectedMois); }
+  get canGoNext(): boolean { return this.period.canGoNext(this.periodes, this.selectedMois); }
 
   toggleClient(key: string) {
-    this.expandedClients.has(key) ? this.expandedClients.delete(key) : this.expandedClients.add(key);
+    toggleInSet(this.expandedClients, key);
   }
 
   isExpanded(key: string): boolean { return this.expandedClients.has(key); }
 
   formatPeriod(p: string): string {
-    const [y, m] = p.split('-');
-    return new Date(+y, +m - 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    return this.period.format(p);
   }
 
   get totalMontant(): number {
@@ -110,13 +116,11 @@ export class PrevendeurComponent implements OnInit {
   }
 
   formatMontant(n: number): string {
-    if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + ' M';
-    if (n >= 1_000) return (n / 1_000).toFixed(0) + ' k';
-    return n.toFixed(0);
+    return this.format.formatMontant(n);
   }
 
   val(v: number | null): string {
-    return v ? String(v) : '';
+    return this.format.emptyIfNull(v);
   }
 
   familleClass(p: string): string {
@@ -180,22 +184,19 @@ export class PrevendeurComponent implements OnInit {
   }
 
   get objectifsByFamille(): { famille: string; items: PrevObjectifItem[]; pct: number }[] {
-    const map = new Map<string, PrevObjectifItem[]>();
-    for (const obj of this.objectifs) {
-      const key = obj.famille || 'autre';
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(obj);
-    }
-    return Array.from(map.entries()).map(([famille, items]) => {
-      const totalActual = items.reduce((s, o) => s + o.actual, 0);
-      const totalObj    = items.reduce((s, o) => s + o.objectif, 0);
-      const pct = totalObj > 0 ? Math.round(Math.min(totalActual / totalObj * 100, 100)) : 0;
-      return { famille, items, pct };
-    }).sort((a, b) => a.pct - b.pct);
+    const map = groupBy(this.objectifs, o => o.famille || 'autre');
+    return Array.from(map.entries())
+      .map(([famille, items]) => {
+        const totalActual = items.reduce((s, o) => s + o.actual, 0);
+        const totalObj = items.reduce((s, o) => s + o.objectif, 0);
+        const pct = calculatePercentage(totalActual, totalObj);
+        return { famille, items, pct };
+      })
+      .sort((a, b) => a.pct - b.pct);
   }
 
   toggleFamille(famille: string) {
-    this.collapsedFamilles.has(famille) ? this.collapsedFamilles.delete(famille) : this.collapsedFamilles.add(famille);
+    toggleInSet(this.collapsedFamilles, famille);
   }
 
   readonly skeletonRows = Array(6).fill(0);

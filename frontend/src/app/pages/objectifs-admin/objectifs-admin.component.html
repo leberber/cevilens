@@ -1,25 +1,12 @@
-<!-- Page header -->
-<div class="page-header">
-  <div class="page-header__left">
-    <div class="page-icon"><i class="pi pi-bullseye"></i></div>
-    <div>
-      <h1 class="page-header__title">Objectifs</h1>
-      @if (!editMode) {
-        <p class="page-header__sub">{{ filledProducts }} / {{ totalProducts }} produits renseignés</p>
-      } @else {
-        <p class="page-header__sub">
-          <span class="obj-edit-badge"><i class="pi pi-pencil"></i> Mode édition — {{ periodLabel }} — {{ canalLabel }}</span>
-        </p>
-      }
-    </div>
-  </div>
-</div>
+<app-page-layout
+  icon="pi-bullseye"
+  title="Objectifs"
+  [subtitle]="!editMode ? (filledProducts + ' / ' + totalProducts + ' produits renseignés') : ('Mode édition — ' + periodLabel + ' — ' + canalLabel)"
+  [toolbar]="toolbarContent">
 
-<!-- Table container -->
-<div class="table-container" [class.table-container--editing]="editMode">
-
-  <!-- Toolbar -->
-  <div class="obj-toolbar">
+  <!-- Toolbar Template -->
+  <ng-template #toolbarContent>
+    <div class="obj-toolbar">
 
     <div class="obj-toolbar__left">
       @if (!editMode) {
@@ -108,6 +95,7 @@
     </div>
 
   </div>
+  </ng-template>
 
   <!-- Import result banner -->
   @if (importResult) {
@@ -206,10 +194,10 @@
                   <input type="number" step="1" min="0" [(ngModel)]="row._packs_tournee" placeholder="—">
                 </td>
               } @else {
-                <td class="td-num td-tonne">{{ formatNum(canal === 'VD' ? row.objectif_tonne_vd : row.objectif_tonne_vh) }}</td>
-                <td class="td-num td-per-route td-tonne">{{ perRouteTonne(canal === 'VD' ? row.objectif_tonne_vd : row.objectif_tonne_vh) }}</td>
-                <td class="td-num td-packs">{{ formatNum(canal === 'VD' ? row.objectif_packs_vd : row.objectif_packs_vh) }}</td>
-                <td class="td-num td-per-route td-packs">{{ perRoute(canal === 'VD' ? row.objectif_packs_vd_tournee : row.objectif_packs_vh_tournee) }}</td>
+                <td class="td-num td-tonne">{{ formatNum(getRowTonne(row)) }}</td>
+                <td class="td-num td-per-route td-tonne">{{ perRouteTonne(getRowTonne(row)) }}</td>
+                <td class="td-num td-packs">{{ formatNum(getRowPacks(row)) }}</td>
+                <td class="td-num td-per-route td-packs">{{ perRoute(getRowPacksTournee(row)) }}</td>
               }
               <td class="text-muted td-small">{{ row.updated_by || '—' }}</td>
               <td class="text-muted td-small">{{ formatDate(row.updated_at) }}</td>
@@ -277,10 +265,10 @@
                       <input type="number" step="1" min="0" [(ngModel)]="row._packs_tournee" placeholder="—">
                     </td>
                   } @else {
-                    <td class="td-num td-tonne">{{ formatNum(canal === 'VD' ? row.objectif_tonne_vd : row.objectif_tonne_vh) }}</td>
-                    <td class="td-num td-per-route td-tonne">{{ perRouteTonne(canal === 'VD' ? row.objectif_tonne_vd : row.objectif_tonne_vh) }}</td>
-                    <td class="td-num td-packs">{{ formatNum(canal === 'VD' ? row.objectif_packs_vd : row.objectif_packs_vh) }}</td>
-                    <td class="td-num td-per-route td-packs">{{ perRoute(canal === 'VD' ? row.objectif_packs_vd_tournee : row.objectif_packs_vh_tournee) }}</td>
+                    <td class="td-num td-tonne">{{ formatNum(getRowTonne(row)) }}</td>
+                    <td class="td-num td-per-route td-tonne">{{ perRouteTonne(getRowTonne(row)) }}</td>
+                    <td class="td-num td-packs">{{ formatNum(getRowPacks(row)) }}</td>
+                    <td class="td-num td-per-route td-packs">{{ perRoute(getRowPacksTournee(row)) }}</td>
                   }
                   <td class="text-muted td-small">{{ row.updated_by || '—' }}</td>
                   <td class="text-muted td-small">{{ formatDate(row.updated_at) }}</td>
@@ -309,7 +297,7 @@
     </table>
   </div>
 
-</div>
+</app-page-layout>
 
 <!-- Import dialog -->
 @if (showImportDialog) {
@@ -352,20 +340,13 @@
 }
 
 <!-- Confirmation dialog -->
-@if (showConfirm) {
-  <div class="obj-backdrop" (click)="showConfirm = false">
-    <div class="obj-dialog" (click)="$event.stopPropagation()">
-      <h3 class="obj-dialog__title">Confirmer la sauvegarde</h3>
-      <p class="obj-dialog__body">
-        Sauvegarder les objectifs de <strong>{{ periodLabel }}</strong> — <strong>{{ canalLabel }}</strong> ?
-      </p>
-      <p class="obj-dialog__count text-muted">{{ dirtyCount }} produit(s) modifié(s)</p>
-      <div class="obj-dialog__actions">
-        <button class="btn-secondary" (click)="showConfirm = false">Annuler</button>
-        <button class="btn-save" (click)="confirmSave()">
-          <i class="pi pi-check"></i> Confirmer
-        </button>
-      </div>
-    </div>
-  </div>
-}
+<app-confirm-dialog
+  [visible]="showConfirm"
+  title="Confirmer la sauvegarde"
+  [message]="'Sauvegarder les objectifs de ' + periodLabel + ' — ' + canalLabel + ' ? (' + dirtyCount + ' produit(s) modifié(s))'"
+  confirmLabel="Confirmer"
+  cancelLabel="Annuler"
+  [isLoading]="isSaving"
+  (onConfirmed)="confirmSave()"
+  (onCancelled)="showConfirm = false">
+</app-confirm-dialog>

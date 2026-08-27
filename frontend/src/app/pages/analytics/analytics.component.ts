@@ -1,6 +1,10 @@
-import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy, TemplateRef, ViewChild } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { FormatService } from '../../core/services/format.service';
+import { LoadingManager } from '../../core/services/loading-manager.service';
+import { PeriodService } from '../../core/services/period.service';
+import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
 
 import { D3AreaComponent, type AreaPoint } from './d3-area.component';
 import { D3HbarComponent, type HBarItem } from './d3-hbar.component';
@@ -29,18 +33,24 @@ type Unite = 'packs' | 'tonnes';
 @Component({
   selector: 'app-analytics',
   standalone: true,
-  imports: [DecimalPipe, D3AreaComponent, D3HbarComponent, CommuneMapComponent],
+  imports: [DecimalPipe, D3AreaComponent, D3HbarComponent, CommuneMapComponent, PageLayoutComponent],
   templateUrl: './analytics.component.html',
   styleUrl:    './analytics.component.scss',
 })
 export class AnalyticsComponent implements OnInit, OnDestroy {
   private http = inject(HttpClient);
+  private format = inject(FormatService);
+  private loadingManager = inject(LoadingManager);
+  private period = inject(PeriodService);
 
   readonly data        = signal<AnalyticsData | null>(null);
   readonly loading     = signal(true);
   readonly mapData     = signal<CommuneDatum[]>([]);
   readonly fdvBarData  = signal<HBarItem[]>([]);
   readonly prodBarData = signal<HBarItem[]>([]);
+
+  // Template references for PageLayout
+  @ViewChild('headerActions') headerActions!: TemplateRef<any>;
 
   displayKpis = { total_ventes: 0, nb_fdvs: 0 };
   private _animInterval: ReturnType<typeof setInterval> | null = null;
@@ -148,14 +158,15 @@ export class AnalyticsComponent implements OnInit, OnDestroy {
 
   // ── Load ───────────────────────────────────────────────────────────────────
   private load(): void {
-    this.loading.set(true);
     let params = new HttpParams().set('annee_mois', this.periode()).set('canal', this.canal()).set('unite', this.unite());
     if (this.famille()) params = params.set('famille', this.famille());
     if (this.fdv())     params = params.set('fdv', this.fdv()!.code);
     if (this.commune()) params = params.set('commune', this.commune()!.name);
 
-    this.http.get<AnalyticsData>('/api/v1/prevendeur/admin/analytics', { params }).subscribe({
-      next: d => {
+    this.loadingManager.load(
+      this.loading,
+      this.http.get<AnalyticsData>('/api/v1/prevendeur/admin/analytics', { params }),
+      d => {
         this.data.set(d);
         this.animateKpis({ total_ventes: d.kpis.total_ventes, nb_fdvs: d.kpis.nb_fdvs });
 
@@ -165,17 +176,14 @@ export class AnalyticsComponent implements OnInit, OnDestroy {
         this.prodBarData.set(d.by_produit.map((x, i) => ({ id: i, name: x.nom, value: x.total })));
         this.mapData.set(d.by_location.map(r => ({ code: r.code, total: r.total })));
 
-
         if (d.periodes.length) {
           this.periodes.set(d.periodes);
           if (!d.periodes.includes(this.periode())) {
             this.periode.set(d.periodes[0]);
           }
         }
-        this.loading.set(false);
-      },
-      error: () => this.loading.set(false),
-    });
+      }
+    );
   }
 
   get uniteLabel(): string {
@@ -183,8 +191,6 @@ export class AnalyticsComponent implements OnInit, OnDestroy {
   }
 
   formatPeriode(p: string): string {
-    if (!p) return '';
-    const [y, m] = p.split('-');
-    return new Date(+y, +m - 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    return this.period.format(p);
   }
 }

@@ -1,4 +1,4 @@
-import { Component, OnInit, AfterViewInit, OnDestroy, inject, ViewChild, ElementRef, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, AfterViewInit, OnDestroy, inject, ViewChild, ElementRef, ChangeDetectorRef, TemplateRef } from '@angular/core';
 import { Router } from '@angular/router';
 import { DecimalPipe, NgStyle } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -6,32 +6,34 @@ import { TooltipModule } from 'primeng/tooltip';
 import { Select } from 'primeng/select';
 import { Popover } from 'primeng/popover';
 import { VentesService, VenteRead } from '../../core/services/ventes.service';
+import { ColumnStateService, ColDef } from '../../core/services/column-state.service';
+import { PaginationHelper } from '../../core/services/pagination.helper';
+import { FamilleColorService } from '../../core/services/famille-color.service';
+import { SkeletonLoaderComponent } from '../../shared/components/skeleton-loader/skeleton-loader.component';
+import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
 import { DateRangePickerComponent } from '../../shared/components/date-range-picker.component';
+import { BATCH_SIZE, SEARCH_DEBOUNCE_MS } from '../../core/constants/app.constants';
 
 const LS_KEY = 'cevital_ventes_columns';
-const BATCH = 100;
-
-interface ColDef {
-  field: keyof VenteRead;
-  header: string;
-  width: string;
-  visible: boolean;
-  filterable?: boolean;
-}
 
 @Component({
   selector: 'app-ventes',
   standalone: true,
-  imports: [DecimalPipe, NgStyle, FormsModule, TooltipModule, Select, Popover, DateRangePickerComponent],
+  imports: [DecimalPipe, NgStyle, FormsModule, TooltipModule, Select, Popover, SkeletonLoaderComponent, PageLayoutComponent, DateRangePickerComponent],
   templateUrl: './ventes.component.html',
   styleUrl: './ventes.component.scss',
 })
 export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
   private ventesService = inject(VentesService);
+  private columnState = inject(ColumnStateService);
+  private pagination = inject(PaginationHelper);
+  private familleColorService = inject(FamilleColorService);
   private router = inject(Router);
 
   @ViewChild('tableWrapper') tableWrapper!: ElementRef<HTMLElement>;
   @ViewChild('filterPop') filterPop!: Popover;
+  @ViewChild('headerActions') headerActions!: TemplateRef<any>;
+  @ViewChild('toolbarContent') toolbarContent!: TemplateRef<any>;
   private boundScrollFn = () => this.checkScroll();
   private cdr = inject(ChangeDetectorRef);
 
@@ -110,7 +112,6 @@ export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.allColumns.filter(c => c.visible);
   }
 
-  readonly skeletonRows = Array(12).fill(0);
   readonly skWidths = ['72%','55%','88%','50%','78%','63%','90%','42%','70%','82%','58%','68%'];
 
   get hasMore(): boolean {
@@ -254,14 +255,11 @@ export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onSearch() {
-    clearTimeout(this.searchTimeout);
-    this.searchTimeout = setTimeout(() => this.reset(), 400);
+    this.pagination.debounceSearch(() => this.reset(), SEARCH_DEBOUNCE_MS);
   }
 
   toggleColumn(field: string) {
-    const col = this.allColumns.find(c => c.field === field);
-    if (col) col.visible = !col.visible;
-    this.saveColumnState();
+    this.columnState.toggle(this.allColumns, field, LS_KEY);
   }
 
   private loadFdvsAndClients(): void {
@@ -286,7 +284,7 @@ export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
     const f = this.activeFilters;
     this.ventesService.list({
       page: this.currentPage,
-      per_page: BATCH,
+      per_page: BATCH_SIZE,
       date_from: this.dateFrom || undefined,
       date_to: this.dateTo || undefined,
       famille:          (f['famille']          as string) || this.selectedFamille || undefined,
@@ -307,8 +305,10 @@ export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
       search: this.searchTerm || undefined,
     }).subscribe({
       next: res => {
-        this.rows = append ? [...this.rows, ...res.items] : res.items;
-        this.total = res.total;
+        this.pagination.handleBatchLoad(res, this.rows, append, (items, total) => {
+          this.rows = items;
+          this.total = total;
+        });
         this.loading = false;
         this.loadingMore = false;
       },
@@ -320,39 +320,14 @@ export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private loadColumnState() {
-    try {
-      const saved = localStorage.getItem(LS_KEY);
-      if (!saved) return;
-      const state: Record<string, boolean> = JSON.parse(saved);
-      this.allColumns.forEach(col => {
-        if (col.field in state) col.visible = state[col.field];
-      });
-    } catch { /* ignore */ }
+    this.columnState.load(this.allColumns, LS_KEY);
   }
-
-  private saveColumnState() {
-    const state: Record<string, boolean> = {};
-    this.allColumns.forEach(col => (state[col.field] = col.visible));
-    localStorage.setItem(LS_KEY, JSON.stringify(state));
-  }
-
-  private readonly familleColors = [
-    { background: 'rgba(99,102,241,0.12)',  color: '#4f46e5' },  // indigo
-    { background: 'rgba(16,185,129,0.12)',  color: '#059669' },  // emerald
-    { background: 'rgba(245,158,11,0.12)',  color: '#d97706' },  // amber
-    { background: 'rgba(236,72,153,0.12)',  color: '#db2777' },  // pink
-    { background: 'rgba(20,184,166,0.12)',  color: '#0d9488' },  // teal
-    { background: 'rgba(239,68,68,0.12)',   color: '#dc2626' },  // red
-    { background: 'rgba(59,130,246,0.12)',  color: '#2563eb' },  // blue
-    { background: 'rgba(139,92,246,0.12)',  color: '#7c3aed' },  // violet
-    { background: 'rgba(234,88,12,0.12)',   color: '#c2410c' },  // orange
-    { background: 'rgba(15,118,110,0.12)',  color: '#0f766e' },  // dark-teal
-  ];
 
   getFamilleStyle(famille: string | null): { background: string; color: string } {
-    if (!famille) return { background: 'transparent', color: 'inherit' };
-    let hash = 0;
-    for (let i = 0; i < famille.length; i++) hash = (hash * 31 + famille.charCodeAt(i)) >>> 0;
-    return this.familleColors[hash % this.familleColors.length];
+    return this.familleColorService.getStyle(famille);
+  }
+
+  getRowValue(row: VenteRead, field: string): any {
+    return (row as any)[field] ?? '—';
   }
 }

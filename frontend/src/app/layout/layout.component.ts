@@ -1,8 +1,9 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, computed, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../core/services/auth.service';
-import { DistributorService } from '../core/services/distributor.service';
+import { RoleService } from '../core/services/role.service';
+import { DistributorContextService } from '../core/services/distributor-context.service';
 
 @Component({
   selector: 'app-layout',
@@ -10,37 +11,21 @@ import { DistributorService } from '../core/services/distributor.service';
   imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet],
   templateUrl: './layout.component.html',
 })
-export class LayoutComponent implements OnInit {
+export class LayoutComponent {
   collapsed  = signal(false);
   drawerOpen = signal(false);
   auth       = inject(AuthService);
-  distributorService = inject(DistributorService);
-  distributorName = signal<string | null>(null);
+  roleService = inject(RoleService);
+  distributorContext = inject(DistributorContextService);
 
-  ngOnInit() {
-    const user = this.auth.currentUser();
-    if (user?.distributor_id) {
-      this.distributorService.getDistributor(user.distributor_id).subscribe({
-        next: (dist) => this.distributorName.set(`${dist.code} - ${dist.nom}`),
-        error: () => this.distributorName.set(null),
-      });
-    }
-  }
+  // Computed signals
+  distributorName = computed(() => this.distributorContext.formattedName());
 
   get user()             { return this.auth.currentUser(); }
-  get isPlatformAdmin()  {
-    const r = this.auth.currentUser()?.role;
-    return r === 'platform_admin' || r === 'admin';
-  }
-  get isDistributorAdmin() {
-    const r = this.auth.currentUser()?.role;
-    return r === 'distributor_admin' || r === 'admin';
-  }
-  get isSuperviseur()    { return this.auth.currentUser()?.role === 'superviseur'; }
-  get isPrevendeur()     {
-    const r = this.auth.currentUser()?.role;
-    return r === 'prevendeur' || r === 'prevender';
-  }
+  get isPlatformAdmin()  { return this.roleService.isPlatformAdmin(); }
+  get isDistributorAdmin() { return this.roleService.isDistributorAdmin(); }
+  get isSuperviseur()    { return this.roleService.isSuperviseur(); }
+  get isPrevendeur()     { return this.roleService.isPrevendeur(); }
 
   logout() { this.auth.logout(); }
 }

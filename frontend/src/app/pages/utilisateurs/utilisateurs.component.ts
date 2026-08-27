@@ -1,31 +1,36 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, TemplateRef, ViewChild } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Toast } from 'primeng/toast';
 import { ConfirmDialog } from 'primeng/confirmdialog';
-import { MessageService, ConfirmationService } from 'primeng/api';
 import { sortItems, toggleSort } from '../../core/utils/sort.util';
 
 import { UsersService } from '../../core/services/users.service';
 import { AuthService } from '../../core/services/auth.service';
+import { RoleService } from '../../core/services/role.service';
 import { DistributorService } from '../../core/services/distributor.service';
+import { NotificationService } from '../../core/services/notification.service';
+import { UtilityService } from '../../core/services/utility.service';
+import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
+import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { User } from '../../core/models/user.model';
+import { ROLE_LABELS, ROLE_BADGES } from '../../core/constants/roles';
 
 @Component({
   selector: 'app-utilisateurs',
   standalone: true,
-  imports: [CommonModule, FormsModule, Toast, ConfirmDialog],
-  providers: [MessageService, ConfirmationService],
+  imports: [CommonModule, FormsModule, Toast, ConfirmDialog, PageLayoutComponent, ConfirmDialogComponent],
   templateUrl: './utilisateurs.component.html',
 })
 export class UtilisateursComponent implements OnInit {
   private usersService        = inject(UsersService);
   private distributorService  = inject(DistributorService);
-  private messageService      = inject(MessageService);
-  private confirmationService = inject(ConfirmationService);
+  private notification        = inject(NotificationService);
+  private utility             = inject(UtilityService);
   private router              = inject(Router);
   auth                        = inject(AuthService);
+  roleService                 = inject(RoleService);
 
   users: User[] = [];
   distributors: any[] = [];
@@ -38,22 +43,14 @@ export class UtilisateursComponent implements OnInit {
   editingPhoneId: number | null = null;
   editingPhoneValue = '';
 
-  readonly roleLabel: Record<string, string> = {
-    platform_admin: '🔑 Platform Admin',
-    distributor_admin: '📦 Distributor Admin',
-    superviseur: '👮 Superviseur',
-    prevendeur: '🚚 Prévendeur',
-    admin: 'Admin',
-    prevender: 'Prévendeur',
-  };
-  readonly roleBadge: Record<string, string> = {
-    platform_admin:    'badge badge--danger',
-    distributor_admin: 'badge badge--warning',
-    superviseur:       'badge badge--info',
-    prevendeur:        '',
-    admin:             'badge badge--danger',
-    prevender:         '',
-  };
+  // Confirmation dialog state
+  showConfirmDelete = false;
+  userToDelete: User | null = null;
+
+  @ViewChild('toolbarContent') toolbarContent!: TemplateRef<any>;
+
+  readonly roleLabel = ROLE_LABELS;
+  readonly roleBadge = ROLE_BADGES;
 
   get sorted(): User[] {
     const q = this.searchQuery.toLowerCase();
@@ -81,7 +78,7 @@ export class UtilisateursComponent implements OnInit {
     this.loading = true;
     this.usersService.list().subscribe({
       next: data => { this.users = data; this.loading = false; },
-      error: () => { this.loading = false; this.toast('error', 'Erreur de chargement'); },
+      error: () => { this.loading = false; this.notification.error('Erreur de chargement'); },
     });
   }
 
@@ -91,20 +88,24 @@ export class UtilisateursComponent implements OnInit {
     this.router.navigate(['/utilisateurs', u.id, 'modifier'], { state: { utilisateur: u } });
   }
 
-  confirmDelete(u: User) {
-    this.confirmationService.confirm({
-      message: `Supprimer "${u.full_name}" ?`,
-      header: 'Confirmation',
-      icon: 'pi pi-exclamation-triangle',
-      acceptLabel: 'Supprimer',
-      rejectLabel: 'Annuler',
-      accept: () => {
-        this.usersService.delete(u.id).subscribe({
-          next: () => { this.load(); this.toast('success', 'Utilisateur supprimé'); },
-          error: e  => this.toast('error', e.error?.detail ?? 'Erreur'),
-        });
-      },
+  confirmDelete(u: User): void {
+    this.userToDelete = u;
+    this.showConfirmDelete = true;
+  }
+
+  onDeleteConfirmed(): void {
+    if (!this.userToDelete) return;
+    const user = this.userToDelete;
+    this.showConfirmDelete = false;
+    this.usersService.delete(user.id).subscribe({
+      next: () => { this.load(); this.notification.success('Utilisateur supprimé'); this.userToDelete = null; },
+      error: e  => this.notification.showHttpError(e, 'Erreur'),
     });
+  }
+
+  onDeleteCancelled(): void {
+    this.showConfirmDelete = false;
+    this.userToDelete = null;
   }
 
   startEditPhone(u: User): void {
@@ -120,7 +121,7 @@ export class UtilisateursComponent implements OnInit {
         u.phone = updated.phone;
         this.editingPhoneId = null;
       },
-      error: e => this.toast('error', e.error?.detail ?? 'Erreur'),
+      error: e => this.notification.showHttpError(e, 'Erreur'),
     });
   }
 
@@ -129,10 +130,7 @@ export class UtilisateursComponent implements OnInit {
   get isAdmin(): boolean { return this.auth.isAdmin; }
 
   formatPhone(phone: string): string {
-    const d = phone.replace(/\s/g, '');
-    return d.length === 10
-      ? `${d.slice(0,4)} ${d.slice(4,6)} ${d.slice(6,8)} ${d.slice(8,10)}`
-      : phone;
+    return this.utility.formatPhone(phone);
   }
 
   isSelf(u: User): boolean { return u.id === this.auth.currentUser()?.id; }
@@ -140,9 +138,5 @@ export class UtilisateursComponent implements OnInit {
   getDistributorName(distributorId: number | null | undefined): string {
     if (!distributorId) return '—';
     return this.distributorMap.get(distributorId) ?? '—';
-  }
-
-  private toast(severity: string, detail: string) {
-    this.messageService.add({ severity, summary: severity === 'error' ? 'Erreur' : 'Succès', detail, life: 4000 });
   }
 }
