@@ -1,6 +1,6 @@
 import { Component, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule, FormBuilder, Validators, AbstractControl } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Toast } from 'primeng/toast';
 import { InputText } from 'primeng/inputtext';
@@ -89,7 +89,7 @@ export class UtilisateurFormComponent implements OnInit {
   get roleDisplayLabel(): string { return this.roleLabels[this.currentRole] ?? ''; }
 
   form = this.fb.group({
-    phone:            ['', [Validators.required, (c) => this.utility.isValidPhone(c.value ?? '') ? null : { invalidPhone: true }]],
+    phone:            ['', [Validators.required, (c: AbstractControl) => this.utility.isValidPhone(c.value ?? '') ? null : { invalidPhone: true }]],
     full_name:        ['', Validators.required],
     password:         [''],
     role:             ['superviseur' as UserRole, Validators.required],

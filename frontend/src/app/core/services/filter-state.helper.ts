@@ -22,7 +22,7 @@ export class FilterStateHelper {
     const state = {} as T;
     for (const key in template) {
       if (template.hasOwnProperty(key)) {
-        state[key] = null;
+        (state as any)[key] = null;
       }
     }
     return state;
@@ -34,7 +34,7 @@ export class FilterStateHelper {
   resetFilters<T extends FilterState>(filters: T): void {
     for (const key in filters) {
       if (filters.hasOwnProperty(key)) {
-        filters[key] = null;
+        (filters as any)[key] = null;
       }
     }
   }

@@ -8,8 +8,8 @@ import { Injectable } from '@angular/core';
   providedIn: 'root',
 })
 export class IntervalManager {
-  private intervals = new Map<string, NodeJS.Timeout>();
-  private timeouts = new Map<string, NodeJS.Timeout>();
+  private intervals = new Map<string, number>();
+  private timeouts = new Map<string, number>();
 
   /**
    * Create named interval with automatic tracking
