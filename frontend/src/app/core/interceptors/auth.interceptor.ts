@@ -1,14 +1,35 @@
 import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
-import { inject } from '@angular/core';
+import { inject, Injector } from '@angular/core';
 import { catchError, throwError } from 'rxjs';
 import { AuthService } from '../services/auth.service';
+import { DistributorContextService } from '../services/distributor-context.service';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  const auth  = inject(AuthService);
-  const token = auth.token;
+  const auth = inject(AuthService);
+  const injector = inject(Injector);
+  const headers: Record<string, string> = {};
 
-  const authReq = token
-    ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
+  // Add authentication token
+  if (auth.token) {
+    headers['Authorization'] = `Bearer ${auth.token}`;
+  }
+
+  // Add distributor context for platform admin filtering
+  // Lazy-load to avoid circular dependency
+  try {
+    const distContext = injector.get(DistributorContextService, null);
+    if (distContext) {
+      const distributorId = distContext.selectedDistributorId();
+      if (distributorId) {
+        headers['X-Distributor-Id'] = distributorId.toString();
+      }
+    }
+  } catch {
+    // Service not yet available, continue without distributor header
+  }
+
+  const authReq = Object.keys(headers).length > 0
+    ? req.clone({ setHeaders: headers })
     : req;
 
   return next(authReq).pipe(

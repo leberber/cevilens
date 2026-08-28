@@ -5,15 +5,9 @@ import { DistributorService } from '../../../core/services/distributor.service';
 import { Distributor } from '../../../core/models/distributor.model';
 
 /**
- * DistributorSwitcherComponent
- *
- * Shows "Données de vente · [Distributor Name]" as context.
- * - Non-platform-admin: static display of their own distributor.
- * - Platform admin: clickable dropdown to switch between all active distributors.
- *   Emits null to indicate "all distributors" (no filter).
- *
- * Usage:
- * <app-distributor-switcher (distributorChange)="onDistributeurChange($event)" />
+ * Distributor selector for platform admins.
+ * Allows switching between active distributors to filter data.
+ * Non-admins see read-only display of their assigned distributor.
  */
 @Component({
   selector: 'app-distributor-switcher',
@@ -27,32 +21,28 @@ export class DistributorSwitcherComponent implements OnInit {
   private readonly distService = inject(DistributorService);
 
   readonly isPlatformAdmin = this.roleService.isPlatformAdmin();
-
   readonly distributors = signal<Distributor[]>([]);
   readonly selected = signal<Distributor | null>(null);
   readonly showMenu = signal(false);
 
-  readonly displayName = computed(() => {
-    if (this.isPlatformAdmin) {
-      return this.selected()?.nom ?? null;
-    }
-    return this.distContext.distributor()?.nom ?? null;
-  });
+  readonly displayName = computed(() =>
+    this.isPlatformAdmin
+      ? this.selected()?.nom ?? null
+      : this.distContext.distributor()?.nom ?? null
+  );
 
-  readonly distributorChange = output<string | null>();
+  readonly distributorChange = output<Distributor | null>();
 
   ngOnInit() {
-    if (this.isPlatformAdmin) {
-      this.distService.listDistributors().subscribe(list => {
-        const active = list.filter(d => d.is_active);
-        this.distributors.set(active);
-        // Always default to first distributor
-        if (active.length > 0 && !this.selected()) {
-          this.selected.set(active[0]);
-          this.distributorChange.emit(active[0].nom);
-        }
-      });
-    }
+    if (!this.isPlatformAdmin) return;
+
+    this.distService.listDistributors().subscribe(list => {
+      const active = list.filter(d => d.is_active);
+      this.distributors.set(active);
+      if (active.length > 0 && !this.selected()) {
+        this.selectDistributor(active[0]);
+      }
+    });
   }
 
   toggleMenu(event: Event) {
@@ -62,9 +52,19 @@ export class DistributorSwitcherComponent implements OnInit {
 
   select(dist: Distributor, event: Event) {
     event.stopPropagation();
-    this.selected.set(dist);
+    this.selectDistributor(dist);
     this.showMenu.set(false);
-    this.distributorChange.emit(dist.nom);
+  }
+
+  @HostListener('document:click')
+  onOutsideClick() {
+    this.showMenu.set(false);
+  }
+
+  private selectDistributor(dist: Distributor) {
+    this.selected.set(dist);
+    this.distContext.setSelectedDistributor(dist);
+    this.distributorChange.emit(dist);
   }
 
   @HostListener('document:click')

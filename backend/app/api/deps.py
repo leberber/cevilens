@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordBearer
 from sqlmodel import Session, select
 from typing import Optional
@@ -25,15 +25,33 @@ def get_current_user(
 
 
 def get_current_distributor(
+    request: Request,
     current_user: User = Depends(get_current_user),
     session: Session = Depends(get_session),
 ) -> Optional[Distributor]:
-    """Get the distributor associated with the current user."""
-    if not current_user.distributor_id:
+    """Get the distributor associated with the current user.
+    For non-platform-admin users, returns their assigned distributor.
+    For platform-admin users, returns their selected distributor from header (if any).
+    """
+    distributor_id = None
+
+    # Non-platform-admin users use their assigned distributor
+    if current_user.distributor_id:
+        distributor_id = current_user.distributor_id
+    else:
+        # Platform admin: check header for selected distributor
+        distributor_id_header = request.headers.get("X-Distributor-Id")
+        if distributor_id_header:
+            try:
+                distributor_id = int(distributor_id_header)
+            except (ValueError, TypeError):
+                pass
+
+    if not distributor_id:
         return None
 
     distributor = session.exec(
-        select(Distributor).where(Distributor.id == current_user.distributor_id)
+        select(Distributor).where(Distributor.id == distributor_id)
     ).first()
 
     if not distributor:

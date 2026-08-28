@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, ViewChild, DestroyRef, ChangeDetectionStrategy, ChangeDetectorRef, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, ViewChild, DestroyRef, ChangeDetectionStrategy, ChangeDetectorRef, signal, computed, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -10,6 +10,7 @@ import { ColumnStateService, ColDef } from '../../core/services/column-state.ser
 import { FamilleColorService } from '../../core/services/famille-color.service';
 import { DateHelper } from '../../core/services/date.helper';
 import { NotificationService } from '../../core/services/notification.service';
+import { DistributorContextService } from '../../core/services/distributor-context.service';
 import { SkeletonLoaderComponent } from '../../shared/components/skeleton-loader/skeleton-loader.component';
 import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
 import { DateRangePickerComponent } from '../../shared/components/date-range-picker/date-range-picker.component';
@@ -45,6 +46,7 @@ export class VentesComponent implements OnInit {
   private readonly notify               = inject(NotificationService);
   private readonly destroyRef           = inject(DestroyRef);
   private readonly cdr                  = inject(ChangeDetectorRef);
+  private readonly distContext          = inject(DistributorContextService);
   readonly filterService                = inject(VentesFilterService);
 
   @ViewChild('filterPop') filterPop!: Popover;
@@ -113,6 +115,14 @@ export class VentesComponent implements OnInit {
   readonly visibleColumns = computed(() => this.allColumns.filter(c => c.visible));
   readonly totalCount = computed(() => this.total());
   readonly skWidths = ['72%','55%','88%','50%','78%','63%','90%','42%','70%','82%','58%','68%'];
+
+  // Watch for distributor changes and reload data
+  private readonly distributorEffect = effect(() => {
+    this.distContext.selectedDistributorId();
+    if (this.dateFrom() && this.dateTo()) {
+      this.reset();
+    }
+  });
 
   ngOnInit() {
     this.loadColumnState();
@@ -189,11 +199,6 @@ export class VentesComponent implements OnInit {
     this.ventesService.getClients(this.dateFrom() || undefined, this.dateTo() || undefined, this.selectedFdv() || undefined)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(d => this.clients.set(d));
-    this.reset();
-  }
-
-  onDistributeurChange(value: string | null): void {
-    this.selectedDistributeur.set(value);
     this.reset();
   }
 

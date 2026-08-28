@@ -4,24 +4,25 @@ import { DistributorService } from './distributor.service';
 import { Distributor } from '../models/distributor.model';
 
 /**
- * Global distributor context service
- * Caches and provides distributor information to all components
+ * Manages global distributor context.
+ * - For non-admin users: loads their assigned distributor
+ * - For platform admins: tracks their selected distributor for filtering
  */
 @Injectable({ providedIn: 'root' })
 export class DistributorContextService {
-  private auth = inject(AuthService);
-  private distributorSvc = inject(DistributorService);
+  private readonly auth = inject(AuthService);
+  private readonly distributorSvc = inject(DistributorService);
 
-  // Signal to track the current distributor info
-  private currentDistributorSignal = signal<Distributor | null>(null);
+  private readonly currentDistributorSignal = signal<Distributor | null>(null);
+  private readonly selectedDistributorIdSignal = signal<number | null>(null);
 
-  // Computed to get formatted distributor name
   readonly formattedName = computed(() => {
     const dist = this.currentDistributorSignal();
     return dist ? `${dist.code} - ${dist.nom}` : null;
   });
 
   readonly distributor = computed(() => this.currentDistributorSignal());
+  readonly selectedDistributorId = computed(() => this.selectedDistributorIdSignal());
 
   constructor() {
     // Load distributor context on initialization
@@ -39,6 +40,13 @@ export class DistributorContextService {
         error: () => this.currentDistributorSignal.set(null),
       });
     }
+  }
+
+  /**
+   * Set the selected distributor for platform admin
+   */
+  setSelectedDistributor(distributor: Distributor | null) {
+    this.selectedDistributorIdSignal.set(distributor?.id ?? null);
   }
 
   /**

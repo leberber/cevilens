@@ -187,9 +187,9 @@ def list_ventes(
     current_distributor = Depends(get_current_distributor),
 ) -> Any:
     conditions = []
-    # Filter by distributor for non-platform-admin users
+    # Filter by distributor for all users (including platform admin)
     # Include rows where distributor_id is NULL (backward compatibility) or matches current distributor
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         conditions.append(
             (Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None)
         )
@@ -265,7 +265,7 @@ def list_periodes(
     current_distributor = Depends(get_current_distributor),
 ) -> Any:
     q = select(Vente.annee_mois).distinct().order_by(Vente.annee_mois.desc())
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     result = session.exec(q).all()
     return list(result)
@@ -279,7 +279,7 @@ def get_date_range(
 ) -> Any:
     q_min = select(func.min(Vente.date_commande))
     q_max = select(func.max(Vente.date_commande))
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         filter_cond = (Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None)
         q_min = q_min.where(filter_cond)
         q_max = q_max.where(filter_cond)
@@ -301,7 +301,7 @@ def list_fdvs(
     current_distributor = Depends(get_current_distributor),
 ) -> Any:
     q = select(Vente.nom_fdv).distinct().order_by(Vente.nom_fdv)
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     if annee_mois:
         q = q.where(Vente.annee_mois == annee_mois)
@@ -322,7 +322,7 @@ def list_familles(
     current_distributor = Depends(get_current_distributor),
 ) -> Any:
     q = select(Vente.famille).distinct().order_by(Vente.famille)
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     if annee_mois:
         q = q.where(Vente.annee_mois == annee_mois)
@@ -350,7 +350,7 @@ def list_distinct(
     # Use fast lookup table for client names
     if field == 'nom_client':
         q = select(VenteClientName.nom_client).distinct().order_by(VenteClientName.nom_client)
-        if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        if current_distributor:
             q = q.where(
                 (VenteClientName.distributor_id == current_distributor.id) |
                 (VenteClientName.distributor_id == None)
@@ -365,7 +365,7 @@ def list_distinct(
     if field == 'date_commande':
         col = cast(col, String)
     q = select(col).distinct().order_by(col)
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     if date_from:
         q = q.where(Vente.date_commande >= date_type.fromisoformat(_normalize_date(date_from)))
@@ -387,7 +387,7 @@ def list_clients(
     current_distributor = Depends(get_current_distributor),
 ) -> Any:
     q = select(Vente.nom_client).distinct().order_by(Vente.nom_client)
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     if annee_mois:
         q = q.where(Vente.annee_mois == annee_mois)
@@ -408,7 +408,7 @@ def list_client_names(
 ) -> Any:
     """Fast lookup: return all client names for current distributor (no search filtering)."""
     q = select(VenteClientName.nom_client).distinct().order_by(VenteClientName.nom_client)
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         q = q.where(
             (VenteClientName.distributor_id == current_distributor.id) |
             (VenteClientName.distributor_id == None)
@@ -458,38 +458,7 @@ async def upload_ventes(
             "file_info": {"total_rows": total_rows, "date_min": date_min, "date_max": date_max},
         })
 
-        # Date overlap check
-        file_dates = list({d for d in df['Date'].dt.date if d is not None})
-        existing_dates = set(session.exec(
-            select(Vente.date_commande)
-            .where(Vente.date_commande.in_(file_dates))
-            .distinct()
-        ).all())
-        existing_dates.discard(None)
-
-        if existing_dates and mode is None:
-            overlap_sorted = sorted(existing_dates)
-            yield event({
-                "type": "overlap",
-                "overlap_min": overlap_sorted[0].strftime('%d/%m/%Y'),
-                "overlap_max": overlap_sorted[-1].strftime('%d/%m/%Y'),
-                "overlap_count": len(overlap_sorted),
-            })
-            return
-
-        if mode == 'replace' and existing_dates:
-            yield event({"progress": 20, "message": "Suppression des données existantes..."})
-            session.exec(sa_delete(Vente).where(Vente.date_commande.in_(list(existing_dates))))
-            session.commit()
-        elif mode == 'skip' and existing_dates:
-            df = df[~df['Date'].dt.date.isin(existing_dates)]
-            if df.empty:
-                yield event({"error": "Toutes les dates sont déjà présentes dans la base"})
-                return
-
-        yield event({"progress": 25, "message": "Extraction du distributeur..."})
-
-        # Extract distributor info from data (use first non-null value)
+        # Extract distributor info early (before overlap check)
         dist_code = None
         dist_nom = None
         for _, row in df.iterrows():
@@ -508,7 +477,7 @@ async def upload_ventes(
         ).first()
 
         if not distributor:
-            yield event({"progress": 26, "message": f"Création du distributeur: {dist_nom}..."})
+            yield event({"progress": 16, "message": f"Création du distributeur: {dist_nom}..."})
             distributor = Distributor(code=dist_code, nom=dist_nom, is_active=True)
             session.add(distributor)
             session.flush()
@@ -520,7 +489,41 @@ async def upload_ventes(
             if distributor_id != current_user.distributor_id:
                 yield event({"error": "Vous ne pouvez importer des données que pour votre distributeur"})
                 return
-        yield event({"progress": 28, "message": f"Distributeur: {distributor.nom}"})
+
+        # Date overlap check (filtered by distributor_id)
+        file_dates = list({d for d in df['Date'].dt.date if d is not None})
+        existing_dates = set(session.exec(
+            select(Vente.date_commande)
+            .where(Vente.date_commande.in_(file_dates))
+            .where(Vente.distributor_id == distributor_id)
+            .distinct()
+        ).all())
+        existing_dates.discard(None)
+
+        if existing_dates and mode is None:
+            overlap_sorted = sorted(existing_dates)
+            yield event({
+                "type": "overlap",
+                "overlap_min": overlap_sorted[0].strftime('%d/%m/%Y'),
+                "overlap_max": overlap_sorted[-1].strftime('%d/%m/%Y'),
+                "overlap_count": len(overlap_sorted),
+            })
+            return
+
+        if mode == 'replace' and existing_dates:
+            yield event({"progress": 20, "message": "Suppression des données existantes..."})
+            session.exec(sa_delete(Vente).where(
+                (Vente.date_commande.in_(list(existing_dates))) &
+                (Vente.distributor_id == distributor_id)
+            ))
+            session.commit()
+        elif mode == 'skip' and existing_dates:
+            df = df[~df['Date'].dt.date.isin(existing_dates)]
+            if df.empty:
+                yield event({"error": "Toutes les dates sont déjà présentes dans la base"})
+                return
+
+        yield event({"progress": 25, "message": f"Distributeur: {distributor.nom}"})
 
         yield event({"progress": 30, "message": "Préparation des enregistrements..."})
 
