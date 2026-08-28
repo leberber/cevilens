@@ -324,8 +324,9 @@ export class DateRangePickerComponent implements OnChanges {
 
   /* ── Calendar ──────────────────────────────────── */
   get navLabel(): string {
-    return new Date(this.navYear, this.navMonth, 1)
+    const label = new Date(this.navYear, this.navMonth, 1)
       .toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    return label.charAt(0).toUpperCase() + label.substring(1);
   }
 
   prevMonth(): void {
@@ -373,9 +374,10 @@ export class DateRangePickerComponent implements OnChanges {
   /* ── Chips ─────────────────────────────────────── */
   chipLabel(period: string): string {
     const [y, m] = period.split('-').map(Number);
-    return new Date(y, m - 1, 1)
+    const label = new Date(y, m - 1, 1)
       .toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' })
       .replace('.', '');
+    return label.charAt(0).toUpperCase() + label.substring(1);
   }
 
   isChipActive(period: string): boolean {
@@ -409,7 +411,12 @@ export class DateRangePickerComponent implements OnChanges {
     if (!iso) return '';
     const [y, m, d] = iso.split('-');
     const date = new Date(+y, +m - 1, +d);
-    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+    const label = date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+    const parts = label.split(' ');
+    if (parts.length === 2) {
+      parts[1] = parts[1].charAt(0).toUpperCase() + parts[1].substring(1);
+    }
+    return parts.join(' ');
   }
 
   private emit(): void {

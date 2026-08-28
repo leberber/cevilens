@@ -43,6 +43,11 @@ import { NgTemplateOutlet } from '@angular/common';
           @if (subtitle) {
             <p class="page-header__sub">{{ subtitle }}</p>
           }
+          @if (context) {
+            <div class="page-header__context">
+              <ng-container [ngTemplateOutlet]="context"></ng-container>
+            </div>
+          }
         </div>
       </div>
       @if (actions) {
@@ -106,6 +111,10 @@ import { NgTemplateOutlet } from '@angular/common';
       color: var(--text-color-secondary);
     }
 
+    .page-header__context {
+      margin-top: 0.3rem;
+    }
+
     .page-header__actions {
       display: flex;
       gap: 0.75rem;
@@ -124,4 +133,5 @@ export class PageLayoutComponent {
   @Input() subtitle: string | null = null;
   @Input() actions: TemplateRef<any> | null = null;
   @Input() toolbar: TemplateRef<any> | null = null;
+  @Input() context: TemplateRef<any> | null = null;
 }

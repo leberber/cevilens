@@ -83,7 +83,7 @@
 .table-wrapper {
   overflow-x: auto;
   overflow-y: auto;
-  height: var(--table-max-height, calc(100vh - 250px));
+  height: var(--table-max-height, calc(100vh - 210px));
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }

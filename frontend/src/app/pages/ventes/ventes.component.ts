@@ -1,33 +1,44 @@
-import { Component, OnInit, inject, ViewChild, TemplateRef, DestroyRef, ChangeDetectionStrategy } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, OnInit, inject, ViewChild, DestroyRef, ChangeDetectionStrategy, ChangeDetectorRef, signal, computed } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { VirtualScrollContainerDirective } from '../../shared/directives/virtual-scroll-container.directive';
 import { FormsModule } from '@angular/forms';
 import { TooltipModule } from 'primeng/tooltip';
 import { Select } from 'primeng/select';
 import { Popover } from 'primeng/popover';
+import { Paginator } from 'primeng/paginator';
 import { VentesService, VenteRead } from '../../core/services/ventes.service';
 import { ColumnStateService, ColDef } from '../../core/services/column-state.service';
-import { PaginationHelper } from '../../core/services/pagination.helper';
 import { FamilleColorService } from '../../core/services/famille-color.service';
 import { DateHelper } from '../../core/services/date.helper';
-import { SearchFilterHelper } from '../../core/services/search-filter.helper';
+import { NotificationService } from '../../core/services/notification.service';
 import { SkeletonLoaderComponent } from '../../shared/components/skeleton-loader/skeleton-loader.component';
 import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
 import { DateRangePickerComponent } from '../../shared/components/date-range-picker/date-range-picker.component';
-import { DistributorFilterComponent } from '../../shared/components/distributor-filter/distributor-filter.component';
-import { SearchInputComponent } from '../../shared/components/search-input/search-input.component';
+import { DistributorSwitcherComponent } from '../../shared/components/distributor-switcher/distributor-switcher.component';
 import { ActiveFilterChipsComponent } from '../../shared/components/active-filter-chips/active-filter-chips.component';
 import { VentesFilterService } from './services/ventes-filter.service';
-import { BATCH_SIZE, SEARCH_DEBOUNCE_MS } from '../../core/constants/app.constants';
+import { BATCH_SIZE } from '../../core/constants/app.constants';
 
 const LS_KEY = 'cevital_ventes_columns';
 
 @Component({
   selector: 'app-ventes',
   standalone: true,
-  imports: [FormsModule, TooltipModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    TooltipModule,
+    Select,
+    Popover,
+    Paginator,
+    SkeletonLoaderComponent,
+    EmptyStateComponent,
+    PageLayoutComponent,
+    DateRangePickerComponent,
+    DistributorSwitcherComponent,
+    ActiveFilterChipsComponent,
+  ],
   templateUrl: './ventes.component.html',
   styleUrl: './ventes.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -35,32 +46,28 @@ const LS_KEY = 'cevital_ventes_columns';
 export class VentesComponent implements OnInit {
   private readonly ventesService        = inject(VentesService);
   private readonly columnState          = inject(ColumnStateService);
-  private readonly pagination           = inject(PaginationHelper);
   private readonly familleColorService  = inject(FamilleColorService);
   private readonly dateHelper           = inject(DateHelper);
-  private readonly router               = inject(Router);
+  private readonly notify               = inject(NotificationService);
   private readonly destroyRef           = inject(DestroyRef);
+  private readonly cdr                  = inject(ChangeDetectorRef);
   readonly filterService                = inject(VentesFilterService);
 
   @ViewChild('filterPop') filterPop!: Popover;
 
-  rows: VenteRead[] = [];
-  total = 0;
-  loading = false;
-  loadingMore = false;
-  periodes: string[] = [];
-  dateFrom = '';
-  dateTo = '';
-  searchTerm = '';
-  fdvs: string[] = [];
-  clients: string[] = [];
-  familles: string[] = [];
-  selectedFdv: string | null = null;
-  selectedClient: string | null = null;
-  selectedFamille: string | null = null;
-  selectedDistributeur: string | null = null;
-  private currentPage = 1;
-  private searchTimeout: ReturnType<typeof setTimeout> | undefined;
+  readonly BATCH_SIZE = BATCH_SIZE;
+
+  readonly rows = signal<VenteRead[]>([]);
+  readonly total = signal(0);
+  readonly loading = signal(false);
+  readonly periodes = signal<string[]>([]);
+  readonly dateFrom = signal('');
+  readonly dateTo = signal('');
+  readonly fdvs = signal<string[]>([]);
+  readonly clients = signal<string[]>([]);
+  readonly selectedFdv = signal<string | null>(null);
+  readonly selectedClient = signal<string | null>(null);
+  readonly selectedDistributeur = signal<string | null>(null);
 
   readonly allColumns: ColDef[] = [
     { field: 'date_commande',        header: 'Date',                width: '110px', visible: true  },
@@ -69,7 +76,7 @@ export class VentesComponent implements OnInit {
     { field: 'canal',                header: 'Canal',               width: '80px',  visible: true,  filterable: true  },
     { field: 'type_commande',        header: 'Type',                width: '80px',  visible: true,  filterable: true  },
     { field: 'code_client',          header: 'Code Client',         width: '140px', visible: false },
-    { field: 'nom_client',           header: 'Nom client',          width: '180px', visible: true  },
+    { field: 'nom_client',           header: 'Nom client',          width: '180px', visible: true, filterable: true  },
     { field: 'categorie_client',     header: 'Catégorie',           width: '90px',  visible: true,  filterable: true  },
     { field: 'adresse_client',       header: 'Adresse Client',      width: '200px', visible: false },
     { field: 'route',                header: 'Route',               width: '130px', visible: false, filterable: true  },
@@ -109,39 +116,28 @@ export class VentesComponent implements OnInit {
     { field: 'total_facture',        header: 'Total Facturée',      width: '120px', visible: true  },
   ];
 
-  get visibleColumns(): ColDef[] {
-    return this.allColumns.filter(c => c.visible);
-  }
-
+  readonly visibleColumns = computed(() => this.allColumns.filter(c => c.visible));
+  readonly totalCount = computed(() => this.total());
   readonly skWidths = ['72%','55%','88%','50%','78%','63%','90%','42%','70%','82%','58%','68%'];
-
-  get hasMore(): boolean {
-    return this.rows.length < this.total;
-  }
 
   ngOnInit() {
     this.loadColumnState();
     this.ventesService.getPeriodes()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(periodes => {
-        this.periodes = periodes;
+        this.periodes.set(periodes);
         if (periodes.length) {
-          this.dateFrom = this.dateHelper.getFirstDayOfMonth(periodes[0]);
-          this.dateTo   = this.dateHelper.getLastDayOfMonth(periodes[0]);
+          this.dateFrom.set(this.dateHelper.getFirstDayOfMonth(periodes[0]));
+          this.dateTo.set(this.dateHelper.getLastDayOfMonth(periodes[0]));
           this.loadFdvsAndClients();
           this.reset();
         }
       });
   }
 
-  /**
-   * Called by VirtualScrollContainerDirective when user scrolls near bottom
-   * Triggers batch loading for infinite scroll
-   */
-  onScrollNearBottom() {
-    if (this.hasMore && !this.loadingMore && !this.loading) {
-      this.currentPage++;
-      this.loadBatch(true);
+  onPageChange(event: { page?: number }): void {
+    if (event.page !== undefined) {
+      this.loadBatch(event.page + 1);
     }
   }
 
@@ -149,13 +145,9 @@ export class VentesComponent implements OnInit {
     return this.filterService.filteredOptions;
   }
 
-  get activeFilterCount(): number {
-    return this.filterService.activeFilterCount;
-  }
-
   async openColumnFilter(field: string, event: Event): Promise<void> {
     event.stopPropagation();
-    await this.filterService.openColumnFilter(field, this.dateFrom || undefined, this.dateTo || undefined);
+    await this.filterService.openColumnFilter(field, this.dateFrom() || undefined, this.dateTo() || undefined);
     this.filterPop.toggle(event);
   }
 
@@ -184,25 +176,14 @@ export class VentesComponent implements OnInit {
   }
 
   onRangeChange(range: { from: string; to: string }): void {
-    this.dateFrom = range.from;
-    this.dateTo   = range.to;
-    this.selectedFdv = null;
-    this.selectedClient = null;
-    this.selectedFamille = null;
-    this.selectedDistributeur = null;
+    this.dateFrom.set(range.from);
+    this.dateTo.set(range.to);
+    this.selectedFdv.set(null);
+    this.selectedClient.set(null);
+    this.selectedDistributeur.set(null);
     this.filterService.clearAllColumnFilters();
     this.loadFdvsAndClients();
     this.reset();
-  }
-
-  goToRapport(): void {
-    this.router.navigate(['/rapport-facturation'], {
-      queryParams: {
-        date_from: this.dateFrom || undefined,
-        date_to:   this.dateTo   || undefined,
-        nom_fdv:   this.selectedFdv || undefined,
-      },
-    });
   }
 
   reload(): void {
@@ -210,24 +191,16 @@ export class VentesComponent implements OnInit {
   }
 
   onFdvChange(): void {
-    this.selectedClient = null;
-    this.ventesService.getClients(this.dateFrom || undefined, this.dateTo || undefined, this.selectedFdv || undefined)
+    this.selectedClient.set(null);
+    this.ventesService.getClients(this.dateFrom() || undefined, this.dateTo() || undefined, this.selectedFdv() || undefined)
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(d => this.clients = d);
+      .subscribe(d => this.clients.set(d));
     this.reset();
   }
 
   onDistributeurChange(value: string | null): void {
-    this.selectedDistributeur = value;
+    this.selectedDistributeur.set(value);
     this.reset();
-  }
-
-  onFilterChange(): void {
-    this.reset();
-  }
-
-  onSearch() {
-    this.pagination.debounceSearch(() => this.reset(), SEARCH_DEBOUNCE_MS);
   }
 
   toggleColumn(field: string) {
@@ -235,36 +208,30 @@ export class VentesComponent implements OnInit {
   }
 
   private loadFdvsAndClients(): void {
-    this.ventesService.getFdvs(this.dateFrom || undefined, this.dateTo || undefined)
+    this.ventesService.getFdvs(this.dateFrom() || undefined, this.dateTo() || undefined)
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(d => this.fdvs = d);
-    this.ventesService.getClients(this.dateFrom || undefined, this.dateTo || undefined)
+      .subscribe(d => this.fdvs.set(d));
+    this.ventesService.getClients(this.dateFrom() || undefined, this.dateTo() || undefined)
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(d => this.clients = d);
-    this.ventesService.getFamilles(this.dateFrom || undefined, this.dateTo || undefined)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(d => this.familles = d);
+      .subscribe(d => this.clients.set(d));
   }
 
   private reset() {
-    this.rows = [];
-    this.currentPage = 1;
-    this.total = 0;
-    this.loadBatch(false);
+    this.loadBatch(1);
   }
 
-  private loadBatch(append: boolean) {
-    if (!this.dateFrom && !this.dateTo) return;
-    if (append) this.loadingMore = true;
-    else this.loading = true;
+  private loadBatch(page: number) {
+    if (!this.dateFrom() && !this.dateTo()) return;
+
+    this.loading.set(true);
 
     const f = this.filterService.activeFilters;
     this.ventesService.list({
-      page: this.currentPage,
+      page: page,
       per_page: BATCH_SIZE,
-      date_from: this.dateFrom || undefined,
-      date_to: this.dateTo || undefined,
-      famille:          (f['famille']          as string) || this.selectedFamille || undefined,
+      date_from: this.dateFrom() || undefined,
+      date_to: this.dateTo() || undefined,
+      famille:          (f['famille']          as string) || undefined,
       sous_famille:     (f['sous_famille']     as string) || undefined,
       type_commande:    (f['type_commande']    as string) || undefined,
       categorie_client: (f['categorie_client'] as string) || undefined,
@@ -275,25 +242,23 @@ export class VentesComponent implements OnInit {
       source:           (f['source']           as string) || undefined,
       canal:            (f['canal']            as string) || undefined,
       route:            (f['route']            as string) || undefined,
-      nom_fdv:          (f['nom_fdv']          as string) || this.selectedFdv || undefined,
+      nom_fdv:          (f['nom_fdv']          as string) || this.selectedFdv() || undefined,
       nom_livreur:      (f['nom_livreur']      as string) || undefined,
-      nom_distributeur: (f['nom_distributeur'] as string) || this.selectedDistributeur || undefined,
-      nom_client: this.selectedClient || undefined,
-      search: this.searchTerm || undefined,
+      nom_distributeur: (f['nom_distributeur'] as string) || this.selectedDistributeur() || undefined,
+      nom_client:       (f['nom_client']       as string) || this.selectedClient() || undefined,
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: res => {
-          this.pagination.handleBatchLoad(res, this.rows, append, (items, total) => {
-            this.rows = items;
-            this.total = total;
-          });
-          this.loading = false;
-          this.loadingMore = false;
+        next: (res) => {
+          this.rows.set([...res.items]);
+          this.total.set(res.total);
+          this.loading.set(false);
+          this.cdr.detectChanges();
         },
-        error: () => {
-          this.loading = false;
-          this.loadingMore = false;
+        error: (err) => {
+          this.loading.set(false);
+          this.notify.showHttpError(err);
+          this.cdr.detectChanges();
         },
       });
   }
@@ -308,5 +273,19 @@ export class VentesComponent implements OnInit {
 
   getRowValue(row: VenteRead, field: string): unknown {
     return (row as unknown as Record<string, unknown>)[field] ?? '—';
+  }
+
+  getFooterTotal(field: string): string {
+    if (!this.rows().length) return '—';
+
+    let sum = 0;
+    this.rows().forEach(row => {
+      const value = (row as unknown as Record<string, unknown>)[field];
+      if (typeof value === 'number') {
+        sum += value;
+      }
+    });
+
+    return sum > 0 ? Math.round(sum).toString() : '—';
   }
 }

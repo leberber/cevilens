@@ -1,4 +1,4 @@
-from sqlalchemy import Index
+from sqlalchemy import Index, UniqueConstraint
 from sqlmodel import SQLModel, Field
 from typing import List, Optional
 from datetime import date, datetime, timezone
@@ -175,3 +175,19 @@ class RapprochementResult(SQLModel):
     date: str
     net_a_payer: float
     lignes: List[RapprochementLigne]
+
+
+class VenteClientName(SQLModel, table=True):
+    """Fast lookup table for client names in ventes filtering"""
+    __tablename__ = "vente_client_names"
+    __table_args__ = (
+        UniqueConstraint("code_client", "distributor_id", name="uq_vente_client_code_dist"),
+        Index("idx_vente_client_names_nom_client", "nom_client"),
+    )
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    code_client: str = Field(max_length=50, index=True)
+    nom_client: str = Field(max_length=150, index=True)
+    distributor_id: Optional[int] = Field(default=None, foreign_key="distributeurs.id", index=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

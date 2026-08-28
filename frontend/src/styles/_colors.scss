@@ -10,17 +10,19 @@
 // =============================================================================
 
 :root {
-  // ── Brand palette ──────────────────────────────────────────────────────────
-  --brand-blue-dark:  #1e40af;
-  --brand-blue-main:  #2563eb;
-  --brand-blue-light: #3b82f6;
+  // ── Brand palette — Cevital ────────────────────────────────────────────────
+  --brand-blue-dark:  #133e96;
+  --brand-blue-main:  #1749B2;
+  --brand-blue-light: #2860cc;
+  --brand-gold:       #FFC200;
+  --brand-gold-rgb:   255, 194, 0;
 
   // ── Primary system ─────────────────────────────────────────────────────────
-  --primary-color:    #2563eb;
-  --primary-700:      #1e40af;
-  --primary-100:      rgba(37, 99, 235, 0.1);
-  --primary-rgb:      37, 99, 235;
-  --primary-gradient: linear-gradient(135deg, #3b82f6 0%, #1e3a8a 100%);
+  --primary-color:    #1749B2;
+  --primary-700:      #133e96;
+  --primary-100:      rgba(23, 73, 178, 0.1);
+  --primary-rgb:      23, 73, 178;
+  --primary-gradient: linear-gradient(135deg, #2860cc 0%, #0f3390 100%);
 
   // ── Text ───────────────────────────────────────────────────────────────────
   --text-color:             #1a1a2e;
@@ -85,8 +87,8 @@
 
   // ── Surface ────────────────────────────────────────────────────────────────
   --surface-0:       #ffffff;
-  --surface-50:      #fafafa;
-  --surface-100:     #f4f4f5;
+  --surface-50:      #f5f7fb;
+  --surface-100:     #edf0f7;
   --surface-200:     #e4e4e7;
   --surface-300:     #d4d4d8;
   --surface-400:     #a1a1aa;
@@ -95,7 +97,7 @@
   --surface-700:     #3f3f46;
   --surface-800:     #27272a;
   --surface-900:     #18181b;
-  --surface-ground:  #f8fafc;
+  --surface-ground:  #ffffff;
   --surface-card:    #ffffff;
   --surface-border:  var(--surface-200);
   --surface-hover:   var(--surface-100);

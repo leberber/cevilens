@@ -4,6 +4,7 @@ import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideServiceWorker } from '@angular/service-worker';
 import { providePrimeNG } from 'primeng/config';
+import { MessageService } from 'primeng/api';
 import Aura from '@primeng/themes/aura';
 import { definePreset } from '@primeng/themes';
 
@@ -11,23 +12,22 @@ import { routes } from './app.routes';
 import { authInterceptor } from './core/interceptors/auth.interceptor';
 import { httpErrorInterceptor } from './core/interceptors/http-error.interceptor';
 
-// Brand preset — overrides PrimeNG Aura's default primary (emerald) with blue.
-// The primary-600 shade must match --primary-color in src/styles/_colors.scss.
-// To change theme: update the shades below AND update _colors.scss accordingly.
+// Brand preset — Cevital blue (#1749B2) + gold (#FFC200).
+// primary-600 must match --primary-color in src/styles/_colors.scss.
 const BrandPreset = definePreset(Aura, {
   semantic: {
     primary: {
-      50:  '{blue.50}',
-      100: '{blue.100}',
-      200: '{blue.200}',
-      300: '{blue.300}',
-      400: '{blue.400}',
-      500: '{blue.500}',
-      600: '{blue.600}',  // #2563eb — matches --primary-color
-      700: '{blue.700}',
-      800: '{blue.800}',
-      900: '{blue.900}',
-      950: '{blue.950}',
+      50:  '#edf2fd',
+      100: '#d2e0f9',
+      200: '#a5c1f3',
+      300: '#78a2ed',
+      400: '#4b83e7',
+      500: '#2b65d1',
+      600: '#1749B2',  // --primary-color
+      700: '#133e96',  // --primary-700
+      800: '#0f337a',
+      900: '#0b285f',
+      950: '#071a42',
     },
   },
 });
@@ -37,12 +37,13 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
-    provideHttpClient(withInterceptors([authInterceptor, httpErrorInterceptor])),
     provideAnimationsAsync(),
     providePrimeNG({
       theme: { preset: BrandPreset, options: { darkModeSelector: false } },
       ripple: true,
     }),
+    MessageService,
+    provideHttpClient(withInterceptors([authInterceptor, httpErrorInterceptor])),
     provideServiceWorker('ngsw-worker.js', {
       enabled: !isDevMode(),
       registrationStrategy: 'registerWhenStable:30000',

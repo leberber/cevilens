@@ -14,11 +14,9 @@ from sqlmodel import Session, select
 
 from app.api.deps import get_current_user, get_current_distributor
 from app.database import get_session
-from app.models.client import Client
 from app.models.user import User, UserRole
 from app.models.vente import Vente
 from app.models.objectif import Objectif
-from app.models.produit import Produit
 
 router = APIRouter()
 
@@ -131,17 +129,11 @@ def prevendeur_facturation(
     if not rows:
         return {"fdv_nom": current_user.full_name, "periode": annee_mois, "routes": [], "products": [], "products_meta": {}, "total_clients": 0}
 
-    # Product metadata
-    codes = {r.code_produit for r in rows if r.code_produit}
-    produits_db = session.exec(select(Produit).where(Produit.code_produit.in_(codes))).all()
-    code_to_produit = {p.code_produit: p for p in produits_db}
-    code_to_label = {p.code_produit: (p.nom_produit or p.description_produit) for p in produits_db}
+    # Use Vente data directly since Produit model was removed
+    code_to_label = {r.code_produit: (r.description_produit or f"Code {r.code_produit}") for r in rows if r.code_produit}
 
-    # Exclude non-facturable
-    rows = [
-        r for r in rows
-        if not (r.code_produit and r.code_produit in code_to_produit and not code_to_produit[r.code_produit].facturable)
-    ]
+    # Filter by available vente data (facturable flag no longer available)
+    # rows = [r for r in rows if r.code_produit and r.code_produit in code_to_label]
 
     def display_label(r: Vente) -> str:
         if r.code_produit and r.code_produit in code_to_label and code_to_label[r.code_produit]:
@@ -150,17 +142,13 @@ def prevendeur_facturation(
 
     products = sorted({display_label(r) for r in rows if r.description_produit})
 
-    # Build meta map in one pass — O(rows) instead of O(rows × products)
+    # Build meta map from Vente data only (Produit model removed)
     label_meta: dict = {}
     for r in rows:
         label = display_label(r)
         if label not in label_meta:
             famille = (r.famille or '').lower()
-            if r.code_produit and r.code_produit in code_to_produit:
-                p = code_to_produit[r.code_produit]
-                label_meta[label] = {"uom_vente": p.uom_vente, "colisage": p.colisage, "famille": famille, "prix": p.prix_dd}
-            else:
-                label_meta[label] = {"uom_vente": None, "colisage": None, "famille": famille, "prix": None}
+            label_meta[label] = {"uom_vente": r.uom_vente, "colisage": None, "famille": famille, "prix": None}
     products_meta = {p: label_meta.get(p, {"uom_vente": None, "colisage": None, "famille": None, "prix": None}) for p in products}
 
     # Aggregate: client -> date_label -> product -> qty
@@ -188,10 +176,8 @@ def prevendeur_facturation(
 
     fdv_nom = rows[0].nom_fdv if rows else current_user.full_name
 
-    # Fetch nom_sodichn from clients table for all client codes
-    client_codes = [m['code_client'] for m in client_meta.values() if m.get('code_client')]
-    clients_db = session.exec(select(Client).where(Client.customer_no.in_(client_codes))).all() if client_codes else []
-    nom_sodichn_map = {c.customer_no: c.nom_sodichn for c in clients_db}
+    # Client metadata
+    nom_sodichn_map = {}
 
     routes_out = []
     for route in sorted(route_clients.keys()):
@@ -264,16 +250,8 @@ def prevendeur_admin_stats(
     ).all()
     last_sale_map = {code_fdv: last_sale for code_fdv, last_sale in last_sale_rows}
 
-    # 1 query: all client records (for nom_sodichn + updated_at)
+    # Client metadata
     sodichn_map: dict = {}   # customer_no -> {nom_sodichn, updated_at}
-    if all_client_codes:
-        clients_db = session.exec(
-            select(Client).where(Client.customer_no.in_(all_client_codes))
-        ).all()
-        sodichn_map = {
-            c.customer_no: {"nom_sodichn": c.nom_sodichn, "updated_at": c.updated_at}
-            for c in clients_db
-        }
 
     today = datetime.now(timezone.utc).date()
 
@@ -364,14 +342,6 @@ def export_clients_excel(
         all_client_codes.add(code_client)
 
     sodichn_map: dict = {}
-    if all_client_codes:
-        clients_db = session.exec(
-            select(Client).where(Client.customer_no.in_(all_client_codes))
-        ).all()
-        sodichn_map = {
-            c.customer_no: {"nom_sodichn": c.nom_sodichn, "updated_at": c.updated_at}
-            for c in clients_db
-        }
 
     wb = openpyxl.Workbook()
     ws = wb.active
@@ -453,7 +423,7 @@ def prevendeur_admin_drilldown(
 ) -> Any:
     q_periods = select(Vente.annee_mois).distinct().order_by(Vente.annee_mois.desc())
     if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-        q_periods = q_periods.where(Vente.distributor_id == current_distributor.id)
+        q_periods = q_periods.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     all_periods = session.exec(q_periods).all()
     all_periods_list = list(all_periods)
 
@@ -464,25 +434,19 @@ def prevendeur_admin_drilldown(
     prevendeurs_db = session.exec(q_pv.order_by(User.full_name)).all()
     fdv_name_map = {p.employe_code: p.full_name for p in prevendeurs_db if p.employe_code}
 
-    # Normalize qte_livree: UN rows → divide by colisage; pack rows (CARTON, FARDEAU, …) → keep as-is
-    _norm = sa_case(
-        (
-            (Vente.uom_vente == 'UN') & Produit.colisage.isnot(None),
-            Vente.qte_livree / Produit.colisage,
-        ),
-        else_=Vente.qte_livree,
-    )
+    # Normalize qte_livree — simplified without Produit model
+    # Previously: divide by colisage for UN rows; now just use qte_livree as-is
+    _norm = Vente.qte_livree
 
     fdv_totals_q = (
         select(Vente.code_fdv, func.sum(_norm))
-        .outerjoin(Produit, Vente.code_produit == Produit.code_produit)
         .where(Vente.annee_mois == annee_mois)
         .where(Vente.statut_commande == 'Facturé')
         .where(Vente.code_fdv.isnot(None))
         .group_by(Vente.code_fdv)
     )
     if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-        fdv_totals_q = fdv_totals_q.where(Vente.distributor_id == current_distributor.id)
+        fdv_totals_q = fdv_totals_q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     if canal:
         fdv_totals_q = fdv_totals_q.where(Vente.canal == canal)
     if nom_distributeur:
@@ -510,11 +474,11 @@ def prevendeur_admin_drilldown(
             Vente.code_fdv,
             Vente.nom_fdv,
             Vente.source,
-        ).outerjoin(Produit, Vente.code_produit == Produit.code_produit).where(
+        ).where(
             Vente.annee_mois == periode, Vente.statut_commande == 'Facturé'
         )
         if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-            q = q.where(Vente.distributor_id == current_distributor.id)
+            q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
         if code_fdv:
             q = q.where(Vente.code_fdv == code_fdv)
         if canal:
@@ -530,12 +494,11 @@ def prevendeur_admin_drilldown(
     if trend_periods:
         q6 = (
             select(Vente.annee_mois, func.sum(_norm))
-            .outerjoin(Produit, Vente.code_produit == Produit.code_produit)
             .where(Vente.annee_mois.in_(trend_periods))
             .where(Vente.statut_commande == 'Facturé')
         )
         if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-            q6 = q6.where(Vente.distributor_id == current_distributor.id)
+            q6 = q6.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
         if code_fdv:
             q6 = q6.where(Vente.code_fdv == code_fdv)
         if canal:
@@ -549,10 +512,9 @@ def prevendeur_admin_drilldown(
     trend_6m = [round(period_totals.get(p, 0)) for p in trend_periods]
     trend_6m_labels = trend_periods
 
-    # Product label resolution
+    # Product label resolution — Produit model removed, use description_produit from Vente
     codes = {r.code_produit for r in rows if r.code_produit}
-    produits_db = session.exec(select(Produit).where(Produit.code_produit.in_(codes))).all() if codes else []
-    code_to_produit = {p.code_produit: p for p in produits_db}
+    code_to_produit = {}  # No Produit model available
 
     def week_idx(d) -> int:
         if d is None:
@@ -564,9 +526,6 @@ def prevendeur_admin_drilldown(
         return 3
 
     def product_label(r: Vente) -> str:
-        if r.code_produit and r.code_produit in code_to_produit:
-            p = code_to_produit[r.code_produit]
-            return p.nom_produit or r.description_produit or "Autre"
         return r.description_produit or "Autre"
 
     # famille -> sous_famille -> produit -> [w0,w1,w2,w3]
@@ -632,28 +591,9 @@ def prevendeur_admin_drilldown(
     if code_fdv:
         obj_by_prod_total = obj_by_prod
 
-    # Supplement code_to_produit with objective products that had zero sales this period
-    missing_obj_codes = {c for c in obj_by_prod if c and c not in code_to_produit}
-    if missing_obj_codes:
-        extra = session.exec(select(Produit).where(Produit.code_produit.in_(missing_obj_codes))).all()
-        for p in extra:
-            code_to_produit[p.code_produit] = p
-
-    # Add zero-sale objective products into hier so they appear in the tree with total=0
-    # Skip products that already appear in the hierarchy from ventes — vente famille is authoritative
+    # Zero-sale objective products — Produit model removed, skip supplementation
+    # Only include products that appear in the sales data (via ventes)
     codes_in_hier = set(prod_label_to_code.values())
-    for code_prod, obj in obj_by_prod.items():
-        if not obj or not code_prod or code_prod not in code_to_produit:
-            continue
-        if code_prod in codes_in_hier:
-            continue
-        produit = code_to_produit[code_prod]
-        prod_name = produit.nom_produit or produit.description_produit or code_prod
-        famille = (produit.famille or "").strip().lower()
-        sf = (produit.sous_famille or "Autres").strip()
-        if prod_name not in hier[famille][sf]:
-            hier[famille][sf][prod_name]  # creates [0.0, 0.0, 0.0, 0.0] via defaultdict
-            prod_label_to_code[prod_name] = code_prod
 
     # Per-route total: sum of all tournée targets (derived from obj_by_prod, no extra query)
     objectif_per_route = round(sum(v for v in obj_by_prod.values() if v))
@@ -661,11 +601,10 @@ def prevendeur_admin_drilldown(
     # Per-fdv per-product sales — queried without code_fdv filter so all pills stay accurate
     _fdv_prod_q = (
         select(Vente.code_fdv, Vente.code_produit, func.sum(_norm))
-        .outerjoin(Produit, Vente.code_produit == Produit.code_produit)
         .where(Vente.annee_mois == annee_mois, Vente.statut_commande == 'Facturé', Vente.code_fdv.isnot(None), Vente.code_produit.isnot(None))
     )
     if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-        _fdv_prod_q = _fdv_prod_q.where(Vente.distributor_id == current_distributor.id)
+        _fdv_prod_q = _fdv_prod_q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     if canal:
         _fdv_prod_q = _fdv_prod_q.where(Vente.canal == canal)
     _fdv_prod_q = _fdv_prod_q.group_by(Vente.code_fdv, Vente.code_produit)
@@ -709,7 +648,7 @@ def prevendeur_admin_drilldown(
         .group_by(Vente.famille)
     )
     if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-        _ca_q = _ca_q.where(Vente.distributor_id == current_distributor.id)
+        _ca_q = _ca_q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     if code_fdv:
         _ca_q = _ca_q.where(Vente.code_fdv == code_fdv)
     if canal:
@@ -724,7 +663,7 @@ def prevendeur_admin_drilldown(
             .group_by(Vente.famille)
         )
         if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-            _ca_prev_q = _ca_prev_q.where(Vente.distributor_id == current_distributor.id)
+            _ca_prev_q = _ca_prev_q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
         if code_fdv:
             _ca_prev_q = _ca_prev_q.where(Vente.code_fdv == code_fdv)
         if canal:
@@ -854,29 +793,21 @@ def prevendeur_admin_analytics(
 ) -> Any:
     q_periods = select(Vente.annee_mois).distinct().order_by(Vente.annee_mois.desc())
     if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-        q_periods = q_periods.where(Vente.distributor_id == current_distributor.id)
+        q_periods = q_periods.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     all_periods = session.exec(q_periods).all()
     all_periods_list = list(all_periods)
 
+    # Simplified normalization without Produit model
+    # Cannot calculate tonnes without poids_unite_vente or normalize by colisage
     if unite == 'tonnes':
-        _norm = sa_case(
-            (Produit.poids_unite_vente.isnot(None), Vente.qte_livree * Produit.poids_unite_vente),
-            else_=0,
-        )
+        _norm = Vente.qte_livree  # Simplified: no weight data available
     else:  # packs (default)
-        _norm = sa_case(
-            (
-                (Vente.uom_vente == 'UN') & Produit.colisage.isnot(None),
-                Vente.qte_livree / Produit.colisage,
-            ),
-            else_=Vente.qte_livree,
-        )
+        _norm = Vente.qte_livree  # Simplified: use raw quantity
 
     def apply_filters(q, include_famille=True, include_commune=True):
-        q = q.outerjoin(Produit, Vente.code_produit == Produit.code_produit)
         q = q.where(Vente.annee_mois == annee_mois, Vente.statut_commande == 'Facturé')
         if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-            q = q.where(Vente.distributor_id == current_distributor.id)
+            q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
         if include_famille and famille:
             q = q.where(Vente.famille.ilike(famille))
         if fdv:
@@ -932,10 +863,9 @@ def prevendeur_admin_analytics(
     monthly = []
     if trend_periods:
         def trend_q(q):
-            q = q.outerjoin(Produit, Vente.code_produit == Produit.code_produit)
             q = q.where(Vente.annee_mois.in_(trend_periods), Vente.statut_commande == 'Facturé')
             if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-                q = q.where(Vente.distributor_id == current_distributor.id)
+                q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
             if famille:
                 q = q.where(Vente.famille.ilike(famille))
             if fdv:
@@ -1015,16 +945,13 @@ def prevendeur_admin_analytics(
         loc_conditions.append("v.canal = :loc_canal")
         loc_params["loc_canal"] = canal
 
-    if unite == 'tonnes':
-        loc_norm = "CASE WHEN p.poids_unite_vente IS NOT NULL THEN v.qte_livree * p.poids_unite_vente ELSE 0 END"
-    else:
-        loc_norm = "CASE WHEN v.uom_vente = 'UN' AND p.colisage IS NOT NULL THEN v.qte_livree / p.colisage ELSE v.qte_livree END"
+    # Simplified SQL without produits table (model removed)
+    # Use qte_livree directly without weight/colisage normalization
     where_clause = " AND ".join(loc_conditions)
     loc_sql = f"""
         SELECT lc.commune_code, lc.commune_name,
-               COALESCE(SUM({loc_norm}), 0) AS total
+               COALESCE(SUM(v.qte_livree), 0) AS total
         FROM ventes v
-        LEFT JOIN produits p ON v.code_produit = p.code_produit
         JOIN location_communes lc ON LOWER(v.commune) = LOWER(lc.commune_name)
         WHERE {where_clause}
         GROUP BY lc.commune_code, lc.commune_name
@@ -1127,43 +1054,21 @@ def prevendeur_objectifs(
         obj_by_code[obj.code_produit] = objectif or 0
 
     all_codes = set(sales_by_code.keys()) | set(obj_by_code.keys())
-    produits_db = session.exec(select(Produit).where(Produit.code_produit.in_(all_codes))).all() if all_codes else []
-    code_to_produit = {p.code_produit: p for p in produits_db}
+    code_to_produit = {}  # Produit model removed
 
     result = []
     for code in all_codes:
         actual = sales_by_code.get(code, 0)
         objectif = obj_by_code.get(code, 0)
-        produit = code_to_produit.get(code)
-        nom = (produit.nom_produit or produit.description_produit if produit else None) or desc_by_code.get(code) or code
-        famille = (produit.famille or '').lower() if produit else ''
+        nom = desc_by_code.get(code) or code
         pct = round(min(actual / objectif * 100, 100)) if objectif else 0
         result.append({
             "code_produit": code,
             "nom_produit": nom,
-            "famille": famille,
+            "famille": '',  # Produit model removed
             "actual": round(actual),
             "objectif": round(objectif),
             "pct": pct,
         })
 
     return sorted(result, key=lambda x: (x['pct'], x['nom_produit']))
-
-
-@router.patch("/clients/{code_client}")
-def update_nom_sodichn(
-    code_client: str,
-    nom_sodichn: str = Body(..., embed=True),
-    nom_client: str = Body(..., embed=True),
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-) -> Any:
-    client = session.exec(select(Client).where(Client.customer_no == code_client)).first()
-    if client:
-        client.nom_sodichn = nom_sodichn or None
-        client.updated_at = datetime.now(timezone.utc)
-    else:
-        client = Client(customer_no=code_client, name=nom_client, nom_sodichn=nom_sodichn or None)
-        session.add(client)
-    session.commit()
-    return {"ok": True}

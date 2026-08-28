@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import date as date_type
+from datetime import date as date_type, datetime, timezone
 from typing import Any, List, Optional
 
 import pandas as pd
@@ -15,8 +15,7 @@ from app.api.deps import get_current_user, get_current_distributor
 from app.database import get_session
 from app.models.user import User, UserRole
 from app.models.distributor import Distributor
-from app.models.vente import Vente, VentePage, VenteRead
-from app.models.produit_bl_mapping import ProduitBlMapping
+from app.models.vente import Vente, VentePage, VenteRead, VenteClientName
 from app.utils.parse import parse_file
 from app.core.security import hash_password
 
@@ -155,7 +154,7 @@ def _row_to_vente(row: pd.Series, annee_mois: str, uploaded_by_id: int, distribu
 _FILTERABLE_FIELDS = {
     'sous_famille', 'type_commande', 'categorie_client', 'statut_commande',
     'wilaya', 'zone', 'region', 'type_client',
-    'source', 'canal', 'route', 'nom_fdv', 'nom_livreur', 'famille', 'nom_distributeur',
+    'source', 'canal', 'route', 'nom_fdv', 'nom_livreur', 'famille', 'nom_distributeur', 'nom_client',
 }
 
 
@@ -188,8 +187,11 @@ def list_ventes(
 ) -> Any:
     conditions = []
     # Filter by distributor for non-platform-admin users
+    # Include rows where distributor_id is NULL (backward compatibility) or matches current distributor
     if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-        conditions.append(Vente.distributor_id == current_distributor.id)
+        conditions.append(
+            (Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None)
+        )
 
     if annee_mois:
         conditions.append(Vente.annee_mois == annee_mois)
@@ -261,7 +263,7 @@ def list_periodes(
 ) -> Any:
     q = select(Vente.annee_mois).distinct().order_by(Vente.annee_mois.desc())
     if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-        q = q.where(Vente.distributor_id == current_distributor.id)
+        q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     result = session.exec(q).all()
     return list(result)
 
@@ -275,8 +277,9 @@ def get_date_range(
     q_min = select(func.min(Vente.date_commande))
     q_max = select(func.max(Vente.date_commande))
     if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-        q_min = q_min.where(Vente.distributor_id == current_distributor.id)
-        q_max = q_max.where(Vente.distributor_id == current_distributor.id)
+        filter_cond = (Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None)
+        q_min = q_min.where(filter_cond)
+        q_max = q_max.where(filter_cond)
     min_date = session.exec(q_min).one()
     max_date = session.exec(q_max).one()
     return {
@@ -296,7 +299,7 @@ def list_fdvs(
 ) -> Any:
     q = select(Vente.nom_fdv).distinct().order_by(Vente.nom_fdv)
     if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-        q = q.where(Vente.distributor_id == current_distributor.id)
+        q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     if annee_mois:
         q = q.where(Vente.annee_mois == annee_mois)
     if date_from:
@@ -317,7 +320,7 @@ def list_familles(
 ) -> Any:
     q = select(Vente.famille).distinct().order_by(Vente.famille)
     if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-        q = q.where(Vente.distributor_id == current_distributor.id)
+        q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     if annee_mois:
         q = q.where(Vente.annee_mois == annee_mois)
     if date_from:
@@ -332,6 +335,7 @@ def list_distinct(
     field: str,
     date_from: Optional[str] = Query(default=None),
     date_to: Optional[str] = Query(default=None),
+    search: Optional[str] = Query(default=None),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     current_distributor = Depends(get_current_distributor),
@@ -339,14 +343,30 @@ def list_distinct(
     from fastapi import HTTPException
     if field not in _FILTERABLE_FIELDS:
         raise HTTPException(status_code=400, detail=f"Field '{field}' not filterable")
+
+    # Use fast lookup table for client names
+    if field == 'nom_client':
+        q = select(VenteClientName.nom_client).distinct().order_by(VenteClientName.nom_client)
+        if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+            q = q.where(
+                (VenteClientName.distributor_id == current_distributor.id) |
+                (VenteClientName.distributor_id == None)
+            )
+        if search:
+            q = q.where(VenteClientName.nom_client.ilike(f"%{search}%"))
+        return [v for v in session.exec(q).all() if v]
+
+    # Standard DISTINCT query for other fields
     col = getattr(Vente, field)
     q = select(col).distinct().order_by(col)
     if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-        q = q.where(Vente.distributor_id == current_distributor.id)
+        q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     if date_from:
         q = q.where(Vente.date_commande >= date_type.fromisoformat(_normalize_date(date_from)))
     if date_to:
         q = q.where(Vente.date_commande <= date_type.fromisoformat(_normalize_date(date_to)))
+    if search:
+        q = q.where(col.ilike(f"%{search}%"))
     return [v for v in session.exec(q).all() if v]
 
 
@@ -362,7 +382,7 @@ def list_clients(
 ) -> Any:
     q = select(Vente.nom_client).distinct().order_by(Vente.nom_client)
     if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-        q = q.where(Vente.distributor_id == current_distributor.id)
+        q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     if annee_mois:
         q = q.where(Vente.annee_mois == annee_mois)
     if date_from:
@@ -371,6 +391,22 @@ def list_clients(
         q = q.where(Vente.date_commande <= date_type.fromisoformat(_normalize_date(date_to)))
     if nom_fdv:
         q = q.where(Vente.nom_fdv == nom_fdv)
+    return [v for v in session.exec(q).all() if v]
+
+
+@router.get("/client-names", response_model=List[str])
+def list_client_names(
+    session: Session = Depends(get_session),
+    current_user: User = Depends(get_current_user),
+    current_distributor = Depends(get_current_distributor),
+) -> Any:
+    """Fast lookup: return all client names for current distributor (no search filtering)."""
+    q = select(VenteClientName.nom_client).distinct().order_by(VenteClientName.nom_client)
+    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        q = q.where(
+            (VenteClientName.distributor_id == current_distributor.id) |
+            (VenteClientName.distributor_id == None)
+        )
     return [v for v in session.exec(q).all() if v]
 
 
@@ -489,6 +525,7 @@ async def upload_ventes(
 
         BATCH = 500
         inserted = 0
+        clients_to_sync = {}  # code_client -> nom_client
         for batch_start in range(0, total, BATCH):
             batch_df = df.iloc[batch_start:batch_start + BATCH]
             batch_ventes = []
@@ -498,6 +535,13 @@ async def upload_ventes(
                     continue
                 row_month = date_val.strftime('%Y-%m')
                 batch_ventes.append(_row_to_vente(row, row_month, current_user.id, distributor_id))
+
+                # Collect client codes and names for lookup table
+                code_client = _normalize_code(row.get('Code Client'), 50)
+                nom_client = _safe_str(row.get('Nom client'), 150)
+                if code_client and nom_client:
+                    clients_to_sync[code_client] = nom_client
+
             session.add_all(batch_ventes)
             session.flush()
             del batch_ventes
@@ -507,6 +551,25 @@ async def upload_ventes(
                 "progress": progress,
                 "message": f"{inserted:,} / {total:,} lignes insérées...",
             })
+
+        # Upsert into VenteClientName lookup table
+        for code_client, nom_client in clients_to_sync.items():
+            existing = session.exec(
+                select(VenteClientName).where(
+                    (VenteClientName.code_client == code_client) &
+                    (VenteClientName.distributor_id == distributor_id)
+                )
+            ).first()
+            if existing:
+                existing.nom_client = nom_client
+                existing.updated_at = datetime.now(timezone.utc)
+                session.add(existing)
+            else:
+                session.add(VenteClientName(
+                    code_client=code_client,
+                    nom_client=nom_client,
+                    distributor_id=distributor_id
+                ))
 
         session.commit()
 

@@ -1,0 +1,178 @@
+<!-- Page Layout -->
+<app-page-layout
+  icon="pi-chart-line"
+  title="Ventes"
+  [subtitle]="totalCount() > 0 ? (totalCount() | number) + ' lignes au total' : null"
+  [actions]="headerActions"
+  [toolbar]="toolbarContent">
+
+  <!-- Header Actions Template -->
+  <ng-template #headerActions>
+    <app-date-range-picker
+      [periodes]="periodes()"
+      [dateFrom]="dateFrom()"
+      [dateTo]="dateTo()"
+      (rangeChange)="onRangeChange($event)"
+    />
+  </ng-template>
+
+
+  <!-- Toolbar Template -->
+  <ng-template #toolbarContent>
+    <div class="ventes-toolbar">
+      <div class="ventes-toolbar__filters">
+        <app-active-filter-chips
+          [chips]="getActiveFilterChips()"
+          (remove)="removeFilter($event)"
+          (clearAll)="clearAllColumnFilters()"
+        />
+      </div>
+
+      <div class="ventes-toolbar__actions">
+        @if (totalCount() > 0) {
+          <p-paginator
+            [rows]="BATCH_SIZE"
+            [totalRecords]="total()"
+            [pageLinkSize]="3"
+            [showPageLinks]="false"
+            [showFirstLastIcon]="true"
+            [showCurrentPageReport]="true"
+            currentPageReportTemplate="{currentPage} / {totalPages}"
+            (onPageChange)="onPageChange($event)"
+            styleClass="paginator-compact"
+          />
+        }
+        <button class="table-action-btn" pTooltip="Colonnes" (click)="colMenu.toggle($event)">
+          <i class="pi pi-sliders-h"></i>
+        </button>
+        <p-popover #colMenu styleClass="col-menu-popover">
+          <div class="table-options-menu">
+            <div class="table-options-columns">
+              @for (col of allColumns; track col.field) {
+                <label class="column-toggle">
+                  <input type="checkbox" [checked]="col.visible" (change)="toggleColumn(col.field)" />
+                  <span>{{ col.header }}</span>
+                </label>
+              }
+            </div>
+          </div>
+        </p-popover>
+        <button class="table-action-btn" pTooltip="Rafraîchir" (click)="reload()">
+          <i class="pi pi-refresh" [class.pi-spin]="loading()"></i>
+        </button>
+      </div>
+    </div>
+  </ng-template>
+
+  <!-- Table -->
+  <div class="table-wrapper">
+    @if (rows().length === 0 && !loading()) {
+      <div class="table-empty">
+        @if (!dateFrom() && !dateTo()) {
+          Sélectionnez une période pour afficher les données
+        } @else {
+          Aucune donnée pour cette période
+        }
+      </div>
+    } @else {
+      <table class="table">
+        <thead>
+          <tr>
+            @for (col of visibleColumns(); track col.field) {
+              <th [style.min-width]="col.width">
+                <div class="th-content">
+                  <span>{{ col.header }}</span>
+                  @if (col.filterable) {
+                    <button class="col-filter-btn"
+                      [class.col-filter-btn--active]="getColumnFilter(col.field)"
+                      (click)="openColumnFilter(col.field, $event)"
+                      [pTooltip]="getColumnFilter(col.field) || 'Filtrer'"
+                      tooltipPosition="top">
+                      <i class="pi"
+                        [class.pi-filter]="!getColumnFilter(col.field)"
+                        [class.pi-filter-fill]="!!getColumnFilter(col.field)"></i>
+                    </button>
+                  }
+                </div>
+              </th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @if (loading()) {
+            <tr class="sk-row">
+              <td [attr.colspan]="visibleColumns().length">
+                <app-skeleton-loader [rows]="12" [columns]="visibleColumns().length" [widths]="skWidths" />
+              </td>
+            </tr>
+          } @else {
+            @for (row of rows(); track $index; let i = $index) {
+              <tr class="table-row-animate" [style.--row-delay]="i < 20 ? i * 15 + 'ms' : '0ms'">
+                @for (col of visibleColumns(); track col.field) {
+                  <td [style.min-width]="col.width">
+                    @if (col.field === 'famille' && row.famille) {
+                      <span class="famille-pill" [ngStyle]="getFamilleStyle(row.famille)">{{ row.famille }}</span>
+                    } @else {
+                      {{ getRowValue(row, col.field) }}
+                    }
+                  </td>
+                }
+              </tr>
+            }
+          }
+        </tbody>
+        <tfoot>
+          <tr class="table-footer">
+            @for (col of visibleColumns(); track col.field) {
+              <td [style.min-width]="col.width">
+                @if (col.field === 'prix_unitaire') {
+                  {{ getFooterTotal('prix_unitaire') }}
+                } @else if (col.field === 'qte_commandee') {
+                  {{ getFooterTotal('qte_commandee') }}
+                } @else if (col.field === 'qte_livree') {
+                  {{ getFooterTotal('qte_livree') }}
+                } @else if (col.field === 'qte_facturee') {
+                  {{ getFooterTotal('qte_facturee') }}
+                } @else if (col.field === 'total_facture') {
+                  {{ getFooterTotal('total_facture') }}
+                }
+              </td>
+            }
+          </tr>
+        </tfoot>
+      </table>
+    }
+  </div>
+
+  <!-- Column filter popover -->
+  <p-popover #filterPop>
+    <div class="col-filter-popup">
+      <input type="text" class="col-filter-search"
+        placeholder="Rechercher…"
+        [(ngModel)]="filterService.filterSearchTerm" (ngModelChange)="filterService.onSearchTermChange()" />
+      <div class="col-filter-list">
+        @if (filterService.filterOptionsLoading) {
+          <div class="col-filter-loading"><i class="pi pi-spin pi-spinner"></i></div>
+        } @else {
+          <div class="col-filter-option"
+            [class.col-filter-option--active]="!filterService.activeFilters[filterService.activeFilterField!]"
+            (click)="applyColumnFilter(null)">
+            <i class="pi pi-list"></i> Tous
+          </div>
+          @for (opt of filteredOptions; track opt) {
+            <div class="col-filter-option"
+              [class.col-filter-option--active]="filterService.activeFilters[filterService.activeFilterField!] === opt"
+              (click)="applyColumnFilter(opt)">
+              {{ opt }}
+            </div>
+          }
+          @if (filteredOptions.length === 0) {
+            <div class="col-filter-empty">Aucun résultat</div>
+          }
+        }
+      </div>
+    </div>
+  </p-popover>
+
+
+</app-page-layout>

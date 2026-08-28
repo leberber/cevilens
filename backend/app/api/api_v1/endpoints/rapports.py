@@ -14,7 +14,6 @@ from sqlmodel import Session, select
 from app.api.deps import get_current_user
 from app.database import get_session
 from app.models.vente import Vente
-from app.models.produit import Produit
 
 router = APIRouter()
 

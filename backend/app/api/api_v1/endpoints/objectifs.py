@@ -9,7 +9,6 @@ from sqlmodel import Session, select
 from app.api.deps import get_current_user, get_current_distributor
 from app.database import get_session
 from app.models.objectif import Objectif
-from app.models.produit import Produit
 from app.models.user import User, UserRole
 from app.models.vente import Vente
 
@@ -54,7 +53,7 @@ def routes_count(
             Vente.code_fdv.isnot(None),
         )
         if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-            q = q.where(Vente.distributor_id == current_distributor.id)
+            q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
         rows = session.exec(q.group_by(Vente.canal)).all()
         return {canal: int(cnt) for canal, cnt in rows}
 
@@ -66,7 +65,7 @@ def routes_count(
     if vd == 0 and vh == 0:
         q_latest = select(Vente.annee_mois).where(Vente.canal.isnot(None), Vente.code_fdv.isnot(None))
         if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-            q_latest = q_latest.where(Vente.distributor_id == current_distributor.id)
+            q_latest = q_latest.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
         latest = session.exec(q_latest.order_by(Vente.annee_mois.desc()).limit(1)).first()
         if latest and latest != annee_mois:
             fallback_mois = latest

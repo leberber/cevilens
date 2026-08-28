@@ -2,64 +2,84 @@
 
   <!-- Sidebar (desktop only) -->
   <aside class="admin-sidebar">
+    <!-- Sidebar collapse handle -->
+    <div class="sidebar-collapse-handle" (click)="collapsed.set(!collapsed())" title="Réduire/Agrandir le menu">
+      <i [class]="collapsed() ? 'pi pi-chevron-right' : 'pi pi-chevron-left'"></i>
+    </div>
 
-    <!-- Logo or Distributor Context -->
+    <!-- Brand / Logo -->
     <div class="admin-sidebar__logo">
-      @if(user?.distributor_id && !isPlatformAdmin) {
-        <div style="text-align:center;padding:1rem;font-weight:600;font-size:0.9rem;color:var(--primary-color)">
-          📍 {{ distributorName() ?? 'Loading...' }}
+      @if (user?.distributor_id && !isPlatformAdmin) {
+        <div class="sidebar-brand-dist">
+          <i class="pi pi-building sidebar-brand-dist__icon"></i>
+          <span class="sidebar-brand-dist__name">{{ distributorName() ?? '…' }}</span>
         </div>
       } @else {
-        <img src="ceviicon.png" alt="Cevi" class="sidebar-logo-full" />
+        <img src="cevilogo.webp" alt="Cevital" class="sidebar-logo-full" />
       }
     </div>
 
+    <!-- Global Distributor Filter (centered under logo) -->
+    @if (isPlatformAdmin) {
+      <div class="sidebar-distributor-filter-centered">
+        <app-distributor-switcher (distributorChange)="onDistributorChange($event)" />
+      </div>
+    }
+
     <!-- Nav -->
     <nav class="admin-sidebar__nav">
-      @if(!isPrevendeur) {
-        <a class="nav-item" routerLink="/dashboard" routerLinkActive="active">
-          <i class="pi pi-home"></i><span>Tableau de bord</span>
-        </a>
-        <a class="nav-item" routerLink="/analytics" routerLinkActive="active">
-          <i class="pi pi-chart-line"></i><span>Analytiques</span>
-        </a>
-      }
-      @if(isPlatformAdmin) {
-        <a class="nav-item" routerLink="/admin" routerLinkActive="active">
-          <i class="pi pi-users"></i><span>Admin Dashboard</span>
-        </a>
-        <a class="nav-item" routerLink="/distributors" routerLinkActive="active">
-          <i class="pi pi-building"></i><span>Distributeurs</span>
-        </a>
-      }
-      @if(auth.isAdminOrEmploye || isSuperviseur) {
-        <a class="nav-item" routerLink="/ventes" routerLinkActive="active">
-          <i class="pi pi-table"></i><span>Données ventes</span>
-        </a>
-        <a class="nav-item nav-item--accent" routerLink="/upload" routerLinkActive="active">
-          <i class="pi pi-upload"></i><span>Importer des données</span>
-        </a>
-        <a class="nav-item" routerLink="/utilisateurs" routerLinkActive="active">
-          <i class="pi pi-shield"></i><span>Fonctionnaires</span>
-        </a>
-        <a class="nav-item" routerLink="/objectifs" routerLinkActive="active">
-          <i class="pi pi-bullseye"></i><span>Objectifs OUT</span>
-        </a>
-        <a class="nav-item" routerLink="/parametres" routerLinkActive="active">
-          <i class="pi pi-cog"></i><span>Paramètres</span>
-        </a>
-        @if (isPlatformAdmin || isDistributorAdmin) {
-          <a class="nav-item" routerLink="/logs" routerLinkActive="active">
-            <i class="pi pi-list"></i><span>Logs</span>
+      @if (!isPrevendeur) {
+        <div class="nav-section">
+          <a class="nav-item" routerLink="/dashboard" routerLinkActive="active">
+            <i class="pi pi-home"></i><span>Tableau de bord</span>
           </a>
-        }
+          <a class="nav-item" routerLink="/analytics" routerLinkActive="active">
+            <i class="pi pi-chart-line"></i><span>Analytiques</span>
+          </a>
+        </div>
+      }
+
+      @if (isPlatformAdmin) {
+        <div class="nav-section">
+          <span class="nav-label">Administration</span>
+          <a class="nav-item" routerLink="/admin" routerLinkActive="active">
+            <i class="pi pi-users"></i><span>Admin Dashboard</span>
+          </a>
+          <a class="nav-item" routerLink="/distributors" routerLinkActive="active">
+            <i class="pi pi-building"></i><span>Distributeurs</span>
+          </a>
+        </div>
+      }
+
+      @if (auth.isAdminOrEmploye || isSuperviseur) {
+        <div class="nav-section">
+          <span class="nav-label">Données</span>
+          <a class="nav-item" routerLink="/ventes" routerLinkActive="active">
+            <i class="pi pi-table"></i><span>Données ventes</span>
+          </a>
+          <a class="nav-item" routerLink="/objectifs" routerLinkActive="active">
+            <i class="pi pi-bullseye"></i><span>Objectifs OUT</span>
+          </a>
+        </div>
+        <div class="nav-section">
+          <span class="nav-label">Gestion</span>
+          <a class="nav-item" routerLink="/utilisateurs" routerLinkActive="active">
+            <i class="pi pi-shield"></i><span>Fonctionnaires</span>
+          </a>
+          <a class="nav-item" routerLink="/upload" routerLinkActive="active">
+            <i class="pi pi-upload"></i><span>Importer des données</span>
+          </a>
+          <a class="nav-item" routerLink="/parametres" routerLinkActive="active">
+            <i class="pi pi-cog"></i><span>Paramètres</span>
+          </a>
+          @if (isPlatformAdmin || isDistributorAdmin) {
+            <a class="nav-item" routerLink="/logs" routerLinkActive="active">
+              <i class="pi pi-list"></i><span>Logs</span>
+            </a>
+          }
+        </div>
       }
     </nav>
-
-    <!-- Collapse toggle -->
-    <button class="sidebar-toggle" type="button" (click)="collapsed.set(!collapsed())">
-      <i [class]="collapsed() ? 'pi pi-chevron-right' : 'pi pi-chevron-left'"></i>
-    </button>
 
     <!-- Footer: user info + logout -->
     <div class="admin-sidebar__footer">
@@ -69,9 +89,6 @@
       <div class="admin-sidebar__footer-text">
         <strong>{{ user?.full_name }}</strong>
         <span>{{ user?.role | titlecase }}</span>
-        @if(user?.distributor_id && !isPlatformAdmin) {
-          <span class="distributor-context">📍 {{ distributorName() ?? 'Loading...' }}</span>
-        }
       </div>
       <button class="sidebar-logout" type="button" (click)="logout()" title="Se déconnecter">
         <i class="pi pi-sign-out"></i>
@@ -83,7 +100,7 @@
   <!-- Mobile top bar -->
   @if (!isPrevendeur) {
     <header class="mob-topbar">
-      <img src="ceviicon.png" alt="Cevi" class="mob-topbar__logo" />
+      <img src="cevilogo.webp" alt="Cevital" class="mob-topbar__logo" />
     </header>
   }
 

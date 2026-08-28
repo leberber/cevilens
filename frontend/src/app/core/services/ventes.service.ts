@@ -58,10 +58,6 @@ export interface VentePage {
   items: VenteRead[];
 }
 
-export interface BlMapping {
-  bl_code: string;
-  code_produit: string;
-}
 
 export interface UploadResponse {
   lignes: number;
@@ -131,8 +127,12 @@ export class VentesService {
     return this.http.get<string[]>('/api/v1/ventes/clients', { params: p });
   }
 
-  getDistinct(field: string, date_from?: string, date_to?: string) {
-    const p = this.paramsBuilder.build({ date_from, date_to });
+  getClientNames() {
+    return this.http.get<string[]>('/api/v1/ventes/client-names');
+  }
+
+  getDistinct(field: string, date_from?: string, date_to?: string, search?: string) {
+    const p = this.paramsBuilder.build({ date_from, date_to, search });
     return this.http.get<string[]>(`/api/v1/ventes/distinct/${field}`, { params: p });
   }
 
@@ -140,18 +140,6 @@ export class VentesService {
     const form = new FormData();
     form.append('file', file);
     return this.http.post<UploadResponse>('/api/v1/ventes/upload', form);
-  }
-
-  getMappings() {
-    return this.http.get<BlMapping[]>('/api/v1/mappings');
-  }
-
-  createMapping(bl_code: string, code_produit: string) {
-    return this.http.post<BlMapping>('/api/v1/mappings', { bl_code, code_produit });
-  }
-
-  deleteMapping(bl_code: string) {
-    return this.http.delete(`/api/v1/mappings/${encodeURIComponent(bl_code)}`);
   }
 
 }

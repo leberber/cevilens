@@ -14,11 +14,22 @@ export class VentesFilterService {
 
   activeFilters: Partial<Record<string, string>> = {};
   filterOptions: string[] = [];
+  allClientNames: string[] = [];
   filterOptionsLoading = false;
   filterSearchTerm = '';
   activeFilterField: string | null = null;
 
   get filteredOptions(): string[] {
+    // For nom_client, filter in-memory from loaded list
+    if (this.activeFilterField === 'nom_client') {
+      if (!this.filterSearchTerm.trim()) {
+        return this.allClientNames;
+      }
+      const term = this.filterSearchTerm.toLowerCase();
+      return this.allClientNames.filter(name =>
+        name.toLowerCase().includes(term)
+      );
+    }
     return this.searchFilter.filterByField(this.filterOptions, this.filterSearchTerm, 0);
   }
 
@@ -31,15 +42,46 @@ export class VentesFilterService {
       this.activeFilterField = field;
       this.filterSearchTerm = '';
       this.filterOptions = [];
-      this.filterOptionsLoading = true;
-      this.ventesService.getDistinct(field, dateFrom, dateTo)
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe(vals => {
-          this.filterOptions = vals;
-          this.filterOptionsLoading = false;
+      this.filterOptionsLoading = false;
+      this.dateFrom = dateFrom;
+      this.dateTo = dateTo;
+
+      // For nom_client, load all names once and filter in-memory
+      if (field === 'nom_client') {
+        if (this.allClientNames.length === 0) {
+          this.filterOptionsLoading = true;
+          this.ventesService.getClientNames()
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe(names => {
+              this.allClientNames = names;
+              this.filterOptionsLoading = false;
+              resolve();
+            });
+        } else {
           resolve();
-        });
+        }
+      } else {
+        // For other fields, load from server with date filters
+        this.filterOptionsLoading = true;
+        this.ventesService.getDistinct(field, dateFrom, dateTo)
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe(vals => {
+            this.filterOptions = vals;
+            this.filterOptionsLoading = false;
+            resolve();
+          });
+      }
     });
+  }
+
+  private dateFrom: string | undefined;
+  private dateTo: string | undefined;
+  private searchTimeout: ReturnType<typeof setTimeout> | undefined;
+
+  onSearchTermChange(): void {
+    // nom_client filtering is now in-memory (see filteredOptions getter)
+    // No server call needed anymore
+    // This method kept for other field types that may need debounced search
   }
 
   applyColumnFilter(value: string | null): void {
