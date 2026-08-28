@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { TooltipModule } from 'primeng/tooltip';
-import { Select } from 'primeng/select';
 import { Popover } from 'primeng/popover';
 import { Paginator } from 'primeng/paginator';
 import { VentesService, VenteRead } from '../../core/services/ventes.service';
@@ -12,10 +11,8 @@ import { FamilleColorService } from '../../core/services/famille-color.service';
 import { DateHelper } from '../../core/services/date.helper';
 import { NotificationService } from '../../core/services/notification.service';
 import { SkeletonLoaderComponent } from '../../shared/components/skeleton-loader/skeleton-loader.component';
-import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
 import { DateRangePickerComponent } from '../../shared/components/date-range-picker/date-range-picker.component';
-import { DistributorSwitcherComponent } from '../../shared/components/distributor-switcher/distributor-switcher.component';
 import { ActiveFilterChipsComponent } from '../../shared/components/active-filter-chips/active-filter-chips.component';
 import { VentesFilterService } from './services/ventes-filter.service';
 import { BATCH_SIZE } from '../../core/constants/app.constants';
@@ -29,14 +26,11 @@ const LS_KEY = 'cevital_ventes_columns';
     CommonModule,
     FormsModule,
     TooltipModule,
-    Select,
     Popover,
     Paginator,
     SkeletonLoaderComponent,
-    EmptyStateComponent,
     PageLayoutComponent,
     DateRangePickerComponent,
-    DistributorSwitcherComponent,
     ActiveFilterChipsComponent,
   ],
   templateUrl: './ventes.component.html',

@@ -2,7 +2,7 @@ import { UserRole } from '../models/user.model';
 
 export const ROLE_LABELS: Record<UserRole | string, string> = {
   platform_admin: '🔑 Platform Admin',
-  distributor_admin: '📦 Distributor Admin',
+  distributor_admin: '📦 Admin',
   superviseur: '👮 Superviseur',
   prevendeur: '🚚 Prévendeur',
   prevender: '🚚 Prévendeur', // legacy
