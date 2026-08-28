@@ -66,9 +66,4 @@ export class DistributorSwitcherComponent implements OnInit {
     this.distContext.setSelectedDistributor(dist);
     this.distributorChange.emit(dist);
   }
-
-  @HostListener('document:click')
-  onOutsideClick() {
-    this.showMenu.set(false);
-  }
 }

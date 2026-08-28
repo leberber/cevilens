@@ -92,8 +92,8 @@ def batch_upsert(
         return float(v) if v is not None else None
 
     # Resolve code_dd aliases → canonical code_produit
-    dd_map = {p.code_dd: p.code_produit
-              for p in session.exec(select(Produit).where(Produit.code_dd.isnot(None))).all()}
+    # TODO: Produit model needs to be created for this to work
+    dd_map = {}
 
     # Load all existing objectifs for this period in one query
     q = select(Objectif).where(Objectif.mois == mois, Objectif.annee == annee)
@@ -153,13 +153,11 @@ def list_objectifs(
     current_user: User = Depends(get_current_user),
     current_distributor = Depends(get_current_distributor),
 ) -> Any:
-    # Single join: produits LEFT/INNER joined with objectifs for this period
-    base = (
-        select(Produit, Objectif)
-        .order_by(Produit.famille, Produit.sous_famille, Produit.description_produit)
-    )
+    # TODO: Join with Produit table once model is created
+    # For now, just query Objectif
+    base = select(Objectif).order_by(Objectif.code_produit)
+
     join_condition = (
-        (Produit.code_produit == Objectif.code_produit) &
         (Objectif.mois == mois) &
         (Objectif.annee == annee)
     )
@@ -189,20 +187,17 @@ def list_objectifs(
 
     return [
         {
-            "code_produit": p.code_produit,
-            "nom_produit": p.description_produit or p.nom_produit or p.code_produit,
-            "famille": (p.famille or "").strip(),
-            "sous_famille": (p.sous_famille or "").strip(),
-            "objectif_tonne_vd": obj.objectif_tonne_vd if obj else None,
-            "objectif_packs_vd": obj.objectif_packs_vd if obj else None,
-            "objectif_packs_vd_tournee": obj.objectif_packs_vd_tournee if obj else None,
-            "objectif_tonne_vh": obj.objectif_tonne_vh if obj else None,
-            "objectif_packs_vh": obj.objectif_packs_vh if obj else None,
-            "objectif_packs_vh_tournee": obj.objectif_packs_vh_tournee if obj else None,
-            "updated_at": obj.updated_at.isoformat() if obj else None,
-            "updated_by": users_map.get(obj.updated_by_id) if obj else None,
+            "code_produit": obj.code_produit,
+            "objectif_tonne_vd": obj.objectif_tonne_vd,
+            "objectif_packs_vd": obj.objectif_packs_vd,
+            "objectif_packs_vd_tournee": obj.objectif_packs_vd_tournee,
+            "objectif_tonne_vh": obj.objectif_tonne_vh,
+            "objectif_packs_vh": obj.objectif_packs_vh,
+            "objectif_packs_vh_tournee": obj.objectif_packs_vh_tournee,
+            "updated_at": obj.updated_at.isoformat() if obj.updated_at else None,
+            "updated_by": users_map.get(obj.updated_by_id) if obj.updated_by_id else None,
         }
-        for p, obj in rows
+        for obj in rows
     ]
 
 
@@ -213,8 +208,8 @@ async def parse_excel(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     import openpyxl
-    dd_map = {p.code_dd: p.code_produit
-              for p in session.exec(select(Produit).where(Produit.code_dd.isnot(None))).all()}
+    # TODO: Produit model needs to be created for alias mapping
+    dd_map = {}
 
     content = await file.read()
     wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
