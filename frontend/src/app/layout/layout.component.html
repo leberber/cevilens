@@ -9,13 +9,15 @@
 
     <!-- Brand / Logo -->
     <div class="admin-sidebar__logo">
-      @if (user?.distributor_id && !isPlatformAdmin) {
+      <img src="cevilogo.webp" alt="Cevital" class="sidebar-logo-full" />
+      @if (isPlatformAdmin) {
+        <!-- Platform admin: show switcher below logo -->
+      } @else {
+        <!-- Distributor admin: show distributor name (read-only) -->
         <div class="sidebar-brand-dist">
           <i class="pi pi-building sidebar-brand-dist__icon"></i>
           <span class="sidebar-brand-dist__name">{{ distributorName() ?? '…' }}</span>
         </div>
-      } @else {
-        <img src="cevilogo.webp" alt="Cevital" class="sidebar-logo-full" />
       }
     </div>
 

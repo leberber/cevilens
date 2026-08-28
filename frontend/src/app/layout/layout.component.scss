@@ -36,7 +36,8 @@
   &__logo {
     padding: 1.25rem var(--space-5);
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
     justify-content: center;
     overflow: hidden;
     min-height: 88px;
@@ -491,22 +492,23 @@
 
 .sidebar-brand-dist {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   gap: 0.4rem;
-  text-align: center;
+  text-align: left;
   padding: var(--space-2) 0;
+  margin-left: 14px;
   overflow: hidden;
 
   &__icon {
-    font-size: 1.4rem;
+    font-size: 1rem;
     color: var(--brand-gold);
   }
 
   &__name {
     font-size: 0.78rem;
     font-weight: 600;
-    color: #fff;
+    color: var(--text-color);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -518,8 +520,9 @@
 .sidebar-distributor-filter-centered {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   padding: 0.2rem var(--space-4);
+  margin-left: 17px;
   margin-top: -15px;
   margin-bottom: 25px;
   flex-shrink: 0;
@@ -527,10 +530,10 @@
   background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.02), rgba(var(--primary-rgb), 0.01));
 
   ::ng-deep .dist-switcher {
-    width: 100%;
+    width: auto;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
     flex-direction: column;
     gap: 0.3rem;
 
