@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 logger = logging.getLogger("app.upload")
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, delete as sa_delete, case as sa_case
+from sqlalchemy import func, delete as sa_delete, case as sa_case, cast, String
 from sqlmodel import Session, select
 
 from app.api.deps import get_current_user, get_current_distributor
@@ -152,7 +152,7 @@ def _row_to_vente(row: pd.Series, annee_mois: str, uploaded_by_id: int, distribu
 
 
 _FILTERABLE_FIELDS = {
-    'sous_famille', 'type_commande', 'categorie_client', 'statut_commande',
+    'date_commande', 'sous_famille', 'type_commande', 'categorie_client', 'statut_commande',
     'wilaya', 'zone', 'region', 'type_client',
     'source', 'canal', 'route', 'nom_fdv', 'nom_livreur', 'famille', 'nom_distributeur', 'nom_client',
 }
@@ -165,6 +165,7 @@ def list_ventes(
     annee_mois: Optional[str] = Query(default=None),
     date_from: Optional[str] = Query(default=None),
     date_to: Optional[str] = Query(default=None),
+    date_commande: Optional[str] = Query(default=None),
     famille: Optional[str] = Query(default=None),
     sous_famille: Optional[str] = Query(default=None),
     type_commande: Optional[str] = Query(default=None),
@@ -199,6 +200,8 @@ def list_ventes(
         conditions.append(Vente.date_commande >= date_type.fromisoformat(_normalize_date(date_from)))
     if date_to:
         conditions.append(Vente.date_commande <= date_type.fromisoformat(_normalize_date(date_to)))
+    if date_commande:
+        conditions.append(Vente.date_commande == date_type.fromisoformat(_normalize_date(date_commande)))
     if famille:
         conditions.append(Vente.famille == famille)
     if sous_famille:
@@ -358,6 +361,9 @@ def list_distinct(
 
     # Standard DISTINCT query for other fields
     col = getattr(Vente, field)
+    # Cast dates to strings for proper serialization
+    if field == 'date_commande':
+        col = cast(col, String)
     q = select(col).distinct().order_by(col)
     if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
         q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
@@ -365,7 +371,7 @@ def list_distinct(
         q = q.where(Vente.date_commande >= date_type.fromisoformat(_normalize_date(date_from)))
     if date_to:
         q = q.where(Vente.date_commande <= date_type.fromisoformat(_normalize_date(date_to)))
-    if search:
+    if search and field != 'date_commande':
         q = q.where(col.ilike(f"%{search}%"))
     return [v for v in session.exec(q).all() if v]
 

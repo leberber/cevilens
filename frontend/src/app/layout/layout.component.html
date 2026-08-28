@@ -88,7 +88,7 @@
       </div>
       <div class="admin-sidebar__footer-text">
         <strong>{{ user?.full_name }}</strong>
-        <span>{{ user?.role | titlecase }}</span>
+        <span>{{ roleLabel }}</span>
       </div>
       <button class="sidebar-logout" type="button" (click)="logout()" title="Se déconnecter">
         <i class="pi pi-sign-out"></i>
@@ -135,7 +135,7 @@
         <div class="mob-drawer__user-avatar"><i class="pi pi-user"></i></div>
         <div>
           <div class="mob-drawer__user-name">{{ user?.full_name }}</div>
-          <div class="mob-drawer__user-role">{{ user?.role | titlecase }}</div>
+          <div class="mob-drawer__user-role">{{ roleLabel }}</div>
           @if(user?.distributor_id && !isPlatformAdmin) {
             <div class="mob-drawer__user-distributor">📍 {{ distributorName() ?? 'Loading...' }}</div>
           }

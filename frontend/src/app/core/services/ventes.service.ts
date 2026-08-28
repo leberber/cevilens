@@ -76,6 +76,7 @@ export interface VenteListParams {
   annee_mois?: string;
   date_from?: string;
   date_to?: string;
+  date_commande?: string;
   famille?: string;
   sous_famille?: string;
   type_commande?: string;

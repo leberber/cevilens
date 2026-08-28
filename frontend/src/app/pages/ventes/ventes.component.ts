@@ -64,7 +64,7 @@ export class VentesComponent implements OnInit {
   readonly selectedDistributeur = signal<string | null>(null);
 
   readonly allColumns: ColDef[] = [
-    { field: 'date_commande',        header: 'Date',                width: '110px', visible: true  },
+    { field: 'date_commande',        header: 'Date',                width: '110px', visible: true,  filterable: true  },
     { field: 'num_commande',         header: 'N° Commande',         width: '160px', visible: true  },
     { field: 'source',               header: 'Source',              width: '90px',  visible: true,  filterable: true  },
     { field: 'canal',                header: 'Canal',               width: '80px',  visible: true,  filterable: true  },
@@ -225,6 +225,7 @@ export class VentesComponent implements OnInit {
       per_page: BATCH_SIZE,
       date_from: this.dateFrom() || undefined,
       date_to: this.dateTo() || undefined,
+      date_commande:    (f['date_commande']    as string) || undefined,
       famille:          (f['famille']          as string) || undefined,
       sous_famille:     (f['sous_famille']     as string) || undefined,
       type_commande:    (f['type_commande']    as string) || undefined,
