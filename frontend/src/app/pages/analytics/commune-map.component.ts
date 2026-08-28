@@ -4,6 +4,8 @@ import {
 } from '@angular/core';
 import * as L from 'leaflet';
 import { HttpClient } from '@angular/common/http';
+import { CommuneMapStyleService } from './services/commune-map-style.service';
+import { CommuneMapTooltipService } from './services/commune-map-tooltip.service';
 
 export interface CommuneDatum { code: number; total: number; }
 
@@ -155,10 +157,12 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
   readonly mapMode      = signal<MapMode>('choropleth');
   readonly isFullscreen = signal(false);
 
-  private http      = inject(HttpClient);
-  private el        = inject(ElementRef<HTMLElement>);
-  private geoData   = signal<GeoFeatureCollection | null>(null);
-  private mapReady  = signal(false);
+  private readonly http           = inject(HttpClient);
+  private readonly el             = inject(ElementRef<HTMLElement>);
+  private readonly styleService   = inject(CommuneMapStyleService);
+  private readonly tooltipService = inject(CommuneMapTooltipService);
+  private geoData        = signal<GeoFeatureCollection | null>(null);
+  private mapReady       = signal(false);
   private map: L.Map | null = null;
   private geoLayer: L.FeatureGroup | null = null;
   private top1Marker: L.Marker | null = null;
@@ -203,7 +207,6 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
       this.http.get<GeoFeatureCollection>(`/api/v1/prevendeur/admin/communes-geojson?codes=${codes}`).subscribe({
         next: geo => { this.geoData.set(geo); this.geoLoading.set(false); },
         error: err => {
-          console.error('[commune-map] GeoJSON load failed:', err);
           this.geoLoading.set(false); this.geoError.set(true);
         },
       });
@@ -255,6 +258,7 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.cleanupTimers.forEach(clearTimeout);
+    this.tooltipService.clearTimers();
     this.map?.remove(); this.map = null;
   }
 
@@ -269,58 +273,10 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
     return ((layer as any).feature?.properties?.['name'] ?? (layer as any).communeName) as string | undefined;
   }
 
-  private fillColor(total: number, maxTotal: number): string {
-    const t = Math.pow(total / maxTotal, 0.5);
-    return `rgb(${Math.round(219 - 190 * t)},${Math.round(234 - 156 * t)},${Math.round(254 - 38 * t)})`;
-  }
-
-  private fmtVal(v: number): string {
-    return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`;
-  }
-
   private findLayerByCode(code: number): L.Layer | undefined {
     let found: L.Layer | undefined;
     this.geoLayer?.eachLayer(l => { if (this.layerCode(l) === code) found = l; });
     return found;
-  }
-
-  // ── Floating info card ────────────────────────────────────────────────────
-
-  private setCard(html: string): void {
-    const el = this.cardEl?.nativeElement;
-    if (!el) return;
-    el.classList.add('fading');
-    setTimeout(() => {
-      el.innerHTML = html;
-      el.classList.remove('fading');
-      el.classList.add('visible');
-    }, 180);
-  }
-
-  private buildCard(name: string | undefined, row: CommuneDatum | undefined, totalAll: number, rank?: number): string {
-    const bc = rank === 1 ? '#2563eb' : rank && rank <= 3 ? '#1d4ed8' : '#3b82f6';
-    const header = `
-      <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:12px">
-        ${rank ? `<div style="min-width:28px;height:28px;border-radius:8px;background:${bc};
-                    display:flex;align-items:center;justify-content:center;
-                    font-size:9px;font-weight:800;color:#fff;flex-shrink:0">#${rank}</div>` : ''}
-        <div style="min-width:0">
-          <div style="font-weight:700;color:#0f172a;font-size:13px;line-height:1.25;
-                      white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name ?? '—'}</div>
-          <div style="font-size:10px;color:#94a3b8;margin-top:1px">Commune</div>
-        </div>
-      </div>`;
-    if (!row || row.total === 0) return header + `<div style="color:#94a3b8;font-size:11px">Aucune vente sur la période</div>`;
-    const pct = Math.round((row.total / totalAll) * 100);
-    return header + `
-      <div style="font-size:21px;font-weight:800;color:${bc};letter-spacing:-.5px;line-height:1;margin-bottom:10px">
-        ${this.fmtVal(row.total)} <span style="font-size:11px;font-weight:500;color:#64748b">unités</span></div>
-      <div style="height:5px;background:#f1f5f9;border-radius:3px;overflow:hidden;margin-bottom:4px">
-        <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,#93c5fd,${bc});border-radius:3px"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:#94a3b8">
-        <span>Part du total</span><span>${pct}%</span>
-      </div>`;
   }
 
   // ── #1 marker ─────────────────────────────────────────────────────────────
@@ -352,7 +308,7 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
       const row  = code != null ? dataMap.get(code) : undefined;
       const path = (layer as any)._path as SVGPathElement | undefined;
       if (!path) return;
-      const fill = row && row.total > 0 ? this.fillColor(row.total, maxTotal) : '#eff6ff';
+      const fill = row && row.total > 0 ? this.styleService.fillColor(row.total, maxTotal) : '#eff6ff';
       const rank = code != null ? (rankMap.get(code) ?? 9999) : 9999;
       rank <= 6 ? top.push({ path, fill, rank }) : rest.push({ path, fill, rank });
     });
@@ -388,7 +344,7 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
     const rankMap  = new Map<number, number>(sorted.map((d, i) => [d.code, i + 1]));
     this.top1Code  = sorted[0]?.code;
 
-    this.maxStr.set(maxTotal >= 1000 ? `${(maxTotal / 1000).toFixed(0)}k` : `${maxTotal}`);
+    this.maxStr.set(this.styleService.fmtVal(maxTotal));
 
     if (this.geoLayer) { this.geoLayer.remove(); this.geoLayer = null; }
 
@@ -408,7 +364,7 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
     // Show top-1 card
     const top1Layer = this.findLayerByCode(this.top1Code!);
     const top1Name  = top1Layer ? this.layerName(top1Layer) : undefined;
-    this.showTop1 = () => this.setCard(this.buildCard(top1Name, sorted[0], totalAll, 1));
+    this.showTop1 = () => this.tooltipService.setCard(this.cardEl, this.tooltipService.buildCard(top1Name, sorted[0], totalAll, 1));
     this.showTop1();
   }
 
@@ -449,7 +405,7 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
 
         layer.on('mouseover', () => {
           (layer as L.Path).setStyle({ weight: 2, color: '#1d4ed8' });
-          this.setCard(this.buildCard(name, dataMap.get(code!), totalAll, rankMap.get(code!)));
+          this.tooltipService.setCard(this.cardEl, this.tooltipService.buildCard(name, dataMap.get(code!), totalAll, rankMap.get(code!)));
         });
         layer.on('mouseout', () => { (layer as L.Path).setStyle(baseStyle()); this.showTop1?.(); });
         layer.on('click', () => {
@@ -515,7 +471,7 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
 
       marker.on('mouseover', () => {
         marker.setStyle({ color: '#1d4ed8', weight: 2 });
-        this.setCard(this.buildCard(name, row, totalAll, rank));
+        this.tooltipService.setCard(this.cardEl, this.tooltipService.buildCard(name, row, totalAll, rank));
       });
       marker.on('mouseout', () => {
         const isSel = code === this.selectedCode();

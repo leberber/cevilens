@@ -1,10 +1,9 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
-import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-confirm-dialog',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     @if (visible) {
       <div class="confirm-backdrop" (click)="onCancel()">
@@ -15,7 +14,7 @@ import { CommonModule } from '@angular/common';
             <button class="btn-secondary" (click)="onCancel()" [disabled]="isLoading">
               {{ cancelLabel }}
             </button>
-            <button class="btn-save" (click)="onConfirm()" [disabled]="isLoading">
+            <button class="btn-add" (click)="onConfirm()" [disabled]="isLoading">
               @if (isLoading) {
                 <i class="pi pi-spin pi-spinner"></i>
               } @else {
@@ -66,31 +65,6 @@ import { CommonModule } from '@angular/common';
       justify-content: flex-end;
     }
 
-    button {
-      padding: 8px 16px;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    button:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .btn-secondary {
-      background: #f0f0f0;
-      color: #333;
-    }
-
-    .btn-save {
-      background: #4f46e5;
-      color: white;
-    }
   `],
 })
 export class ConfirmDialogComponent {

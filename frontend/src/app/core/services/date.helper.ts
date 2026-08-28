@@ -58,4 +58,27 @@ export class DateHelper {
     date.setMonth(date.getMonth() + months);
     return this.getPeriodFromDate(date);
   }
+
+  /**
+   * Format period for display (YYYY-MM → "Jan 2024" or similar)
+   */
+  formatPeriod(period: string, locale: string = 'fr-FR'): string {
+    const date = this.parsePeriod(period);
+    return date.toLocaleDateString(locale, { month: 'short', year: 'numeric' });
+  }
+
+  /**
+   * Format period range for display (YYYY-MM → DD/MM/YYYY)
+   */
+  formatPeriodRange(periodStart: string, periodEnd?: string, locale: string = 'fr-FR'): string {
+    const dateStart = this.parsePeriod(periodStart);
+    const fmt = (d: Date) => d.toLocaleDateString(locale, { day: 'numeric', month: 'short', year: 'numeric' });
+
+    if (!periodEnd || periodEnd === periodStart) {
+      return fmt(dateStart);
+    }
+
+    const dateEnd = this.parsePeriod(periodEnd);
+    return `${fmt(dateStart)} → ${fmt(dateEnd)}`;
+  }
 }

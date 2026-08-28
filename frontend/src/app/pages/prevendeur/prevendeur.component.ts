@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { PrevendeurService, PrevFacturation, PrevClient, PrevObjectifItem } from '../../core/services/prevendeur.service';
@@ -6,7 +6,7 @@ import { AuthService } from '../../core/services/auth.service';
 import { FormatService } from '../../core/services/format.service';
 import { LoadingManager } from '../../core/services/loading-manager.service';
 import { PeriodService } from '../../core/services/period.service';
-import { toggleInSet, isInSet } from '../../core/utils/set-toggle.util';
+import { toggleInSet } from '../../core/utils/set-toggle.util';
 import { groupBy, calculatePercentage } from '../../core/utils/data-transform.util';
 
 @Component({
@@ -15,6 +15,7 @@ import { groupBy, calculatePercentage } from '../../core/utils/data-transform.ut
   imports: [CommonModule, FormsModule],
   templateUrl: './prevendeur.component.html',
   styleUrl: './prevendeur.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class PrevendeurComponent implements OnInit {
   private svc = inject(PrevendeurService);

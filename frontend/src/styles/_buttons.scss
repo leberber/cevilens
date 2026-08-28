@@ -1,7 +1,11 @@
 // =============================================================================
-// BUTTONS — PrimeNG overrides + custom
+// BUTTONS
+// =============================================================================
+// Custom button classes. Use PrimeNG p-button / pButton for standard actions.
+// These classes cover cases where PrimeNG variants don't match the design.
 // =============================================================================
 
+// ── PrimeNG p-button override ─────────────────────────────────────────────────
 .p-button {
   border-radius: var(--radius-lg) !important;
   font-weight: var(--font-weight-semibold);
@@ -10,6 +14,75 @@
 
 .btn-block { width: 100%; justify-content: center; }
 
+// ── Shared base — all action buttons ─────────────────────────────────────────
+// Properties identical across every variant are declared once here.
+.btn-add,
+.btn-secondary,
+.btn-save,
+.btn-teal,
+.btn-danger,
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-lg);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  border: none;
+  text-decoration: none;
+  transition: all var(--transition-fast);
+
+  i { font-size: 0.8rem; }
+  &:disabled { opacity: 0.55; cursor: not-allowed; }
+}
+
+// ── Variants ──────────────────────────────────────────────────────────────────
+
+.btn-add {
+  background: var(--primary-gradient);
+  color: var(--color-white);
+  box-shadow: var(--shadow-add);
+  &:hover:not(:disabled) { transform: translateY(-2px); box-shadow: var(--shadow-add-lg); }
+  &:active { transform: scale(0.98); }
+}
+
+.btn-secondary,
+.back-btn {
+  background: var(--surface-card);
+  border: var(--border-width) solid var(--surface-border);
+  color: var(--text-color-secondary);
+  &:hover:not(:disabled) { background: var(--surface-hover); color: var(--text-color); border-color: var(--primary-color); }
+  &:active { transform: scale(0.98); }
+}
+
+.back-btn i { font-size: 0.75rem; }
+
+.btn-save {
+  background: var(--color-success-dark);
+  color: var(--color-white);
+  &:hover:not(:disabled) { filter: brightness(1.08); }
+}
+
+// .btn-teal covers teal-accent actions (e.g. import from Excel)
+.btn-teal {
+  background: #0d9488;
+  color: var(--color-white);
+  &:hover:not(:disabled) { filter: brightness(1.1); }
+}
+
+.btn-danger {
+  background: transparent;
+  border: 1px solid var(--color-error);
+  color: var(--color-error);
+  &:hover:not(:disabled) { background: rgba(var(--color-error-rgb), 0.06); }
+}
+
+// ── Filter toggle chip ────────────────────────────────────────────────────────
+// Used for VD/VH toggles and binary filter buttons.
 .filter-chip {
   display: inline-flex;
   align-items: center;
@@ -39,56 +112,4 @@
       color: var(--text-color);
     }
   }
-}
-
-.btn-secondary {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius-lg);
-  border: var(--border-width) solid var(--surface-border);
-  background: var(--surface-card);
-  color: var(--text-color-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  white-space: nowrap;
-
-  i { font-size: 0.8rem; }
-
-  &:hover {
-    background: var(--surface-hover);
-    color: var(--text-color);
-    border-color: var(--primary-color);
-  }
-
-  &:active { transform: scale(0.98); }
-}
-
-.btn-add {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  padding: 0.5rem 1rem;
-  border-radius: var(--radius-lg);
-  border: none;
-  background: var(--primary-gradient);
-  color: #fff;
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  box-shadow: var(--shadow-add);
-  transition: transform var(--transition-smooth), box-shadow var(--transition-smooth);
-  white-space: nowrap;
-
-  i { font-size: 0.8rem; }
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-add-lg);
-  }
-
-  &:active { transform: scale(0.98); }
 }

@@ -126,41 +126,8 @@
   }
 }
 
-// ── Back button ─────────────────────────────────────────────────────────────────
-.back-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  height: 2.25rem;
-  padding: 0 0.875rem;
-  border-radius: var(--radius-lg);
-  border: var(--border-width) solid var(--surface-border);
-  background: var(--surface-card);
-  color: var(--text-color-secondary);
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  text-decoration: none;
-  transition: all var(--transition-fast);
-  flex-shrink: 0;
-  white-space: nowrap;
-
-  i { font-size: 0.75rem; }
-
-  &:hover {
-    background: var(--surface-hover);
-    color: var(--text-color);
-    border-color: var(--primary-color);
-  }
-}
-
-// ── Form card entry animation (shared by all form pages) ───────────────────────
-@keyframes card-in {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
+// ── Form card entry animation ──────────────────────────────────────────────────
+// @keyframes card-in is defined in _animations.scss
 .form-card--anim {
   animation: card-in 0.3s ease both;
   animation-delay: calc(var(--card-i, 0) * 60ms);
@@ -209,3 +176,4 @@
     bottom: calc(var(--mob-nav-h) + env(safe-area-inset-bottom));
   }
 }
+

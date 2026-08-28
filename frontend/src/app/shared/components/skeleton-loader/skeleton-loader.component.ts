@@ -1,10 +1,9 @@
 import { Component, Input } from '@angular/core';
-import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-skeleton-loader',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="skeleton-rows">
       @for (row of rowsArray; track $index; let i = $index) {
@@ -38,15 +37,6 @@ import { CommonModule } from '@angular/common';
       border-radius: 4px;
     }
 
-    @keyframes shimmer {
-      0% { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.7; }
-    }
   `],
 })
 export class SkeletonLoaderComponent {

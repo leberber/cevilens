@@ -2,6 +2,7 @@ import { Component, inject, signal, OnInit } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
+import { LoadingManager } from '../../core/services/loading-manager.service';
 
 @Component({
   selector: 'app-login',
@@ -11,9 +12,10 @@ import { AuthService } from '../../core/services/auth.service';
   styleUrl: './login.component.scss',
 })
 export class LoginComponent implements OnInit {
-  private auth   = inject(AuthService);
-  private router = inject(Router);
-  private fb     = inject(FormBuilder);
+  private readonly auth           = inject(AuthService);
+  private readonly router         = inject(Router);
+  private readonly fb             = inject(FormBuilder);
+  private readonly loadingManager = inject(LoadingManager);
 
   readonly loading      = signal(false);
   readonly pageReady    = signal(false);
@@ -37,14 +39,12 @@ export class LoginComponent implements OnInit {
   submit(): void {
     if (this.form.invalid || this.loading()) return;
     this.errorMsg.set(null);
-    this.loading.set(true);
     const { phone, password } = this.form.getRawValue();
-    this.auth.login(phone!, password!).subscribe({
-      next: () => { this.loading.set(false); this.router.navigate(['/']); },
-      error: err => {
-        this.loading.set(false);
-        this.errorMsg.set(err.error?.detail ?? 'Identifiants incorrects');
-      },
-    });
+    this.loadingManager.load(
+      this.loading,
+      this.auth.login(phone!, password!),
+      () => this.router.navigate(['/']),
+      () => this.errorMsg.set('Identifiants incorrects')
+    );
   }
 }

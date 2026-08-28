@@ -1,0 +1,412 @@
+// =============================================================================
+// UPLOAD PAGE — all styles specific to the upload component
+// =============================================================================
+
+// ── Page shell ────────────────────────────────────────────────────────────────
+
+.upload-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  padding: 2rem;
+}
+
+// ── Upload card ───────────────────────────────────────────────────────────────
+
+.upload-card {
+  width: 100%;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+
+    h2 {
+      margin: 0 0 0.3rem;
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--text-color);
+      letter-spacing: -0.01em;
+    }
+
+    p {
+      margin: 0;
+      color: var(--text-color-secondary);
+      font-size: 0.825rem;
+    }
+  }
+
+  &__icon {
+    flex-shrink: 0;
+    width: 52px;
+    height: 52px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--primary-color), color-mix(in srgb, var(--primary-color) 60%, var(--color-indigo-light)));
+    box-shadow: 0 4px 14px color-mix(in srgb, var(--primary-color) 35%, transparent);
+
+    i { font-size: 1.5rem; color: var(--color-white); }
+  }
+}
+
+// ── Drop zone ─────────────────────────────────────────────────────────────────
+
+.drop-zone {
+  border: 2px dashed var(--surface-300);
+  border-radius: 1.25rem;
+  padding: 3rem 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  background: var(--surface-ground);
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+
+  &:hover:not(&--loading) {
+    border-color: var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 4%, var(--surface-ground));
+  }
+
+  &--over {
+    border-color: var(--primary-color);
+    background: color-mix(in srgb, var(--primary-color) 8%, var(--surface-ground));
+    transform: scale(1.01);
+  }
+
+  &--loading {
+    cursor: default;
+    border-style: solid;
+    border-color: color-mix(in srgb, var(--primary-color) 35%, transparent);
+    background: color-mix(in srgb, var(--primary-color) 4%, var(--surface-ground));
+  }
+
+  &__icon  { font-size: 2.75rem; color: var(--primary-color); margin-bottom: 0.25rem; }
+  &__text  { font-size: 1rem; font-weight: 600; color: var(--text-color); }
+  &__hint  { font-size: 0.825rem; color: var(--text-color-secondary); }
+
+  &__badges {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.5rem;
+  }
+}
+
+// ── Upload format badge ───────────────────────────────────────────────────────
+
+.upload-badge {
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  background: color-mix(in srgb, var(--primary-color) 12%, transparent);
+  color: var(--primary-color);
+}
+
+// ── Skeleton loading (keyframes from _animations.scss) ────────────────────────
+
+.skeleton-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 0.5rem 1.5rem;
+}
+
+.skeleton-row { display: flex; justify-content: center; }
+
+.skeleton-block {
+  border-radius: 8px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--primary-color) 10%, var(--surface-200)),
+    color-mix(in srgb, var(--primary-color) 28%, var(--surface-100)),
+    color-mix(in srgb, var(--primary-color) 10%, var(--surface-200))
+  );
+  background-size: 300% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
+
+  &--icon  { width: 52px; height: 52px; border-radius: 16px; animation-delay: 0s; }
+  &--title { width: 55%; height: 14px; border-radius: 6px; animation-delay: 0.1s; }
+  &--sub   { width: 35%; height: 10px; border-radius: 6px; opacity: 0.7; animation-delay: 0.2s; }
+  &--line  { height: 8px; border-radius: 999px; animation-delay: 0.3s; }
+  &--line-a { width: 52px; animation-delay: 0.25s; }
+  &--line-b { width: 40px; animation-delay: 0.35s; }
+  &--line-c { width: 48px; animation-delay: 0.45s; }
+}
+
+.skeleton-lines { display: flex; gap: 0.5rem; margin-top: 0.25rem; }
+
+.skeleton-label {
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--text-color-secondary);
+  margin-top: 0.25rem;
+  letter-spacing: 0.01em;
+}
+
+// ── Progress bar ──────────────────────────────────────────────────────────────
+
+.progress-bar-wrap { display: flex; align-items: center; gap: 0.75rem; }
+
+.progress-bar-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-200);
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--primary-color), color-mix(in srgb, var(--primary-color) 70%, var(--color-indigo-light)));
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.progress-pct {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--primary-color);
+  min-width: 2.5rem;
+  text-align: right;
+}
+
+.progress-section { display: flex; align-items: center; gap: 0.75rem; }
+
+// ── Stats grid ────────────────────────────────────────────────────────────────
+
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+
+.upload-stat {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.9rem 1.1rem;
+  border-radius: 1rem;
+  background: var(--surface-card);
+  border: 1px solid var(--surface-200);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--primary-color) 6%, transparent);
+  transition: box-shadow 0.2s;
+
+  &:hover { box-shadow: 0 3px 10px color-mix(in srgb, var(--primary-color) 12%, transparent); }
+
+  &:first-child .upload-stat__icon-wrap {
+    background: linear-gradient(135deg, var(--color-indigo), var(--color-indigo-light));
+    box-shadow: 0 3px 8px color-mix(in srgb, var(--color-indigo) 30%, transparent);
+  }
+
+  &:last-child .upload-stat__icon-wrap {
+    background: linear-gradient(135deg, var(--color-emerald), var(--color-emerald-light));
+    box-shadow: 0 3px 8px color-mix(in srgb, var(--color-emerald) 30%, transparent);
+  }
+
+  &__icon-wrap {
+    flex-shrink: 0;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  &__icon  { font-size: 1rem; color: var(--color-white); }
+
+  &__body  { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+
+  &__value {
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: var(--text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  &__label {
+    font-size: 0.72rem;
+    color: var(--text-color-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+  }
+}
+
+// ── Overlap warning ───────────────────────────────────────────────────────────
+
+.overlap-box {
+  display: flex;
+  gap: 1rem;
+  padding: 1.25rem;
+  border-radius: 1rem;
+  background: color-mix(in srgb, var(--color-warning) 8%, var(--surface-card));
+  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
+
+  &__icon { font-size: 1.35rem; color: var(--color-warning-dark); flex-shrink: 0; padding-top: 0.1rem; }
+
+  &__body { display: flex; flex-direction: column; gap: 0.4rem; flex: 1; }
+
+  &__title { margin: 0; font-weight: 700; font-size: 0.9rem; color: var(--color-warning-strong); }
+
+  &__msg { margin: 0; font-size: 0.835rem; color: var(--color-warning-text); line-height: 1.5; }
+
+  &__actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem; }
+}
+
+// ── Overlap action buttons ────────────────────────────────────────────────────
+
+.btn-overlap {
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.45rem 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  transition: opacity 0.15s, transform 0.1s;
+
+  &:hover  { opacity: 0.85; transform: translateY(-1px); }
+  &:active { transform: translateY(0); }
+
+  &--skip    { background: color-mix(in srgb, var(--color-info) 12%, transparent); color: var(--primary-color); }
+  &--replace { background: color-mix(in srgb, var(--color-error) 10%, transparent); color: var(--color-error-dark); }
+  &--cancel  { background: var(--surface-200); color: var(--text-color-secondary); }
+}
+
+// ── Upload result banner ──────────────────────────────────────────────────────
+
+.upload-result {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: 0.875rem;
+  font-size: 0.9rem;
+  font-weight: 500;
+
+  i { font-size: 1.3rem; }
+
+  &--success {
+    background: color-mix(in srgb, var(--color-success) 10%, transparent);
+    color: var(--color-success-darker);
+    border: 1px solid color-mix(in srgb, var(--color-success) 25%, transparent);
+  }
+
+  &--error {
+    background: color-mix(in srgb, var(--color-error) 8%, transparent);
+    color: var(--color-error-darker);
+    border: 1px solid color-mix(in srgb, var(--color-error) 20%, transparent);
+  }
+}
+
+// ── Missing FDV warning ───────────────────────────────────────────────────────
+
+.missing-fdv-box {
+  margin-top: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-radius: 0.875rem;
+  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
+  font-size: 0.88rem;
+
+  &__header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--color-warning-text);
+    margin-bottom: 0.35rem;
+    flex-wrap: wrap;
+
+    i { font-size: 1rem; }
+    strong { flex: 1; }
+  }
+
+  &__btn-create-all {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.4rem 0.85rem;
+    border-radius: 6px;
+    border: 1px solid var(--color-warning);
+    background: linear-gradient(135deg, var(--color-warning) 0%, var(--color-orange) 100%);
+    color: var(--color-white);
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--color-warning) 30%, transparent);
+
+    i { font-size: 0.85rem; }
+
+    &:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px color-mix(in srgb, var(--color-warning) 40%, transparent);
+    }
+
+    &:active:not(:disabled) { transform: translateY(0); }
+    &:disabled { opacity: 0.7; cursor: not-allowed; }
+  }
+
+  &__sub { color: var(--color-warning-strong); margin: 0 0 0.5rem; }
+
+  &__list {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+
+    li {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: var(--text-color);
+      justify-content: space-between;
+    }
+  }
+
+  &__item-info { display: flex; align-items: center; gap: 0.5rem; flex: 1; min-width: 0; }
+  &__item-name { display: block; font-weight: 500; }
+
+  &__item-dist {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--color-warning-strong);
+    font-style: italic;
+    margin-top: 0.1rem;
+  }
+
+  &__btn {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.65rem;
+    border-radius: 6px;
+    border: 1px solid var(--color-warning);
+    background: transparent;
+    color: var(--color-warning-text);
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+
+    &:hover { background: color-mix(in srgb, var(--color-warning) 12%, transparent); }
+  }
+
+  &__hint { margin: 0; color: var(--color-warning-strong); font-size: 0.82rem; }
+}

@@ -8,35 +8,40 @@ import { Password } from 'primeng/password';
 import { Select } from 'primeng/select';
 import { ToggleSwitch } from 'primeng/toggleswitch';
 
+import { StatusBadgeComponent } from '../../../shared/components/status-badge/status-badge.component';
+import { FormErrorComponent } from '../../../shared/components/form-error/form-error.component';
 import { UsersService } from '../../../core/services/users.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { RoleService } from '../../../core/services/role.service';
-import { VentesService } from '../../../core/services/ventes.service';
 import { DistributorService } from '../../../core/services/distributor.service';
 import { NotificationService } from '../../../core/services/notification.service';
 import { FormSubmitHelper } from '../../../core/services/form-submit.helper';
 import { UtilityService } from '../../../core/services/utility.service';
+import { FormPrefillHelper } from '../../../core/services/form-prefill.helper';
+import { FormValidationHelper } from '../../../core/services/form-validation.helper';
 import { APP_CONFIG } from '../../../core/constants/app.constants';
 import { User, UserCreate, UserUpdate, UserRole } from '../../../core/models/user.model';
 
 @Component({
   selector: 'app-utilisateur-form',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, Toast, InputText, Password, Select, ToggleSwitch],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, Toast, InputText, Password, Select, ToggleSwitch, StatusBadgeComponent, FormErrorComponent],
   templateUrl: './utilisateur-form.component.html',
+  styleUrl: './utilisateur-form.component.scss',
 })
 export class UtilisateurFormComponent implements OnInit {
   private usersService      = inject(UsersService);
-  private ventesService     = inject(VentesService);
   private distributorService = inject(DistributorService);
   private notification      = inject(NotificationService);
   private formSubmit        = inject(FormSubmitHelper);
   private utility           = inject(UtilityService);
+  private formPrefill       = inject(FormPrefillHelper);
   private fb                = inject(FormBuilder);
   private router            = inject(Router);
   private route             = inject(ActivatedRoute);
   auth                      = inject(AuthService);
   private roleService       = inject(RoleService);
+  validation                = inject(FormValidationHelper);
 
   editingId: number | null = null;
   saving = false;
@@ -76,17 +81,8 @@ export class UtilisateurFormComponent implements OnInit {
     prevendeur:        'pi-send',
   };
 
-  private readonly roleLabels: Record<string, string> = {
-    platform_admin:    'Platform Admin',
-    distributor_admin: 'Distributor Admin',
-    superviseur:       'Superviseur',
-    prevendeur:        'Prévendeur',
-  };
-
   get currentRole(): string { return this.form.get('role')?.value ?? 'superviseur'; }
   get roleIcon(): string    { return this.roleIcons[this.currentRole]  ?? 'pi-user'; }
-  get roleBadgeClass(): string { return this.roleBadgeMap[this.currentRole] ?? 'badge'; }
-  get roleDisplayLabel(): string { return this.roleLabels[this.currentRole] ?? ''; }
 
   form = this.fb.group({
     phone:            ['', [Validators.required, (c: AbstractControl) => this.utility.isValidPhone(c.value ?? '') ? null : { invalidPhone: true }]],
@@ -104,7 +100,6 @@ export class UtilisateurFormComponent implements OnInit {
       () => {}, // No loading state needed for this
       {
         onSuccess: (dists) => {
-          console.log('Distributors loaded:', dists);
           this.distributors = dists;
         },
         errorMessage: 'Impossible de charger les distributeurs',
@@ -134,11 +129,8 @@ export class UtilisateurFormComponent implements OnInit {
       this.form.get('password')!.updateValueAndValidity();
       let prefill = (history.state as any)?.prefill;
       if (!prefill) {
-        const stored = sessionStorage.getItem('utilisateur_prefill');
-        if (stored) {
-          prefill = JSON.parse(stored);
-          sessionStorage.removeItem('utilisateur_prefill');
-        }
+        prefill = this.formPrefill.loadFormState('utilisateur_prefill');
+        if (prefill) this.formPrefill.clearFormState('utilisateur_prefill');
       }
       if (prefill) {
         this.form.patchValue({

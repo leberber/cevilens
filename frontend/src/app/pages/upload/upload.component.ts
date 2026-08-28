@@ -12,7 +12,6 @@ interface FileInfo { total_rows: number; date_min: string; date_max: string; }
   standalone: true,
   imports: [CommonModule, DecimalPipe],
   templateUrl: './upload.component.html',
-  styleUrl: './upload.component.scss',
 })
 export class UploadComponent {
   private auth   = inject(AuthService);

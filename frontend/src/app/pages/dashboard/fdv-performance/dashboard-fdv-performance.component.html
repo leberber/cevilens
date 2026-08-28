@@ -1,0 +1,53 @@
+<div class="db-panel">
+  @if (loading) {
+    <div class="db-panel-sk">
+      @for (_ of skeletonRows; track $index; let i = $index) {
+        <div class="db-panel-sk__fdv" [style.animation-delay]="i * 80 + 'ms'">
+          <div class="db-panel-sk__fdv-rank"></div>
+          <div class="db-panel-sk__fdv-name"></div>
+          <div class="db-panel-sk__fdv-bar"></div>
+          <div class="db-panel-sk__fdv-val"></div>
+        </div>
+      }
+    </div>
+  } @else {
+    <div class="db-panel-head">
+      <span class="db-panel-title">{{ fdvPerfTitle }}</span>
+      <span class="db-panel-total">{{ fdvPerfItems.length }} prévendeurs</span>
+    </div>
+    @if (fdvPerfItems.length === 0) {
+      <div class="db-panel-empty">
+        <i class="pi pi-users"></i>
+        <p>Aucune donnée</p>
+      </div>
+    } @else {
+      <div class="db-fdv-perf">
+        @for (item of fdvPerfItems; track item.code; let i = $index) {
+          <div class="db-fdv-row"
+               [class.db-fdv-row--active]="selectedFdv === item.code"
+               (click)="onSelectFdv(item.code)">
+            <span class="db-fdv-rank"
+                  [class.db-fdv-rank--gold]="i === 0"
+                  [class.db-fdv-rank--silver]="i === 1"
+                  [class.db-fdv-rank--bronze]="i === 2">{{ i + 1 }}</span>
+            <span class="db-fdv-name">{{ item.nom }}</span>
+            <div class="db-fdv-bar-track">
+              <div class="db-fdv-bar-fill" [style.width.%]="(item.total / fdvPerfMax) * 100"></div>
+            </div>
+            @if (selectedProduct?.objectif_packs_tournee) {
+              <span class="db-fdv-nums">
+                {{ formatNum(item.total) }}<span class="db-fdv-nums__obj">/{{ formatNum(selectedProduct!.objectif_packs_tournee) }}</span>
+              </span>
+              <span class="db-fdv-obj-pct"
+                    [class.db-fdv-obj-pct--ok]="fdvObjPct(item, selectedProduct!.objectif_packs_tournee!) >= 100">
+                {{ fdvObjPct(item, selectedProduct!.objectif_packs_tournee!) }}%
+              </span>
+            } @else {
+              <span class="db-fdv-val">{{ formatNum(item.total) }}</span>
+            }
+          </div>
+        }
+      </div>
+    }
+  }
+</div>

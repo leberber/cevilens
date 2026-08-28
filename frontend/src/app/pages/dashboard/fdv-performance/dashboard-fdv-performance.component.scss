@@ -1,0 +1,191 @@
+// =============================================================================
+// RIGHT PANEL (FDV PERFORMANCE)
+// =============================================================================
+
+.db-panel {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: var(--surface-ground);
+  border-left: 1px solid var(--surface-border);
+}
+
+// =============================================================================
+// FDV PERFORMANCE LIST
+// =============================================================================
+
+.db-fdv-perf {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0.5rem 0;
+}
+
+.db-fdv-row {
+  display: grid;
+  grid-template-columns: 28px 1fr 1fr 70px 60px;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.1s ease;
+  font-size: 0.8rem;
+
+  &:hover {
+    background: rgba(var(--primary-rgb), 0.05);
+  }
+
+  &--active {
+    background: rgba(var(--primary-rgb), 0.1);
+    border-color: var(--primary-color);
+  }
+}
+
+// =============================================================================
+// FDV RANK BADGE
+// =============================================================================
+
+.db-fdv-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-weight: 700;
+  font-size: 0.8rem;
+  background: var(--surface-200);
+  color: var(--text-color);
+  flex-shrink: 0;
+
+  &--gold {
+    background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    color: #fff;
+  }
+
+  &--silver {
+    background: linear-gradient(135deg, #e5e7eb, #d1d5db);
+    color: #374151;
+  }
+
+  &--bronze {
+    background: linear-gradient(135deg, #d97706, #b45309);
+    color: #fff;
+  }
+}
+
+// =============================================================================
+// FDV NAME
+// =============================================================================
+
+.db-fdv-name {
+  font-weight: 600;
+  color: var(--text-color);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+// =============================================================================
+// FDV BAR
+// =============================================================================
+
+.db-fdv-bar-track {
+  height: 6px;
+  background: var(--surface-200);
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 40px;
+}
+
+.db-fdv-bar-fill {
+  height: 100%;
+  background: var(--primary-color);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+// =============================================================================
+// FDV VALUES
+// =============================================================================
+
+.db-fdv-nums {
+  font-weight: 600;
+  color: var(--text-color);
+  white-space: nowrap;
+
+  &__obj {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--text-color-secondary);
+    margin-left: 0.1rem;
+  }
+}
+
+.db-fdv-val {
+  font-weight: 600;
+  color: var(--text-color);
+  white-space: nowrap;
+}
+
+.db-fdv-obj-pct {
+  font-weight: 600;
+  color: var(--text-color-secondary);
+  white-space: nowrap;
+
+  &--ok {
+    color: var(--color-success);
+  }
+}
+
+// =============================================================================
+// SKELETON LOADING
+// =============================================================================
+
+.db-panel-sk {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.db-panel-sk__fdv {
+  display: grid;
+  grid-template-columns: 28px 1fr 1fr 70px 60px;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 0;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.db-panel-sk__fdv-rank {
+  width: 28px;
+  height: 28px;
+  background: var(--surface-200);
+  border-radius: 50%;
+}
+
+.db-panel-sk__fdv-name {
+  height: 0.7rem;
+  background: var(--surface-200);
+  border-radius: 3px;
+}
+
+.db-panel-sk__fdv-bar {
+  height: 6px;
+  background: var(--surface-200);
+  border-radius: 3px;
+}
+
+.db-panel-sk__fdv-val {
+  height: 0.7rem;
+  background: var(--surface-200);
+  border-radius: 3px;
+}
+

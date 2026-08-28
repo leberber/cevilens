@@ -1,6 +1,6 @@
-import { Component, inject, computed, signal } from '@angular/core';
+import { Component, inject, computed, signal, ViewEncapsulation } from '@angular/core';
+import { TitleCasePipe } from '@angular/common';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { CommonModule } from '@angular/common';
 import { AuthService } from '../core/services/auth.service';
 import { RoleService } from '../core/services/role.service';
 import { DistributorContextService } from '../core/services/distributor-context.service';
@@ -8,15 +8,17 @@ import { DistributorContextService } from '../core/services/distributor-context.
 @Component({
   selector: 'app-layout',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [TitleCasePipe, RouterLink, RouterLinkActive, RouterOutlet],
   templateUrl: './layout.component.html',
+  styleUrl: './layout.component.scss',
+  encapsulation: ViewEncapsulation.None,
 })
 export class LayoutComponent {
   collapsed  = signal(false);
   drawerOpen = signal(false);
-  auth       = inject(AuthService);
-  roleService = inject(RoleService);
-  distributorContext = inject(DistributorContextService);
+  readonly auth               = inject(AuthService);
+  readonly roleService        = inject(RoleService);
+  readonly distributorContext = inject(DistributorContextService);
 
   // Computed signals
   distributorName = computed(() => this.distributorContext.formattedName());

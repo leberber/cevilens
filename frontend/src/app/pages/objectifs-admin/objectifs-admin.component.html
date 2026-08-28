@@ -6,338 +6,80 @@
 
   <!-- Toolbar Template -->
   <ng-template #toolbarContent>
-    <div class="obj-toolbar">
-
-    <div class="obj-toolbar__left">
-      @if (!editMode) {
-        <div class="dash-filter">
-          <button class="dash-filter__btn" [class.dash-filter__btn--active]="canal === 'VD'" (click)="canal = 'VD'">Direct (VD)</button>
-          <button class="dash-filter__btn" [class.dash-filter__btn--active]="canal === 'VH'" (click)="canal = 'VH'">Horeca (VH)</button>
-        </div>
-        <app-period-stepper [mois]="mois" [annee]="annee" (periodChange)="onPeriodChange($event)"></app-period-stepper>
-
-        <div class="obj-distributor-sel">
-          <p-select
-            [options]="distributeurs"
-            [(ngModel)]="selectedDistributeur"
-            placeholder="Tous les distributeurs"
-            [filter]="true"
-            [showClear]="true"
-            [style]="{'width':'280px'}"
-          />
-        </div>
-
-        <!-- Route counts (editable — used as divisor for T/Tournée and P/Tournée) -->
-        <div class="obj-routes">
-          <label class="obj-route-pill obj-route-pill--vd">
-            <i class="pi pi-car"></i>
-            <input type="number" min="1" [(ngModel)]="routesVD" class="obj-route-input"> tournées VD
-          </label>
-          <label class="obj-route-pill obj-route-pill--vh">
-            <i class="pi pi-car"></i>
-            <input type="number" min="1" [(ngModel)]="routesVH" class="obj-route-input"> tournées VH
-          </label>
-          @if (routesFallbackMois) {
-            <span class="obj-route-fallback" title="Aucune donnée pour ce mois — tournées basées sur {{ routesFallbackMois }}">
-              <i class="pi pi-info-circle"></i> basé sur {{ routesFallbackMois }}
-            </span>
-          }
-        </div>
-      }
-    </div>
-
-    <div class="obj-toolbar__right">
-      @if (sortCol) {
-        <button class="btn-reset-sort" (click)="resetSort()">
-          <i class="pi pi-sort-alt-slash"></i> Réinitialiser le tri
-        </button>
-      }
-      @if (!editMode) {
-        @if (!loading) {
-          @if (hasGoals) {
-            <button class="btn-secondary" (click)="enterEditMode()">
-              <i class="pi pi-pencil"></i> Modifier
-            </button>
-          } @else {
-            <button class="btn-add" (click)="enterEditMode()">
-              <i class="pi pi-plus"></i> Définir les objectifs
-            </button>
-          }
-          @if (nextMissingLabel && !isNextMissingPeriod) {
-            <button class="btn-add" (click)="goToNextMissing()">
-              <i class="pi pi-arrow-right"></i> {{ nextMissingLabel }}
-            </button>
-          }
-        }
-      } @else {
-        <!-- Hidden file input for Excel import -->
-        <input #fileInput type="file" accept=".xlsx,.xls" style="display:none"
-          (change)="onFileSelected($event)">
-
-        <button class="btn-import" (click)="fileInput.click()" [disabled]="isSaving || isImporting">
-          <i class="pi pi-file-excel"></i> Importer Excel
-        </button>
-        <button class="btn-secondary" (click)="copyFromPrevious()" [disabled]="isSaving">
-          <i class="pi pi-copy"></i> Copier depuis {{ prevMonthLabel }}
-        </button>
-        <button class="btn-danger" (click)="cancelEdit()" [disabled]="isSaving">
-          <i class="pi pi-times"></i> Annuler
-        </button>
-        <button class="btn-save" (click)="requestSave()" [disabled]="isSaving">
-          @if (isSaving) {
-            <i class="pi pi-spin pi-spinner"></i> Enregistrement…
-          } @else {
-            <i class="pi pi-check"></i> Sauvegarder
-            @if (dirtyCount > 0) { <span class="obj-badge">{{ dirtyCount }}</span> }
-          }
-        </button>
-      }
-    </div>
-
-  </div>
+    <app-objectifs-toolbar
+      [canal]="canal"
+      [mois]="mois"
+      [annee]="annee"
+      [editMode]="editMode"
+      [isSaving]="isSaving"
+      [isImporting]="isImporting"
+      [loading]="loading"
+      [hasGoals]="hasGoals"
+      [distributeurs]="distributeurs"
+      [selectedDistributeur]="selectedDistributeur"
+      [routesVD]="routesVD"
+      [routesVH]="routesVH"
+      [routesFallbackMois]="routesFallbackMois"
+      [sortCol]="sortCol"
+      [dirtyCount]="dirtyCount"
+      [nextMissingLabel]="nextMissingLabel"
+      [isNextMissingPeriod]="isNextMissingPeriod"
+      [prevMonthLabel]="prevMonthLabel"
+      (canalChange)="canal = $event; load()"
+      (periodChange)="onPeriodChange($event)"
+      (distributeurChange)="selectedDistributeur = $event"
+      (routesVDChange)="routesVD = $event"
+      (routesVHChange)="routesVH = $event"
+      (resetSort)="resetSort()"
+      (enterEditMode)="enterEditMode()"
+      (nextMissing)="goToNextMissing()"
+      (fileSelected)="onFileSelected($event)"
+      (copyFromPrevious)="copyFromPrevious()"
+      (cancel)="cancelEdit()"
+      (save)="requestSave()">
+    </app-objectifs-toolbar>
   </ng-template>
 
   <!-- Import result banner -->
-  @if (importResult) {
-    <div class="obj-import-banner" [class.obj-import-banner--warn]="importResult.notFound.length > 0">
-      <div class="obj-import-banner__top">
-        <i class="pi pi-check-circle"></i>
-        <span class="obj-import-banner__msg">
-          <strong>{{ importResult.imported }}</strong> produit(s) importé(s)
-          @if (importResult.notFound.length > 0) {
-            &nbsp;—&nbsp;<strong>{{ importResult.notFound.length }}</strong> non trouvé(s)
-            <button class="obj-import-detail-toggle" (click)="showNotFoundDetail = !showNotFoundDetail">
-              {{ showNotFoundDetail ? 'masquer' : 'voir détail' }}
-              <i class="pi" [class.pi-chevron-down]="!showNotFoundDetail" [class.pi-chevron-up]="showNotFoundDetail"></i>
-            </button>
-          }
-        </span>
-        <button class="obj-import-close" (click)="importResult = null; showNotFoundDetail = false">
-          <i class="pi pi-times"></i>
-        </button>
-      </div>
-      @if (showNotFoundDetail && importResult.notFound.length > 0) {
-        <ul class="obj-import-not-found-list">
-          @for (name of importResult.notFound; track name) {
-            <li>{{ name }}</li>
-          }
-        </ul>
-      }
-    </div>
-  }
+  <app-objectifs-import-banner
+    [importResult]="importResult"
+    [showDetail]="showNotFoundDetail"
+    (showDetailChange)="showNotFoundDetail = $event"
+    (dismiss)="importResult = null; showNotFoundDetail = false">
+  </app-objectifs-import-banner>
 
   <!-- Table -->
-  <div class="table-wrapper">
-    <table class="table">
-      <thead>
-        <tr>
-          <th class="th-sort" style="width:8rem" (click)="setSort('famille')">
-            Famille <i class="pi" [class]="sortIcon('famille')"></i>
-          </th>
-          <th class="th-sort" style="width:8rem" (click)="setSort('code')">
-            Code <i class="pi" [class]="sortIcon('code')"></i>
-          </th>
-          <th class="th-sort" (click)="setSort('produit')">
-            Produit <i class="pi" [class]="sortIcon('produit')"></i>
-          </th>
-          <th class="th-sort" style="width:10rem" (click)="setSort('distributeur')">
-            Distributeur <i class="pi" [class]="sortIcon('distributeur')"></i>
-          </th>
-          <th class="th-num th-sort th-tonne" [class.th-vd]="canal === 'VD'" [class.th-vh]="canal === 'VH'" (click)="setSort('tonne')">
-            Tonnes <i class="pi" [class]="sortIcon('tonne')"></i>
-          </th>
-          <th class="th-num th-per-route th-sort th-tonne" [class.th-vd]="canal === 'VD'" [class.th-vh]="canal === 'VH'" (click)="setSort('tonne_route')">
-            T / Tournée <i class="pi" [class]="sortIcon('tonne_route')"></i>
-          </th>
-          <th class="th-num th-sort th-packs" [class.th-vd]="canal === 'VD'" [class.th-vh]="canal === 'VH'" (click)="setSort('packs')">
-            Packs <i class="pi" [class]="sortIcon('packs')"></i>
-          </th>
-          <th class="th-num th-per-route th-sort th-packs" [class.th-vd]="canal === 'VD'" [class.th-vh]="canal === 'VH'" (click)="setSort('packs_route')">
-            P / Tournée <i class="pi" [class]="sortIcon('packs_route')"></i>
-          </th>
-          <th class="th-sort" style="width:9rem" (click)="setSort('updated_by')">
-            Modifié par <i class="pi" [class]="sortIcon('updated_by')"></i>
-          </th>
-          <th class="th-sort" style="width:7rem" (click)="setSort('updated_at')">
-            Le <i class="pi" [class]="sortIcon('updated_at')"></i>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        @if (loading) {
-          @for (_ of [1,2,3,4,5,6,7,8]; track $index) {
-            <tr class="sk-row">
-              <td colspan="9"><div class="sk-bar"></div></td>
-            </tr>
-          }
-        } @else if (isFlatSort) {
-          <!-- Flat view: global sort across all families -->
-          @for (row of sortedRows; track row.code_produit) {
-            <tr [class.obj-row--dirty]="editMode && isDirtyRow(row)">
-              <td>
-                <span class="famille-pill-badge"
-                  [style.background]="famBg(row.famille)"
-                  [style.color]="famColor(row.famille)">{{ row.famille }}</span>
-              </td>
-              <td><span class="code-chip">{{ row.code_produit }}</span></td>
-              <td class="td-nom" [title]="row.nom_produit">{{ row.nom_produit }}</td>
-              <td class="td-nom" [title]="row.nom_distributeur || '—'">{{ row.nom_distributeur || '—' }}</td>
-              @if (editMode) {
-                <td class="td-input td-tonne" [class.td-vd]="canal === 'VD'" [class.td-vh]="canal === 'VH'">
-                  <input type="number" step="0.01" min="0" [(ngModel)]="row._tonne" placeholder="—">
-                </td>
-                <td class="td-num td-per-route td-tonne" [class.td-vd]="canal === 'VD'" [class.td-vh]="canal === 'VH'">{{ perRouteTonne(row._tonne) }}</td>
-                <td class="td-input td-packs" [class.td-vd]="canal === 'VD'" [class.td-vh]="canal === 'VH'">
-                  <input type="number" step="1" min="0" [(ngModel)]="row._packs" placeholder="—">
-                </td>
-                <td class="td-input td-packs" [class.td-vd]="canal === 'VD'" [class.td-vh]="canal === 'VH'">
-                  <input type="number" step="1" min="0" [(ngModel)]="row._packs_tournee" placeholder="—">
-                </td>
-              } @else {
-                <td class="td-num td-tonne">{{ formatNum(getRowTonne(row)) }}</td>
-                <td class="td-num td-per-route td-tonne">{{ perRouteTonne(getRowTonne(row)) }}</td>
-                <td class="td-num td-packs">{{ formatNum(getRowPacks(row)) }}</td>
-                <td class="td-num td-per-route td-packs">{{ perRoute(getRowPacksTournee(row)) }}</td>
-              }
-              <td class="text-muted td-small">{{ row.updated_by || '—' }}</td>
-              <td class="text-muted td-small">{{ formatDate(row.updated_at) }}</td>
-            </tr>
-          }
-        } @else {
-          <!-- Grouped view: famille → sous-famille → rows -->
-          @for (fam of grouped; track fam.nom) {
-
-            @let fBg = famBg(fam.nom);
-            @let fColor = famColor(fam.nom);
-            @let fBorder = fColor + '33';
-            @let fRows = famRows(fam);
-            @let sfBg = famBgLight(fam.nom);
-            <tr class="obj-fam-row" (click)="toggleFamily(fam.nom)" title="Cliquer pour réduire / développer">
-              <td colspan="3" class="obj-fam-cell"
-                [style.background]="fBg" [style.color]="fColor"
-                [style.border-top-color]="fBorder" [style.border-bottom-color]="fBorder">
-                <div class="obj-fam-inner">
-                  <i class="pi obj-fam-chevron"
-                    [class.pi-chevron-down]="!isFamilyCollapsed(fam.nom)"
-                    [class.pi-chevron-right]="isFamilyCollapsed(fam.nom)"></i>
-                  {{ fam.nom | uppercase }}
-                  <span class="obj-fam-count">{{ fam.sfs.length }} sous-famille(s)</span>
-                </div>
-              </td>
-              <td class="td-num obj-fam-total td-tonne" [style.background]="fBg" [style.color]="fColor" [style.border-top-color]="fBorder" [style.border-bottom-color]="fBorder">{{ sumTonne(fRows) != null ? (sumTonne(fRows) | number:'1.0-2') : '—' }}</td>
-              <td class="td-num td-per-route obj-fam-total td-tonne" [style.background]="fBg" [style.color]="fColor" [style.border-top-color]="fBorder" [style.border-bottom-color]="fBorder">{{ perRouteTonne(sumTonne(fRows)) }}</td>
-              <td class="td-num obj-fam-total td-packs" [style.background]="fBg" [style.color]="fColor" [style.border-top-color]="fBorder" [style.border-bottom-color]="fBorder">{{ sumPacks(fRows) != null ? (sumPacks(fRows) | number:'1.0-0') : '—' }}</td>
-              <td class="td-num td-per-route obj-fam-total td-packs" [style.background]="fBg" [style.color]="fColor" [style.border-top-color]="fBorder" [style.border-bottom-color]="fBorder">{{ sumPacksTournee(fRows) != null ? (sumPacksTournee(fRows) | number:'1.0-0') : '—' }}</td>
-              <td colspan="2" [style.background]="fBg" [style.border-top-color]="fBorder" [style.border-bottom-color]="fBorder"></td>
-            </tr>
-
-            @if (!isFamilyCollapsed(fam.nom)) {
-              @for (sf of fam.sfs; track sf.nom) {
-
-                <tr class="obj-sf-row">
-                  <td colspan="3" [style.background]="sfBg">{{ sf.nom }}</td>
-                  <td class="td-num obj-sf-total td-tonne" [style.background]="sfBg">{{ sumTonne(sf.rows) != null ? (sumTonne(sf.rows) | number:'1.0-2') : '—' }}</td>
-                  <td class="td-num td-per-route obj-sf-total td-tonne" [style.background]="sfBg">{{ perRouteTonne(sumTonne(sf.rows)) }}</td>
-                  <td class="td-num obj-sf-total td-packs" [style.background]="sfBg">{{ sumPacks(sf.rows) != null ? (sumPacks(sf.rows) | number:'1.0-0') : '—' }}</td>
-                  <td class="td-num td-per-route obj-sf-total td-packs" [style.background]="sfBg">{{ sumPacksTournee(sf.rows) != null ? (sumPacksTournee(sf.rows) | number:'1.0-0') : '—' }}</td>
-                  <td colspan="2" [style.background]="sfBg"></td>
-                </tr>
-
-                @for (row of sf.rows; track row.code_produit) {
-                <tr [class.obj-row--dirty]="editMode && isDirtyRow(row)">
-                  <td>
-                    <span class="famille-pill-badge"
-                      [style.background]="famBg(row.famille)"
-                      [style.color]="famColor(row.famille)">{{ row.famille }}</span>
-                  </td>
-                  <td><span class="code-chip">{{ row.code_produit }}</span></td>
-                  <td class="td-nom" [title]="row.nom_produit">{{ row.nom_produit }}</td>
-                  <td class="td-nom" [title]="row.nom_distributeur || '—'">{{ row.nom_distributeur || '—' }}</td>
-                  @if (editMode) {
-                    <td class="td-input td-tonne" [class.td-vd]="canal === 'VD'" [class.td-vh]="canal === 'VH'">
-                      <input type="number" step="0.01" min="0" [(ngModel)]="row._tonne" placeholder="—">
-                    </td>
-                    <td class="td-num td-per-route td-tonne" [class.td-vd]="canal === 'VD'" [class.td-vh]="canal === 'VH'">{{ perRouteTonne(row._tonne) }}</td>
-                    <td class="td-input td-packs" [class.td-vd]="canal === 'VD'" [class.td-vh]="canal === 'VH'">
-                      <input type="number" step="1" min="0" [(ngModel)]="row._packs" placeholder="—">
-                    </td>
-                    <td class="td-input td-packs" [class.td-vd]="canal === 'VD'" [class.td-vh]="canal === 'VH'">
-                      <input type="number" step="1" min="0" [(ngModel)]="row._packs_tournee" placeholder="—">
-                    </td>
-                  } @else {
-                    <td class="td-num td-tonne">{{ formatNum(getRowTonne(row)) }}</td>
-                    <td class="td-num td-per-route td-tonne">{{ perRouteTonne(getRowTonne(row)) }}</td>
-                    <td class="td-num td-packs">{{ formatNum(getRowPacks(row)) }}</td>
-                    <td class="td-num td-per-route td-packs">{{ perRoute(getRowPacksTournee(row)) }}</td>
-                  }
-                  <td class="text-muted td-small">{{ row.updated_by || '—' }}</td>
-                  <td class="text-muted td-small">{{ formatDate(row.updated_at) }}</td>
-                </tr>
-                }
-              }
-            } <!-- end @if !collapsed -->
-          }
-        }
-      </tbody>
-      @if (!loading) {
-        @let totalTonne = sumTonne(rows);
-        @let totalPacks = sumPacks(rows);
-        @let totalPacksTournee = sumPacksTournee(rows);
-        <tfoot class="obj-tfoot">
-          <tr>
-            <td colspan="3" class="obj-tfoot__label">TOTAL</td>
-            <td class="td-num obj-tfoot__val td-tonne">{{ totalTonne != null ? (totalTonne | number:'1.0-2') : '—' }}</td>
-            <td class="td-num td-per-route obj-tfoot__val td-tonne">{{ perRouteTonne(totalTonne) }}</td>
-            <td class="td-num obj-tfoot__val td-packs">{{ totalPacks != null ? (totalPacks | number:'1.0-0') : '—' }}</td>
-            <td class="td-num td-per-route obj-tfoot__val td-packs">{{ totalPacksTournee != null ? (totalPacksTournee | number:'1.0-0') : '—' }}</td>
-            <td colspan="2"></td>
-          </tr>
-        </tfoot>
-      }
-    </table>
-  </div>
+  <app-objectifs-table
+    [rows]="rows"
+    [grouped]="grouped"
+    [editMode]="editMode"
+    [loading]="loading"
+    [canal]="canal"
+    [sortCol]="sortCol"
+    [sortDir]="sortDir"
+    [collapsedFamilies]="collapsedFamilies"
+    [isFlatSort]="isFlatSort"
+    [sortedRows]="sortedRows"
+    [routeCount]="routeCount"
+    (sortChange)="setSort($event)"
+    (familyToggle)="toggleFamily($event)">
+  </app-objectifs-table>
 
 </app-page-layout>
 
 <!-- Import dialog -->
-@if (showImportDialog) {
-  <div class="obj-backdrop" (click)="cancelImport()">
-    <div class="obj-dialog" (click)="$event.stopPropagation()">
-      <h3 class="obj-dialog__title"><i class="pi pi-upload"></i> Importer depuis Excel</h3>
-      <div class="obj-import-period-banner">
-        <i class="pi pi-calendar"></i>
-        <span>Période cible&nbsp;:</span>
-        <app-period-stepper [mois]="importMois" [annee]="importAnnee" (periodChange)="onImportPeriodChange($event)"></app-period-stepper>
-      </div>
-      <p class="obj-dialog__body">
-        Fichier&nbsp;: <strong>{{ importFile?.name }}</strong>
-      </p>
-      <p class="obj-dialog__body">Pour quel canal importer les objectifs ?</p>
-      <div class="obj-import-canal">
-        <button class="obj-import-canal-btn"
-          [class.obj-import-canal-btn--active-vd]="importCanal === 'VD'"
-          (click)="importCanal = 'VD'">
-          <i class="pi pi-car"></i> Direct (VD)
-        </button>
-        <button class="obj-import-canal-btn"
-          [class.obj-import-canal-btn--active-vh]="importCanal === 'VH'"
-          (click)="importCanal = 'VH'">
-          <i class="pi pi-car"></i> Horeca (VH)
-        </button>
-      </div>
-      <div class="obj-dialog__actions">
-        <button class="btn-secondary" (click)="cancelImport()" [disabled]="isImporting">Annuler</button>
-        <button class="btn-save" (click)="confirmImport()" [disabled]="isImporting">
-          @if (isImporting) {
-            <i class="pi pi-spin pi-spinner"></i> Import en cours…
-          } @else {
-            <i class="pi pi-check"></i> Importer
-          }
-        </button>
-      </div>
-    </div>
-  </div>
-}
+<app-objectifs-import-dialog
+  [visible]="showImportDialog"
+  [importFile]="importFile"
+  [importMois]="importMois"
+  [importAnnee]="importAnnee"
+  [importCanal]="importCanal"
+  [isImporting]="isImporting"
+  (periodChange)="onImportPeriodChange($event)"
+  (canalChange)="importCanal = $event"
+  (confirm)="confirmImport()"
+  (cancel)="cancelImport()">
+</app-objectifs-import-dialog>
 
 <!-- Confirmation dialog -->
 <app-confirm-dialog

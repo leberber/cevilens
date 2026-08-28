@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
+import { Component, inject, OnInit, signal, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { DistributorService } from '../../core/services/distributor.service';
@@ -6,13 +6,16 @@ import { AuthService } from '../../core/services/auth.service';
 import { LoadingManager } from '../../core/services/loading-manager.service';
 import { Distributor } from '../../core/models/distributor.model';
 import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { LoadingStateComponent } from '../../shared/components/loading-state/loading-state.component';
 
 @Component({
   selector: 'app-distributors',
   standalone: true,
-  imports: [CommonModule, PageLayoutComponent],
+  imports: [CommonModule, PageLayoutComponent, EmptyStateComponent, LoadingStateComponent],
   templateUrl: './distributors.component.html',
   styleUrl: './distributors.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DistributorsComponent implements OnInit {
   private distributorService = inject(DistributorService);

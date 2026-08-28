@@ -1,0 +1,326 @@
+// =============================================================================
+// LEFT PANEL
+// =============================================================================
+
+.db-panel {
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: var(--surface-ground);
+  border-right: 1px solid var(--surface-border);
+}
+
+// =============================================================================
+// TREE (SF + PRODUCTS)
+// =============================================================================
+
+.db-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0.5rem 0;
+
+  &--overview {
+    border-top: 1px solid var(--surface-border);
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+  }
+
+  &--selection {
+    gap: 0.3rem;
+  }
+}
+
+// =============================================================================
+// TREE SF (SOUS-FAMILLE)
+// =============================================================================
+
+.db-tree-sf {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 1rem;
+  background: transparent;
+  border: none;
+  border-left: 2px solid var(--primary-color);
+  color: var(--text-color);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s ease;
+
+  &:hover {
+    background: rgba(var(--primary-rgb), 0.05);
+  }
+
+  &-chevron {
+    font-size: 0.75rem;
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+  }
+
+  &-name {
+    flex: 1;
+  }
+
+  &-total {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-size: 0.75rem;
+    color: var(--text-color-secondary);
+    white-space: nowrap;
+
+    &__obj {
+      font-size: 0.7rem;
+      font-weight: 500;
+    }
+  }
+
+  &-obj {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-color-secondary);
+    white-space: nowrap;
+
+    &--ok {
+      color: var(--color-success);
+    }
+  }
+}
+
+// =============================================================================
+// TREE PRODUCT
+// =============================================================================
+
+.db-tree-prod {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 1rem 0.5rem 2rem;
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.1s ease;
+
+  &:hover {
+    background: rgba(var(--primary-rgb), 0.05);
+  }
+
+  &--active {
+    background: rgba(var(--primary-rgb), 0.1);
+    border-color: var(--primary-color);
+  }
+
+  &-name {
+    flex-shrink: 0;
+    font-size: 0.8rem;
+    color: var(--text-color);
+    white-space: nowrap;
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+// =============================================================================
+// BAR TRACK & FILL
+// =============================================================================
+
+.db-bar-track {
+  flex: 1;
+  height: 6px;
+  background: var(--surface-200);
+  border-radius: 3px;
+  overflow: hidden;
+  min-width: 40px;
+}
+
+.db-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.db-bar-num {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--text-color);
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  &__obj {
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: var(--text-color-secondary);
+  }
+}
+
+.db-prod-obj-pct {
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+// =============================================================================
+// OVERVIEW (FDV MODE)
+// =============================================================================
+
+.db-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0.5rem 0;
+}
+
+.db-ov-fam-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 1rem;
+  background: transparent;
+  border: none;
+  border-left: 2px solid var(--primary-color);
+  color: var(--text-color);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.1s ease;
+
+  &:hover {
+    background: rgba(var(--primary-rgb), 0.05);
+  }
+
+  &-chevron {
+    font-size: 0.75rem;
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+  }
+
+  &-name {
+    flex: 1;
+  }
+
+  &-obj {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-color-secondary);
+    white-space: nowrap;
+
+    &--ok {
+      color: var(--color-success);
+    }
+  }
+
+  &-total {
+    font-size: 0.8rem;
+    color: var(--text-color-secondary);
+    white-space: nowrap;
+    font-weight: 500;
+  }
+}
+
+// =============================================================================
+// SKELETON LOADING
+// =============================================================================
+
+.db-panel-sk {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.db-panel-sk__sf {
+  height: 2.5rem;
+  background: var(--surface-200);
+  border-radius: 4px;
+  animation: pulse 1.5s ease-in-out infinite;
+  margin-bottom: 0.2rem;
+}
+
+.db-panel-sk__prod {
+  display: grid;
+  grid-template-columns: 120px 1fr 60px;
+  gap: 0.6rem;
+  align-items: center;
+  padding: 0.6rem 0;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.db-panel-sk__prod-name {
+  height: 0.7rem;
+  background: var(--surface-200);
+  border-radius: 3px;
+}
+
+.db-panel-sk__prod-bar {
+  height: 6px;
+  background: var(--surface-200);
+  border-radius: 3px;
+}
+
+.db-panel-sk__prod-num {
+  height: 0.7rem;
+  background: var(--surface-200);
+  border-radius: 3px;
+  justify-self: end;
+}
+
+.db-panel-sk__fdv {
+  height: 2.5rem;
+  background: var(--surface-200);
+  border-radius: 4px;
+  animation: pulse 1.5s ease-in-out infinite;
+  margin-bottom: 0.4rem;
+}
+
+.db-panel-sk__fdv-rank {
+  display: inline-block;
+  width: 2rem;
+  height: 2rem;
+  background: var(--surface-300);
+  border-radius: 4px;
+  vertical-align: middle;
+}
+
+.db-panel-sk__fdv-name {
+  display: inline-block;
+  width: 120px;
+  height: 0.7rem;
+  background: var(--surface-300);
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-left: 0.5rem;
+}
+
+.db-panel-sk__fdv-bar {
+  display: inline-block;
+  flex: 1;
+  height: 6px;
+  background: var(--surface-300);
+  border-radius: 3px;
+  vertical-align: middle;
+  margin: 0 0.5rem;
+  width: 100px;
+}
+
+.db-panel-sk__fdv-val {
+  display: inline-block;
+  width: 60px;
+  height: 0.7rem;
+  background: var(--surface-300);
+  border-radius: 3px;
+  vertical-align: middle;
+}
+

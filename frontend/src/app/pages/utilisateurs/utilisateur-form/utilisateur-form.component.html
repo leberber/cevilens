@@ -42,9 +42,7 @@
             @if(editingId) {
               <div class="uform-status-row">
                 <p-toggleswitch formControlName="is_active" />
-                <span [class]="form.get('is_active')?.value ? 'badge badge--success' : 'badge badge--danger'">
-                  {{ form.get('is_active')?.value ? 'Actif' : 'Inactif' }}
-                </span>
+                <app-status-badge [isActive]="!!form.get('is_active')?.value"></app-status-badge>
               </div>
             }
           </div>
@@ -59,17 +57,19 @@
         <div class="uform-fields">
           <div class="field">
             <label>Nom complet <span class="required-star">*</span></label>
-            <div class="icon-input">
+            <div class="icon-input" [ngClass]="validation.getFieldClasses(form.get('full_name'))">
               <i class="pi pi-id-card"></i>
               <input pInputText formControlName="full_name" placeholder="Prénom Nom">
             </div>
+            <app-form-error [control]="form.get('full_name')" fieldLabel="Nom complet" />
           </div>
           <div class="field">
             <label>Téléphone <span class="required-star">*</span></label>
-            <div class="icon-input">
+            <div class="icon-input" [ngClass]="validation.getFieldClasses(form.get('phone'))">
               <i class="pi pi-phone"></i>
               <input pInputText type="tel" formControlName="phone" placeholder="0550 00 00 00">
             </div>
+            <app-form-error [control]="form.get('phone')" fieldLabel="Téléphone" />
           </div>
         </div>
       </div>
@@ -120,6 +120,7 @@
           <p-password formControlName="password" [feedback]="false" [toggleMask]="true"
             styleClass="w-full" inputStyleClass="w-full"
             [placeholder]="editingId ? '••••••••' : 'Nouveau mot de passe'" />
+          <app-form-error [control]="form.get('password')" fieldLabel="Mot de passe" />
         </div>
       </div>
 

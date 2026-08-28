@@ -1,16 +1,21 @@
-import { Component, inject, TemplateRef, ViewChild } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject, DestroyRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Select } from 'primeng/select';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { VentesService } from '../../core/services/ventes.service';
 import { CanalHelper } from '../../core/services/canal.helper';
 import { SortHelper } from '../../core/services/sort.helper';
 import { AggregateHelper } from '../../core/services/aggregate.helper';
 import { ObjectifsBaseComponent, BaseRow, FamGroupe } from '../../core/base/objectifs-base';
-import { PeriodStepperComponent } from '../../shared/period-stepper/period-stepper.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
 import { FileUploadHelper } from '../../core/services/file-upload.helper';
+import { ObjectifsDirtyTrackerService } from './services/objectifs-dirty-tracker.service';
+import { ObjectifsRouteCountService } from './services/objectifs-route-count.service';
+import { ObjectifsToolbarComponent } from './components/objectifs-toolbar.component';
+import { ObjectifsTableComponent } from './components/objectifs-table.component';
+import { ObjectifsImportBannerComponent } from './components/objectifs-import-banner.component';
+import { ObjectifsImportDialogComponent } from './components/objectifs-import-dialog.component';
+import { CANAL_OPTIONS, CANAL_DISPLAY } from '../../core/constants/canal.constants';
 
 interface ObjectifRow extends BaseRow {
   objectif_tonne_vd:          number | null;
@@ -28,29 +33,24 @@ interface ObjectifRow extends BaseRow {
 @Component({
   selector: 'app-objectifs-admin',
   standalone: true,
-  imports: [CommonModule, FormsModule, Select, PeriodStepperComponent, ConfirmDialogComponent, PageLayoutComponent],
+  imports: [FormsModule, ConfirmDialogComponent, PageLayoutComponent, ObjectifsToolbarComponent, ObjectifsTableComponent, ObjectifsImportBannerComponent, ObjectifsImportDialogComponent],
   templateUrl: './objectifs-admin.component.html',
   styleUrl: './objectifs-admin.component.scss',
 })
 export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow> {
-  private ventesService = inject(VentesService);
-  private canalHelper = inject(CanalHelper);
-  private sortHelper = inject(SortHelper);
-  private aggregateHelper = inject(AggregateHelper);
-  private fileUploadHelper = inject(FileUploadHelper);
+  private readonly ventesService    = inject(VentesService);
+  private readonly canalHelper      = inject(CanalHelper);
+  private readonly sortHelper       = inject(SortHelper);
+  private readonly aggregateHelper  = inject(AggregateHelper);
+  private readonly fileUploadHelper = inject(FileUploadHelper);
+  private readonly destroyRef       = inject(DestroyRef);
+  readonly dirtyTracker             = inject(ObjectifsDirtyTrackerService);
+  readonly routeCountService        = inject(ObjectifsRouteCountService);
 
   canal: 'VD' | 'VH' = 'VD';
   importCanal: 'VD' | 'VH' = 'VD';
   selectedDistributeur: string | null = null;
   distributeurs: string[] = [];
-  routesVD = 0;
-  routesVH = 0;
-  routesFallbackMois: string | null = null;
-
-  // Template references for PageLayout
-  @ViewChild('toolbarContent') toolbarContent!: TemplateRef<any>;
-
-  private snapshot = new Map<string, { tonne: number | null; packs: number | null; packs_tournee: number | null }>();
 
   protected override get nextMissingUrl(): string {
     return '/api/v1/objectifs/next-missing';
@@ -58,10 +58,22 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
 
   override ngOnInit() {
     super.ngOnInit();
-    this.ventesService.getDistinct('nom_distributeur').subscribe(vals => {
-      this.distributeurs = vals;
-    });
+    this.ventesService.getDistinct('nom_distributeur')
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(vals => {
+        this.distributeurs = vals;
+      });
   }
+
+  // Getters for service properties
+  get routesVD(): number { return this.routeCountService.routesVD; }
+  set routesVD(val: number) { this.routeCountService.routesVD = val; }
+
+  get routesVH(): number { return this.routeCountService.routesVH; }
+  set routesVH(val: number) { this.routeCountService.routesVH = val; }
+
+  get routesFallbackMois(): string | null { return this.routeCountService.routesFallbackMois; }
+  set routesFallbackMois(val: string | null) { this.routeCountService.routesFallbackMois = val; }
 
   protected override onFileSelectedHook(): void {
     this.importCanal = this.canal;
@@ -75,23 +87,20 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
     if (this.selectedDistributeur) {
       url += `&code_distributeur=${encodeURIComponent(this.selectedDistributeur)}`;
     }
-    this.http.get<any[]>(url).subscribe({
-      next: data => {
-        this.rows     = data.map(d => ({ ...d, _tonne: null, _packs: null, _packs_tournee: null }));
-        this.hasGoals = data.some(d =>
-          d.objectif_tonne_vd != null || d.objectif_packs_vd != null ||
-          d.objectif_tonne_vh != null || d.objectif_packs_vh != null
-        );
-        this.loading = false;
-      },
-      error: () => { this.loading = false; },
-    });
-    this.http.get<{ vd: number; vh: number; fallback_mois: string | null }>(
-      `/api/v1/objectifs/routes-count?mois=${this.mois}&annee=${this.annee}`
-    ).subscribe({
-      next: d => { this.routesVD = d.vd; this.routesVH = d.vh; this.routesFallbackMois = d.fallback_mois; },
-      error: () => { this.routesVD = 0; this.routesVH = 0; this.routesFallbackMois = null; },
-    });
+    this.http.get<any[]>(url)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: data => {
+          this.rows     = data.map(d => ({ ...d, _tonne: null, _packs: null, _packs_tournee: null }));
+          this.hasGoals = data.some(d =>
+            d.objectif_tonne_vd != null || d.objectif_packs_vd != null ||
+            d.objectif_tonne_vh != null || d.objectif_packs_vh != null
+          );
+          this.loading = false;
+        },
+        error: () => { this.loading = false; },
+      });
+    this.routeCountService.loadRouteCounts(this.mois, this.annee);
   }
 
   // ── Edit mode ─────────────────────────────────────────────────────────────────
@@ -101,22 +110,23 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
     if (this.selectedDistributeur) {
       url += `&code_distributeur=${encodeURIComponent(this.selectedDistributeur)}`;
     }
-    this.http.get<any[]>(url).subscribe({
-      next: data => {
-        this.rows = data.map(d => ({ ...d, _tonne: null, _packs: null, _packs_tournee: null }));
-        this.snapshot.clear();
-        for (const r of this.rows) {
-          const tonne        = this.canalHelper.selectByCanal(this.canal, r.objectif_tonne_vd, r.objectif_tonne_vh);
-          const packs        = this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd, r.objectif_packs_vh);
-          const packs_tournee = this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee);
-          this.snapshot.set(r.code_produit, { tonne, packs, packs_tournee });
-          r._tonne = tonne; r._packs = packs; r._packs_tournee = packs_tournee;
-        }
-        this.loading  = false;
-        this.editMode = true;
-      },
-      error: () => { this.loading = false; },
-    });
+    this.http.get<any[]>(url)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: data => {
+          this.rows = data.map(d => ({ ...d, _tonne: null, _packs: null, _packs_tournee: null }));
+          for (const r of this.rows) {
+            const tonne        = this.canalHelper.selectByCanal(this.canal, r.objectif_tonne_vd, r.objectif_tonne_vh);
+            const packs        = this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd, r.objectif_packs_vh);
+            const packs_tournee = this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee);
+            r._tonne = tonne; r._packs = packs; r._packs_tournee = packs_tournee;
+          }
+          this.dirtyTracker.captureSnapshot(this.rows);
+          this.loading  = false;
+          this.editMode = true;
+        },
+        error: () => { this.loading = false; },
+      });
   }
 
   // ── Save ──────────────────────────────────────────────────────────────────────
@@ -132,15 +142,17 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
       objectif_packs_vh:         this.canal === 'VH' ? r._packs         : r.objectif_packs_vh,
       objectif_packs_vh_tournee: this.canal === 'VH' ? r._packs_tournee : r.objectif_packs_vh_tournee,
     }));
-    this.http.post(`/api/v1/objectifs/batch?mois=${this.mois}&annee=${this.annee}`, body).subscribe({
-      next: () => {
-        this.isSaving = false;
-        this.editMode = false;
-        this.load();
-        this.loadNextMissing();
-      },
-      error: () => { this.isSaving = false; },
-    });
+    this.http.post(`/api/v1/objectifs/batch?mois=${this.mois}&annee=${this.annee}`, body)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: () => {
+          this.isSaving = false;
+          this.editMode = false;
+          this.load();
+          this.loadNextMissing();
+        },
+        error: () => { this.isSaving = false; },
+      });
   }
 
   // ── Excel import ──────────────────────────────────────────────────────────────
@@ -186,63 +198,65 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
 
     const monthChanged = this.importMois !== this.mois || this.importAnnee !== this.annee;
 
-    this.http.post<ImportRow[]>('/api/v1/objectifs/parse-excel', fd).subscribe({
-      next: data => {
-        if (monthChanged) {
-          this.mois  = this.importMois;
-          this.annee = this.importAnnee;
-          this.http.get<any[]>(`/api/v1/objectifs?mois=${this.mois}&annee=${this.annee}&edit=true`).subscribe({
-            next: rows => {
-              this.rows = rows.map(d => ({ ...d, _packs: null, _packs_tournee: null }));
-              this.snapshot.clear();
-              for (const r of this.rows) {
-                const t  = this.canalHelper.selectByCanal(this.importCanal, r.objectif_tonne_vd, r.objectif_tonne_vh);
-                const p  = this.canalHelper.selectByCanal(this.importCanal, r.objectif_packs_vd, r.objectif_packs_vh);
-                const pt = this.canalHelper.selectByCanal(this.importCanal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee);
-                this.snapshot.set(r.code_produit, { tonne: t, packs: p, packs_tournee: pt });
-                r._tonne = t; r._packs = p; r._packs_tournee = pt;
-              }
-              applyImport(data);
-            },
-            error: () => { this.isImporting = false; },
-          });
-        } else {
-          applyImport(data);
-        }
-      },
-      error: () => { this.isImporting = false; },
-    });
+    this.http.post<ImportRow[]>('/api/v1/objectifs/parse-excel', fd)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: data => {
+          if (monthChanged) {
+            this.mois  = this.importMois;
+            this.annee = this.importAnnee;
+            this.http.get<any[]>(`/api/v1/objectifs?mois=${this.mois}&annee=${this.annee}&edit=true`)
+              .pipe(takeUntilDestroyed(this.destroyRef))
+              .subscribe({
+                next: rows => {
+                  this.rows = rows.map(d => ({ ...d, _packs: null, _packs_tournee: null }));
+                  for (const r of this.rows) {
+                    const t  = this.canalHelper.selectByCanal(this.importCanal, r.objectif_tonne_vd, r.objectif_tonne_vh);
+                    const p  = this.canalHelper.selectByCanal(this.importCanal, r.objectif_packs_vd, r.objectif_packs_vh);
+                    const pt = this.canalHelper.selectByCanal(this.importCanal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee);
+                    r._tonne = t; r._packs = p; r._packs_tournee = pt;
+                  }
+                  this.dirtyTracker.captureSnapshot(this.rows);
+                  applyImport(data);
+                },
+                error: () => { this.isImporting = false; },
+              });
+          } else {
+            applyImport(data);
+          }
+        },
+        error: () => { this.isImporting = false; },
+      });
   }
 
   // ── Copy from previous ────────────────────────────────────────────────────────
   copyFromPrevious(): void {
     let pm = this.mois - 1, pa = this.annee;
     if (pm === 0) { pm = 12; pa--; }
-    this.http.get<any[]>(`/api/v1/objectifs?mois=${pm}&annee=${pa}`).subscribe({
-      next: data => {
-        const map = new Map(data.map((d: any) => [d.code_produit, d]));
-        for (const r of this.rows) {
-          const prev = map.get(r.code_produit) as any;
-          if (prev) {
-            r._tonne         = this.canalHelper.selectByCanal(this.canal, prev.objectif_tonne_vd, prev.objectif_tonne_vh);
-            r._packs         = this.canalHelper.selectByCanal(this.canal, prev.objectif_packs_vd, prev.objectif_packs_vh);
-            r._packs_tournee = this.canalHelper.selectByCanal(this.canal, prev.objectif_packs_vd_tournee, prev.objectif_packs_vh_tournee);
+    this.http.get<any[]>(`/api/v1/objectifs?mois=${pm}&annee=${pa}`)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: data => {
+          const map = new Map(data.map((d: any) => [d.code_produit, d]));
+          for (const r of this.rows) {
+            const prev = map.get(r.code_produit) as any;
+            if (prev) {
+              r._tonne         = this.canalHelper.selectByCanal(this.canal, prev.objectif_tonne_vd, prev.objectif_tonne_vh);
+              r._packs         = this.canalHelper.selectByCanal(this.canal, prev.objectif_packs_vd, prev.objectif_packs_vh);
+              r._packs_tournee = this.canalHelper.selectByCanal(this.canal, prev.objectif_packs_vd_tournee, prev.objectif_packs_vh_tournee);
+            }
           }
-        }
-      },
-    });
+        },
+      });
   }
 
   // ── Dirty tracking ────────────────────────────────────────────────────────────
   isDirtyRow(r: ObjectifRow): boolean {
-    const snap = this.snapshot.get(r.code_produit);
-    return r._tonne !== (snap?.tonne ?? null) ||
-           r._packs !== (snap?.packs ?? null) ||
-           r._packs_tournee !== (snap?.packs_tournee ?? null);
+    return this.dirtyTracker.isDirtyRow(r);
   }
 
   get dirtyCount(): number {
-    return this.rows.filter(r => this.isDirtyRow(r)).length;
+    return this.dirtyTracker.getDirtyCount(this.rows);
   }
 
   // ── Sorting ───────────────────────────────────────────────────────────────────
@@ -324,24 +338,8 @@ export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow>
 
   get totalProducts(): number { return this.rows.length; }
 
-  get canalLabel(): string { return this.canal === 'VD' ? 'Direct (VD)' : 'Horeca (VH)'; }
+  readonly canalOptions = CANAL_OPTIONS;
 
-  // ── Template helpers (for cleaner HTML) ───────────────────────────────────
-  getRowTonne(row: ObjectifRow): number | null {
-    return this.rowTonne(row);
-  }
+  get canalLabel(): string { return CANAL_DISPLAY(this.canal); }
 
-  getRowPacks(row: ObjectifRow): number | null {
-    return this.rowPacks(row);
-  }
-
-  getRowPacksTournee(row: ObjectifRow): number | null {
-    return this.rowPacksTournee(row);
-  }
-
-  getFilledCount(): number {
-    return this.rows.filter(r =>
-      this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd, r.objectif_packs_vh) != null
-    ).length;
-  }
 }

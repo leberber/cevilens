@@ -1,5 +1,5 @@
 import { Component, Input, TemplateRef } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { NgTemplateOutlet } from '@angular/common';
 
 /**
  * Reusable page layout component
@@ -30,7 +30,7 @@ import { CommonModule } from '@angular/common';
 @Component({
   selector: 'app-page-layout',
   standalone: true,
-  imports: [CommonModule],
+  imports: [NgTemplateOutlet],
   template: `
     <!-- Page header -->
     <div class="page-header">
@@ -70,67 +70,51 @@ import { CommonModule } from '@angular/common';
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 20px;
-      padding: 24px;
-      background: white;
-      border-bottom: 1px solid #e5e7eb;
-      margin-bottom: 24px;
+      gap: 1.25rem;
+      margin-bottom: var(--space-6);
     }
 
     .page-header__left {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 0.75rem;
     }
 
     .page-icon {
-      width: 48px;
-      height: 48px;
+      width: 2.75rem;
+      height: 2.75rem;
+      border-radius: var(--radius-lg);
+      background: var(--primary-100);
       display: flex;
       align-items: center;
       justify-content: center;
-      background: #f3f4f6;
-      border-radius: 8px;
-      font-size: 24px;
-      color: #6b7280;
+      flex-shrink: 0;
+      font-size: 1.25rem;
+      color: var(--primary-color);
     }
 
     .page-header__title {
       margin: 0;
-      font-size: 24px;
-      font-weight: 700;
-      color: #111827;
+      font-size: var(--font-size-2xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--text-color);
     }
 
     .page-header__sub {
-      margin: 4px 0 0 0;
-      font-size: 14px;
-      color: #6b7280;
+      margin: 0.15rem 0 0;
+      font-size: var(--font-size-sm);
+      color: var(--text-color-secondary);
     }
 
     .page-header__actions {
       display: flex;
-      gap: 12px;
+      gap: 0.75rem;
       align-items: center;
     }
 
-    .table-container {
-      background: white;
-      border-radius: 8px;
-      overflow: hidden;
-    }
-
-    .table-container--no-toolbar {
-      border: 1px solid #e5e7eb;
-    }
-
     .prod-toolbar {
-      padding: 16px 24px;
-      border-bottom: 1px solid #e5e7eb;
-    }
-
-    .table-wrapper {
-      overflow: auto;
+      padding: 0.75rem 1.5rem;
+      border-bottom: 1px solid var(--surface-border);
     }
   `],
 })

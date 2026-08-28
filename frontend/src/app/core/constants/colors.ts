@@ -36,37 +36,27 @@ export const CHART_COLORS = [
 
 const FALLBACK_MAINS = CHART_COLORS;
 
-// Returns the family background blended over white — fully opaque solid color.
-// Use this on sticky/pinned cells so scrolling content can't show through.
-export function getFamilyBgSolid(nom: string): string {
-  const key = nom.trim().toLowerCase()
+// Normalize family name to consistent key (strip accents: thé→the, café→cafe)
+function normalizeKey(nom: string): string {
+  return nom.trim().toLowerCase()
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  const main = FAMILY_COLORS[key]?.main ?? FALLBACK_MAINS[stableIndex(key)];
-  const r = parseInt(main.slice(1, 3), 16);
-  const g = parseInt(main.slice(3, 5), 16);
-  const b = parseInt(main.slice(5, 7), 16);
-  // Blend rgba(r,g,b,0.10) over white (255,255,255)
-  return `rgb(${Math.round(255 - (255 - r) * 0.10)},${Math.round(255 - (255 - g) * 0.10)},${Math.round(255 - (255 - b) * 0.10)})`;
 }
 
 // Returns main color for a family, with consistent fallback for unknown families
 export function getFamilyColor(nom: string): string {
-  const key = nom.trim().toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // strip accents: thé→the, café→cafe
+  const key = normalizeKey(nom);
   return FAMILY_COLORS[key]?.main ?? FALLBACK_MAINS[stableIndex(key)];
 }
 
 export function getFamilyBg(nom: string): string {
-  const key = nom.trim().toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const key = normalizeKey(nom);
   if (FAMILY_COLORS[key]) return FAMILY_COLORS[key].bg;
   const main = FALLBACK_MAINS[stableIndex(key)];
   return hexToRgba(main, 0.10);
 }
 
 export function getFamilyBgLight(nom: string): string {
-  const key = nom.trim().toLowerCase()
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const key = normalizeKey(nom);
   const main = FAMILY_COLORS[key]?.main ?? FALLBACK_MAINS[stableIndex(key)];
   return hexToRgba(main, 0.05);
 }

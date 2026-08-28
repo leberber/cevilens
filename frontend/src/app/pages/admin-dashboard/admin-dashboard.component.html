@@ -1,66 +1,70 @@
 <app-page-layout
   icon="pi-users"
-  title="Admin Dashboard"
-  subtitle="Platform Administration - Manage all users and roles">
+  title="Administration plateforme"
+  subtitle="Gestion globale des utilisateurs et des rôles">
 
-  <!-- Role Summary Cards -->
+  <!-- Cartes résumé par rôle -->
   <div class="role-summary">
-    <div class="role-card" *ngFor="let role of roles">
-      <div class="role-card__color" [style.backgroundColor]="getRoleColor(role)"></div>
-      <div class="role-card__content">
-        <span class="role-card__label">{{ getRoleLabel(role) }}</span>
-        <span class="role-card__count">{{ getRoleCount(role) }} users</span>
+    @for (role of roles; track role) {
+      <div [class]="'role-card role-card--' + role">
+        <div class="role-card__color"></div>
+        <div class="role-card__content">
+          <span class="role-card__label">{{ roleLabels[role] }}</span>
+          <span class="role-card__count">{{ getRoleCount(role) }} utilisateur(s)</span>
+        </div>
       </div>
-    </div>
+    }
   </div>
 
-  <!-- Users Table -->
-  @if (loading) {
-    <div class="loading">Loading users...</div>
-  } @else if (error) {
-    <div class="error">{{ error }}</div>
-  } @else if (users.length === 0) {
-    <div class="empty-state">
-      <p>No users found</p>
+  <!-- États -->
+  @if (loading()) {
+    <app-loading-state message="Chargement des utilisateurs…" />
+  } @else if (error()) {
+    <div class="error-state">
+      <i class="pi pi-exclamation-triangle"></i>
+      <span>{{ error() }}</span>
+      <button class="btn-secondary" (click)="loadUsers()">
+        <i class="pi pi-refresh"></i> Réessayer
+      </button>
     </div>
+  } @else if (users().length === 0) {
+    <app-empty-state icon="pi-users" message="Aucun utilisateur trouvé" />
   } @else {
     <div class="table-container">
-      <table class="users-table">
+      <table class="data-table">
         <thead>
           <tr>
             <th>ID</th>
-            <th>Name</th>
-            <th>Phone</th>
-            <th>Role</th>
-            <th>Distributor ID</th>
-            <th>Active</th>
-            <th>Created</th>
+            <th>Nom</th>
+            <th>Téléphone</th>
+            <th>Rôle</th>
+            <th>Distributeur</th>
+            <th>Statut</th>
+            <th>Créé le</th>
           </tr>
         </thead>
         <tbody>
-          @for (user of users; track user.id) {
+          @for (user of users(); track user.id) {
             <tr>
               <td><strong>#{{ user.id }}</strong></td>
               <td>{{ user.full_name }}</td>
               <td><code>{{ user.phone }}</code></td>
               <td>
-                <span class="badge" [style.backgroundColor]="getRoleColor(user.role)">
-                  {{ getRoleLabel(user.role) }}
+                <span [class]="roleBadges[user.role] || 'badge'">
+                  {{ roleLabels[user.role] }}
                 </span>
               </td>
               <td>
                 @if (user.distributor_id) {
-                  <span class="distributor-badge">{{ user.distributor_id }}</span>
+                  <span class="badge badge--info">{{ user.distributor_id }}</span>
                 } @else {
-                  <span class="distributor-badge empty">—</span>
+                  <span class="badge">—</span>
                 }
               </td>
               <td>
-                <span [class.active]="user.is_active" class="status-badge">
-                  {{ user.is_active ? '✓ Active' : '✗ Inactive' }}
-                </span>
+                <app-status-badge [isActive]="user.is_active" activeLabel="Actif" inactiveLabel="Inactif" />
               </td>
-              <td>{{ user.created_at | date: 'short' }}</td>
+              <td>{{ user.created_at | date: 'dd/MM/yyyy' }}</td>
             </tr>
           }
         </tbody>
@@ -68,7 +72,7 @@
     </div>
 
     <div class="table-footer">
-      <p>Total Users: <strong>{{ users.length }}</strong></p>
+      <span>Total : <strong>{{ users().length }}</strong> utilisateurs</span>
     </div>
   }
 

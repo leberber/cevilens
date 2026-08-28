@@ -19,22 +19,23 @@ export class FilterStateHelper {
    * Create filter state object with all properties set to null
    */
   createFilterState<T extends FilterState>(template: T): T {
-    const state = {} as T;
+    const state: Record<string, null> = {};
     for (const key in template) {
       if (template.hasOwnProperty(key)) {
-        (state as any)[key] = null;
+        state[key] = null;
       }
     }
-    return state;
+    return state as T;
   }
 
   /**
    * Reset all filter properties to null
    */
   resetFilters<T extends FilterState>(filters: T): void {
+    const filterRecord = filters as Record<string, any>;
     for (const key in filters) {
       if (filters.hasOwnProperty(key)) {
-        (filters as any)[key] = null;
+        filterRecord[key] = null;
       }
     }
   }

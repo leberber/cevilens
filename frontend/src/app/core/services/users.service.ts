@@ -12,6 +12,10 @@ export class UsersService {
     return this.http.get<User[]>(this.base);
   }
 
+  listAll(): Observable<User[]> {
+    return this.http.get<User[]>(`${this.base}/admin/all`);
+  }
+
   listByRole(role: UserRole): Observable<User[]> {
     const params = new HttpParams().set('role', role);
     return this.http.get<User[]>(this.base, { params });

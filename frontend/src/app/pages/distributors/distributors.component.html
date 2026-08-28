@@ -4,15 +4,16 @@
   subtitle="Manage all distributors in the system">
 
   @if (loading()) {
-    <div class="loading">Loading...</div>
+    <app-loading-state message="Chargement des distributeurs..."></app-loading-state>
   } @else if (error) {
     <div class="error">{{ error }}</div>
   } @else if (distributors.length === 0) {
-    <div class="empty-state">
-      <p>No distributors found</p>
-    </div>
+    <app-empty-state
+      icon="pi-inbox"
+      message="No distributors found">
+    </app-empty-state>
   } @else {
-    <table class="distributors-table">
+    <table class="data-table">
       <thead>
         <tr>
           <th>ID</th>

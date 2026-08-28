@@ -389,11 +389,6 @@
 
 /* ── Skeleton ───────────────────────────────────────────────────────── */
 
-@keyframes pv-shimmer {
-  0%   { background-position: -300px 0; }
-  100% { background-position: 300px 0; }
-}
-
 .pv-summary--sk {
   gap: 12px;
   padding: 14px 16px;
@@ -403,17 +398,17 @@
   flex: 1;
   height: 44px;
   border-radius: 8px;
-  background: linear-gradient(90deg, #ebebeb 25%, #f5f5f5 50%, #ebebeb 75%);
+  background: linear-gradient(90deg, var(--surface-200) 25%, var(--surface-100) 50%, var(--surface-200) 75%);
   background-size: 600px 100%;
-  animation: pv-shimmer 1.4s infinite linear;
+  animation: shimmer 1.4s infinite linear;
 }
 
 .pv-sk-card {
   height: 68px;
   border-radius: 14px;
-  background: linear-gradient(90deg, #ebebeb 25%, #f5f5f5 50%, #ebebeb 75%);
+  background: linear-gradient(90deg, var(--surface-200) 25%, var(--surface-100) 50%, var(--surface-200) 75%);
   background-size: 600px 100%;
-  animation: pv-shimmer 1.4s infinite linear;
+  animation: shimmer 1.4s infinite linear;
 }
 
 /* ── Bottom nav ─────────────────────────────────────────────────────── */

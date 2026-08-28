@@ -11,7 +11,7 @@
 }
 
 // =============================================================================
-// PAGE HEADER (component-local layout, global styles come from _layout.scss)
+// TOOLBAR HEADER — component-local layout for filter row within app-page-layout toolbar
 // =============================================================================
 
 .page-header__top {
@@ -35,72 +35,9 @@
   flex-shrink: 0;
 }
 
-.btn-back {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-lg);
-  border: var(--border-width) solid var(--border-color-light);
-  background: transparent;
-  color: var(--text-color-secondary);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-  flex-shrink: 0;
-
-  &:hover { border-color: var(--primary-color); color: var(--primary-color); }
-}
-
 // =============================================================================
-// FILTER CARDS — identical to ventes page
+// FILTER CARDS — base styles now in _filters.scss, only rapport-specific here
 // =============================================================================
-
-.filter-card {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  padding: 0.5rem 0.85rem 0.5rem 0.6rem;
-  background: var(--surface-card);
-  border: var(--border-width) solid var(--border-color-light);
-  border-radius: var(--radius-xl, 14px);
-  box-shadow: var(--shadow-sm);
-  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
-  cursor: pointer;
-
-  &:hover {
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.08);
-  }
-
-  &__icon {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-    flex-shrink: 0;
-    border-radius: 10px;
-    background: rgba(var(--primary-rgb), 0.1);
-    color: var(--primary-color);
-    font-size: 1rem;
-  }
-
-  &__body {
-    display: flex;
-    flex-direction: column;
-    min-width: 0;
-  }
-
-  &__label {
-    font-size: 0.625rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    color: var(--text-color-secondary);
-    white-space: nowrap;
-  }
-}
 
 .filter-card--period {
   border-color: color-mix(in srgb, var(--primary-color) 30%, transparent);
@@ -114,30 +51,7 @@
   .filter-card__label { color: var(--primary-color); }
 }
 
-::ng-deep .filter-card-select.p-select {
-  border: none !important;
-  box-shadow: none !important;
-  background: transparent !important;
-  padding: 0;
-  min-width: 200px;
-
-  .p-select-label {
-    padding: 0;
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-color);
-    line-height: 1.4;
-  }
-
-  .p-select-dropdown { width: 1.5rem; color: var(--text-color-secondary); }
-  .p-select-clear-icon { right: 1.5rem; }
-
-  &.p-select-open, &.p-focus {
-    border: none !important;
-    box-shadow: none !important;
-    outline: none !important;
-  }
-}
+// Note: base .filter-card-select override moved to _filters.scss
 
 ::ng-deep .filter-card--period .filter-card-select.p-select {
   min-width: 120px;
@@ -251,19 +165,6 @@
   height: 46px;
 
   input { font-size: 0.85rem; }
-}
-
-.btn-text {
-  background: none;
-  border: none;
-  color: var(--primary-color);
-  font-size: 0.72rem;
-  font-weight: var(--font-weight-semibold);
-  cursor: pointer;
-  padding: 0.2rem 0.5rem;
-  border-radius: var(--radius-md);
-  transition: background var(--transition-fast);
-  &:hover { background: rgba(var(--primary-rgb), 0.08); }
 }
 
 // =============================================================================
@@ -479,10 +380,10 @@
   &:disabled { opacity: 0.4; cursor: not-allowed; }
 
   &--excel {
-    background: color-mix(in srgb, #22c55e 10%, var(--surface-ground));
-    color: #16a34a;
-    border-color: color-mix(in srgb, #22c55e 30%, transparent);
-    &:not(:disabled):hover { background: color-mix(in srgb, #22c55e 18%, var(--surface-ground)); }
+    background: color-mix(in srgb, var(--color-success) 10%, var(--surface-ground));
+    color: var(--color-success-dark);
+    border-color: color-mix(in srgb, var(--color-success) 30%, transparent);
+    &:not(:disabled):hover { background: color-mix(in srgb, var(--color-success) 18%, var(--surface-ground)); }
   }
 
   &--print {
@@ -492,40 +393,6 @@
     &:hover { color: var(--text-color); border-color: var(--border-color); }
   }
 }
-
-// =============================================================================
-// SEGMENTED CONTROL
-// =============================================================================
-
-.rf-seg {
-  display: inline-flex;
-  border-radius: var(--radius-lg);
-  border: var(--border-width) solid var(--border-color-light);
-  overflow: hidden;
-  background: var(--surface-ground);
-
-  &__btn {
-    padding: 0.38rem 0.85rem;
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-semibold);
-    color: var(--text-color-secondary);
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    transition: all var(--transition-fast);
-
-    &--active {
-      background: var(--primary-gradient);
-      color: #fff;
-    }
-
-    &:not(.rf-seg__btn--active):hover {
-      background: var(--surface-card);
-      color: var(--text-color);
-    }
-  }
-}
-
 
 // =============================================================================
 // MAIN SCROLL AREA
@@ -538,13 +405,8 @@
 }
 
 // =============================================================================
-// SKELETON
+// SKELETON (uses @keyframes shimmer from _animations.scss)
 // =============================================================================
-
-@keyframes rf-shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
 
 %rf-sk-base {
   border-radius: 6px;
@@ -555,7 +417,7 @@
     var(--surface-200, #e5e7eb) 100%
   );
   background-size: 200% 100%;
-  animation: rf-shimmer 1.8s ease-in-out infinite;
+  animation: shimmer 1.8s ease-in-out infinite;
 }
 
 .rf-skeleton {
@@ -666,8 +528,8 @@
 // Summary header
 .rapport-summary {
   border-radius: 12px;
-  border: 1px solid #e4ecf5;
-  background: #fff;
+  border: 1px solid var(--print-border);
+  background: var(--color-white);
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.05);
   overflow: hidden;
 
@@ -676,7 +538,7 @@
     font-size: 0.95rem;
     font-weight: 700;
     color: var(--text-color);
-    border-bottom: 1px solid #e4ecf5;
+    border-bottom: 1px solid var(--print-border);
     background: var(--surface-ground);
     letter-spacing: 0.01em;
   }
@@ -692,7 +554,7 @@
     flex-direction: column;
     gap: 0.2rem;
     padding: 0.85rem 1rem;
-    border-right: 1px solid #e4ecf5;
+    border-right: 1px solid var(--print-border);
 
     &:last-child { border-right: none; }
   }
@@ -757,21 +619,21 @@
   &__sep {
     width: 1px;
     height: 40px;
-    background: #e4ecf5;
+    background: var(--print-border);
     flex-shrink: 0;
   }
 
   &__title {
     font-size: 1.05rem;
     font-weight: 800;
-    color: #071b4d;
+    color: var(--print-text);
     letter-spacing: 0.02em;
     line-height: 1;
   }
 
   &__sub {
     font-size: 0.72rem;
-    color: #8a99b8;
+    color: var(--print-muted);
     margin-top: 0.25rem;
     font-weight: 500;
   }
@@ -794,7 +656,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    color: #8a99b8;
+    color: var(--print-muted);
 
     &::after { content: ' :'; }
   }
@@ -802,7 +664,7 @@
   &__tag-value {
     font-size: 0.82rem;
     font-weight: 700;
-    color: #071b4d;
+    color: var(--print-text);
   }
 }
 
@@ -820,15 +682,15 @@
   gap: 0.75rem;
   padding: 0.7rem 0.9rem;
   border-radius: 10px;
-  border: 1px solid #e8eef7;
-  box-shadow: 0 2px 8px rgba(4, 31, 88, 0.06);
+  border: 1px solid var(--print-border);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
 
   &__icon {
     width: 38px;
     height: 38px;
     border-radius: 9px;
-    background: #f0f4ff;
-    color: #1a5fc8;
+    background: var(--print-bg);
+    color: var(--print-blue);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -837,15 +699,15 @@
   }
 
   &--accent .rc-kpi-card__icon {
-    background: linear-gradient(135deg, #1a5fc8, #041f58);
-    color: #fff;
+    background: linear-gradient(135deg, var(--print-blue), var(--print-navy));
+    color: var(--color-white);
   }
 
   &__num {
     display: block;
     font-size: 1.5rem;
     font-weight: 900;
-    color: #041f58;
+    color: var(--print-navy);
     line-height: 1;
   }
 
@@ -855,7 +717,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: #8a99b8;
+    color: var(--print-muted);
     margin-top: 0.15rem;
   }
 }
@@ -875,16 +737,16 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.07em;
-    color: #8a99b8;
+    color: var(--print-muted);
     margin-bottom: 0.85rem;
 
-    i { color: #1a5fc8; font-size: 0.65rem; }
+    i { color: var(--print-blue); font-size: 0.65rem; }
   }
 
   &__list {
     display: flex;
     flex-direction: column;
-    border: 1px solid #dce8f7;
+    border: 1px solid var(--print-border);
     border-radius: 10px;
     overflow: hidden;
   }
@@ -896,11 +758,11 @@
   align-items: center;
   gap: 0.25rem;
   padding: 0.35rem 0.75rem;
-  border-bottom: 1px solid #e4ecf5;
+  border-bottom: 1px solid var(--print-border);
 
   &:last-child { border-bottom: none; }
 
-  &:nth-child(even) { background: #f9fbff; }
+  &:nth-child(even) { background: var(--print-bg-strip); }
 
   &__qty-cell {
     display: flex;
@@ -912,7 +774,7 @@
   &__name {
     font-size: 0.75rem;
     font-weight: 600;
-    color: #071b4d;
+    color: var(--print-text);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -921,8 +783,8 @@
   &__uom {
     font-size: 0.6rem;
     font-weight: 700;
-    color: #1a5fc8;
-    background: #eef2ff;
+    color: var(--print-blue);
+    background: var(--print-bg);
     border-radius: 4px;
     padding: 0.1rem 0.35rem;
     white-space: nowrap;
@@ -933,14 +795,14 @@
 
   &__bar-wrap {
     height: 7px;
-    background: #eef2ff;
+    background: var(--print-bg);
     border-radius: 99px;
     overflow: hidden;
   }
 
   &__bar {
     height: 100%;
-    background: linear-gradient(90deg, #041f58, #1a5fc8);
+    background: linear-gradient(90deg, var(--print-navy), var(--print-blue));
     border-radius: 99px;
     min-width: 4px;
     transition: width 0.3s ease;
@@ -949,25 +811,25 @@
   &__qty {
     font-size: 0.85rem;
     font-weight: 800;
-    color: #041f58;
+    color: var(--print-navy);
   }
 }
 
 .rapport-client {
   border-radius: 12px;
-  border: 1px solid #e4ecf5;
+  border: 1px solid var(--print-border);
   overflow: hidden;
-  background: #fff;
-  box-shadow: 0 2px 10px rgba(4, 31, 88, 0.07);
+  background: var(--color-white);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.07);
 
   &__header {
     display: flex;
     align-items: center;
     gap: 0.65rem;
     padding: 0.65rem 1rem;
-    border-bottom: 1px solid #e4ecf5;
-    background: linear-gradient(90deg, #f0f5ff 0%, #f8faff 100%);
-    border-left: 3px solid #1a5fc8;
+    border-bottom: 1px solid var(--print-border);
+    background: linear-gradient(90deg, var(--print-bg) 0%, var(--print-bg-strip) 100%);
+    border-left: 3px solid var(--print-blue);
   }
 }
 
@@ -988,7 +850,7 @@
 .rc-name {
   font-size: 0.88rem;
   font-weight: 700;
-  color: #071b4d;
+  color: var(--print-text);
   flex: 1;
 }
 
@@ -1015,7 +877,7 @@
 
   &::-webkit-scrollbar { height: 4px; }
   &::-webkit-scrollbar-track { background: transparent; }
-  &::-webkit-scrollbar-thumb { background: #e4ecf5; border-radius: 4px; }
+  &::-webkit-scrollbar-thumb { background: var(--print-border); border-radius: 4px; }
 }
 
 .rapport-table {
@@ -1030,7 +892,7 @@
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.04em;
-    border-bottom: 1px solid #e4ecf5;
+    border-bottom: 1px solid var(--print-border);
     background: var(--surface-ground);
     text-align: center;
     padding: 0.75rem 0.4rem 0.5rem;
@@ -1043,7 +905,7 @@
   }
 
   td {
-    border-bottom: 1px solid #e4ecf5;
+    border-bottom: 1px solid var(--print-border);
     padding: 0.45rem 0.5rem;
     text-align: center;
     color: var(--text-color-secondary);
@@ -1056,7 +918,7 @@
       color: var(--text-color);
       background: var(--surface-ground);
       white-space: nowrap;
-      border-right: 1px solid #e4ecf5;
+      border-right: 1px solid var(--print-border);
     }
 
     &.has-value {
@@ -1270,8 +1132,8 @@
 
   .rc-kpi-row { flex-shrink: 0; }
   .rc-breakdown { flex: 1; }
-  .rc-breakdown__list { border-color: #d0d8e8; }
-  .rc-breakdown-row:nth-child(even) { background: #f9fbff !important; }
+  .rc-breakdown__list { border-color: var(--print-border); }
+  .rc-breakdown-row:nth-child(even) { background: var(--print-bg-strip) !important; }
 
   // Prevent cards from overflowing page width
   .rapport-client {
@@ -1324,7 +1186,7 @@
     page-break-inside: avoid;
     break-inside: avoid;
     box-shadow: none;
-    border-color: #d0d8e8;
+    border-color: var(--print-border);
     margin-bottom: 1.5rem;
   }
   .rc-table-wrap { overflow: visible !important; }

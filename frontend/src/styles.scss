@@ -2,20 +2,21 @@
 // GLOBAL STYLES — Pallette CLR Freha
 // =============================================================================
 
-// 1. Design tokens
-@use './styles/colors'     as *;
-@use './styles/typography' as *;
-@use './styles/spacing'    as *;
-@use './styles/effects'    as *;
+// 1. Design tokens (colors + typography + spacing + effects — all in one place)
+@use './styles/colors' as *;
 
-// 2. Components
-@use './styles/mixins'   as *;
-@use './styles/badges'   as *;
-@use './styles/buttons'  as *;
-@use './styles/cards'    as *;
-@use './styles/inputs'   as *;
-@use './styles/layout'   as *;
-@use './styles/table'    as *;
+// 2. Components & Patterns
+@use './styles/mixins'       as *;
+@use './styles/animations'   as *;
+@use './styles/badges'       as *;
+@use './styles/buttons'      as *;
+@use './styles/cards'        as *;
+@use './styles/filters'      as *;
+@use './styles/inputs'       as *;
+@use './styles/select'       as *;
+@use './styles/table'        as *;
+@use './styles/toolbar'      as *;
+@use './styles/upload'       as *;
 
 // 3. External CSS
 @import 'leaflet/dist/leaflet.css';
@@ -33,7 +34,27 @@ html, body {
   overflow-x: hidden;
 }
 
+body {
+  font-family: var(--font-family-base);
+  font-size: var(--font-size-base);
+  line-height: var(--line-height-normal);
+  color: var(--text-color);
+}
+
+input, textarea, [contenteditable] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
 .p-component { font-family: var(--font-family-base); }
+
+// ── Global utilities ──────────────────────────────────────────────────────────
+.text-muted   { color: var(--text-color-secondary); }
+.text-primary { color: var(--primary-color); }
+.w-full       { width: 100%; }
+.mb-0         { margin-bottom: 0 !important; }
+.mob-hide     { @media (max-width: 768px) { display: none !important; } }
+.desk-hide    { display: none !important; @media (max-width: 768px) { display: block !important; } }
 
 // =============================================================================
 // PRINT — hide shell chrome, show only .rapport-print
@@ -110,16 +131,7 @@ html, body {
 // =============================================================================
 // TOAST OVERRIDES — amanu style
 // =============================================================================
-
-@keyframes toast-slide-in {
-  from { transform: translateY(-100%); opacity: 0; }
-  to   { transform: translateY(0);     opacity: 1; }
-}
-
-@keyframes toast-slide-out {
-  from { transform: translateY(0);     opacity: 1; }
-  to   { transform: translateY(-100%); opacity: 0; }
-}
+// Note: @keyframes toast-slide-in/out are now defined in _animations.scss
 
 .p-toast {
   top: 0 !important;
@@ -159,12 +171,12 @@ html, body {
 .p-toast-summary {
   font-size: 14px !important;
   font-weight: 600 !important;
-  color: #1a1a1a !important;
+  color: var(--text-color) !important;
 }
 
 .p-toast-detail {
   font-size: 13px !important;
-  color: #666 !important;
+  color: var(--text-color-secondary) !important;
   margin-top: 2px !important;
 }
 
@@ -172,18 +184,13 @@ html, body {
   width: 28px !important;
   height: 28px !important;
   border-radius: 6px !important;
-  color: #999 !important;
+  color: var(--text-color-muted) !important;
   transition: background 0.15s, color 0.15s !important;
 
   &:hover {
-    background: rgba(0, 0, 0, 0.06) !important;
-    color: #333 !important;
+    background: var(--overlay-light) !important;
+    color: var(--text-color) !important;
   }
-}
-
-// Page content wrapper (inside admin-content)
-.page-content {
-  // No extra padding needed — admin-content handles it
 }
 
 // Page title
@@ -192,4 +199,128 @@ html, body {
   font-weight: var(--font-weight-bold);
   color: var(--text-color);
   margin: 0 0 var(--space-6);
+}
+
+// =============================================================================
+// OBJECTIVE COLOUR TIER — used across dashboard, prevendeur, and header
+// =============================================================================
+
+.pv-obj--green  { color: var(--color-success); }
+.pv-obj--amber  { color: var(--color-warning); }
+.pv-obj--orange { color: var(--color-orange); }
+.pv-obj--red    { color: var(--color-error); }
+
+// =============================================================================
+// DASHBOARD SHARED PANEL — used by product-tree and fdv-performance components
+// =============================================================================
+
+.db-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--surface-border);
+  background: var(--surface-card);
+  flex-shrink: 0;
+  gap: 1rem;
+}
+
+.db-panel-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-color);
+  flex: 1;
+}
+
+.db-panel-total {
+  font-size: 0.8rem;
+  color: var(--text-color-secondary);
+  white-space: nowrap;
+}
+
+.db-panel-empty,
+.db-no-data {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 3rem 1rem;
+  color: var(--text-color-secondary);
+
+  i, .pi { font-size: 2.5rem; opacity: 0.5; }
+  p, span { font-size: 0.9rem; margin: 0; }
+}
+
+.db-panel-empty { flex: 1; }
+.db-no-data     { grid-column: 1 / -1; }
+
+// =============================================================================
+// FORM VALIDATION — Field error states and visual feedback
+// =============================================================================
+
+.icon-input {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  background: var(--surface-ground);
+  transition: border-color 0.15s, box-shadow 0.15s;
+
+  i {
+    color: var(--text-color-secondary);
+    margin-right: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    outline: none;
+    color: var(--text-color);
+    font-family: inherit;
+    font-size: inherit;
+
+    &:focus {
+      outline: none;
+    }
+
+    &::placeholder {
+      color: var(--text-color-secondary);
+      opacity: 0.6;
+    }
+  }
+
+  &:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.1);
+  }
+
+  // Error state
+  &.field-error {
+    border-color: var(--color-error);
+
+    i {
+      color: var(--color-error);
+    }
+
+    input {
+      color: var(--color-error);
+    }
+
+    &:focus-within {
+      box-shadow: 0 0 0 3px rgba(var(--color-error-rgb), 0.1);
+    }
+  }
+
+  // Valid state
+  &.field-valid {
+    border-color: var(--color-success);
+
+    i {
+      color: var(--color-success);
+    }
+  }
 }

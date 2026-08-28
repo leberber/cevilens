@@ -4,6 +4,8 @@ import { D3ChartBase, fmtShort, type D3G, type D3Path, type D3Line, type D3Rect 
 
 export interface AreaPoint { label: string; v1: number; v2: number; }
 
+type D3Sel = d3.Selection<SVGGElement, unknown, null, undefined>;
+
 @Component({
   selector: 'app-d3-area',
   standalone: true,
@@ -95,9 +97,9 @@ export class D3AreaComponent extends D3ChartBase<AreaPoint> {
     this.updateLayout(W, H, m);
 
     this.gridG
-      .call(d3.axisLeft(y1).ticks(4).tickSize(-iW).tickFormat(() => '') as any)
-      .call((s: any) => s.select('.domain').remove())
-      .call((s: any) => s.selectAll('.tick line').attr('stroke','#e2e8f0').attr('stroke-dasharray','3,3'));
+      .call(d3.axisLeft(y1).ticks(4).tickSize(-iW).tickFormat(() => '') as unknown as (sel: D3Sel) => void)
+      .call((s: D3Sel) => s.select('.domain').remove())
+      .call((s: D3Sel) => s.selectAll('.tick line').attr('stroke','#e2e8f0').attr('stroke-dasharray','3,3'));
 
     const setPath = (sel: D3Path, path: string) =>
       this.tx(sel, 'morph', dur).attr('d', path);
@@ -126,20 +128,20 @@ export class D3AreaComponent extends D3ChartBase<AreaPoint> {
       );
 
     this.xAxisG.attr('transform', `translate(0,${iH})`)
-      .call(d3.axisBottom(x).tickSize(3) as any)
-      .call((s: any) => s.select('.domain').attr('stroke','#e2e8f0'))
-      .call((s: any) => s.selectAll('text').attr('fill','#94a3b8').attr('font-size',10).attr('dy','1.1em'))
-      .call((s: any) => s.selectAll('.tick line').attr('stroke','#e2e8f0'));
+      .call(d3.axisBottom(x).tickSize(3) as unknown as (sel: D3Sel) => void)
+      .call((s: D3Sel) => s.select('.domain').attr('stroke','#e2e8f0'))
+      .call((s: D3Sel) => s.selectAll('text').attr('fill','#94a3b8').attr('font-size',10).attr('dy','1.1em'))
+      .call((s: D3Sel) => s.selectAll('.tick line').attr('stroke','#e2e8f0'));
 
     this.y1AxisG
-      .call(d3.axisLeft(y1).ticks(4).tickFormat(fmtAxis) as any)
-      .call((s: any) => s.select('.domain').remove())
-      .call((s: any) => s.selectAll('text').attr('fill','#64748b').attr('font-size',10));
+      .call(d3.axisLeft(y1).ticks(4).tickFormat(fmtAxis) as unknown as (sel: D3Sel) => void)
+      .call((s: D3Sel) => s.select('.domain').remove())
+      .call((s: D3Sel) => s.selectAll('text').attr('fill','#64748b').attr('font-size',10));
 
     this.y2AxisG.attr('transform', `translate(${iW},0)`)
-      .call(d3.axisRight(y2).ticks(4) as any)
-      .call((s: any) => s.select('.domain').remove())
-      .call((s: any) => s.selectAll('text').attr('fill','#d97706').attr('font-size',10));
+      .call(d3.axisRight(y2).ticks(4) as unknown as (sel: D3Sel) => void)
+      .call((s: D3Sel) => s.select('.domain').remove())
+      .call((s: D3Sel) => s.selectAll('text').attr('fill','#d97706').attr('font-size',10));
 
     this.vlineEl.attr('y1', 0).attr('y2', iH);
     this.hoverEl.attr('x', m.left).attr('y', m.top).attr('width', iW).attr('height', iH)

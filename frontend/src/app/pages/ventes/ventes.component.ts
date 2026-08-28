@@ -1,6 +1,7 @@
-import { Component, OnInit, AfterViewInit, OnDestroy, inject, ViewChild, ElementRef, ChangeDetectorRef, TemplateRef } from '@angular/core';
+import { Component, OnInit, inject, ViewChild, TemplateRef, DestroyRef, ChangeDetectionStrategy } from '@angular/core';
 import { Router } from '@angular/router';
-import { DecimalPipe, NgStyle } from '@angular/common';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { VirtualScrollContainerDirective } from '../../shared/directives/virtual-scroll-container.directive';
 import { FormsModule } from '@angular/forms';
 import { TooltipModule } from 'primeng/tooltip';
 import { Select } from 'primeng/select';
@@ -10,9 +11,15 @@ import { ColumnStateService, ColDef } from '../../core/services/column-state.ser
 import { PaginationHelper } from '../../core/services/pagination.helper';
 import { FamilleColorService } from '../../core/services/famille-color.service';
 import { DateHelper } from '../../core/services/date.helper';
+import { SearchFilterHelper } from '../../core/services/search-filter.helper';
 import { SkeletonLoaderComponent } from '../../shared/components/skeleton-loader/skeleton-loader.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
 import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
-import { DateRangePickerComponent } from '../../shared/components/date-range-picker.component';
+import { DateRangePickerComponent } from '../../shared/components/date-range-picker/date-range-picker.component';
+import { DistributorFilterComponent } from '../../shared/components/distributor-filter/distributor-filter.component';
+import { SearchInputComponent } from '../../shared/components/search-input/search-input.component';
+import { ActiveFilterChipsComponent } from '../../shared/components/active-filter-chips/active-filter-chips.component';
+import { VentesFilterService } from './services/ventes-filter.service';
 import { BATCH_SIZE, SEARCH_DEBOUNCE_MS } from '../../core/constants/app.constants';
 
 const LS_KEY = 'cevital_ventes_columns';
@@ -20,24 +27,22 @@ const LS_KEY = 'cevital_ventes_columns';
 @Component({
   selector: 'app-ventes',
   standalone: true,
-  imports: [DecimalPipe, NgStyle, FormsModule, TooltipModule, Select, Popover, SkeletonLoaderComponent, PageLayoutComponent, DateRangePickerComponent],
+  imports: [FormsModule, TooltipModule],
   templateUrl: './ventes.component.html',
   styleUrl: './ventes.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
-  private ventesService = inject(VentesService);
-  private columnState = inject(ColumnStateService);
-  private pagination = inject(PaginationHelper);
-  private familleColorService = inject(FamilleColorService);
-  private dateHelper = inject(DateHelper);
-  private router = inject(Router);
+export class VentesComponent implements OnInit {
+  private readonly ventesService        = inject(VentesService);
+  private readonly columnState          = inject(ColumnStateService);
+  private readonly pagination           = inject(PaginationHelper);
+  private readonly familleColorService  = inject(FamilleColorService);
+  private readonly dateHelper           = inject(DateHelper);
+  private readonly router               = inject(Router);
+  private readonly destroyRef           = inject(DestroyRef);
+  readonly filterService                = inject(VentesFilterService);
 
-  @ViewChild('tableWrapper') tableWrapper!: ElementRef<HTMLElement>;
   @ViewChild('filterPop') filterPop!: Popover;
-  @ViewChild('headerActions') headerActions!: TemplateRef<any>;
-  @ViewChild('toolbarContent') toolbarContent!: TemplateRef<any>;
-  private boundScrollFn = () => this.checkScroll();
-  private cdr = inject(ChangeDetectorRef);
 
   rows: VenteRead[] = [];
   total = 0;
@@ -50,18 +55,12 @@ export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
   fdvs: string[] = [];
   clients: string[] = [];
   familles: string[] = [];
-  distributeurs: string[] = [];
   selectedFdv: string | null = null;
   selectedClient: string | null = null;
   selectedFamille: string | null = null;
   selectedDistributeur: string | null = null;
-  activeFilters: Partial<Record<string, string>> = {};
-  filterOptions: string[] = [];
-  filterOptionsLoading = false;
-  filterSearchTerm = '';
-  activeFilterField: string | null = null;
   private currentPage = 1;
-  private searchTimeout: any;
+  private searchTimeout: ReturnType<typeof setTimeout> | undefined;
 
   readonly allColumns: ColDef[] = [
     { field: 'date_commande',        header: 'Date',                width: '110px', visible: true  },
@@ -122,91 +121,66 @@ export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
 
   ngOnInit() {
     this.loadColumnState();
-    this.ventesService.getPeriodes().subscribe(periodes => {
-      this.periodes = periodes;
-      if (periodes.length) {
-        this.dateFrom = this.dateHelper.getFirstDayOfMonth(periodes[0]);
-        this.dateTo   = this.dateHelper.getLastDayOfMonth(periodes[0]);
-        this.loadFdvsAndClients();
-        this.reset();
-      }
-    });
+    this.ventesService.getPeriodes()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(periodes => {
+        this.periodes = periodes;
+        if (periodes.length) {
+          this.dateFrom = this.dateHelper.getFirstDayOfMonth(periodes[0]);
+          this.dateTo   = this.dateHelper.getLastDayOfMonth(periodes[0]);
+          this.loadFdvsAndClients();
+          this.reset();
+        }
+      });
   }
 
-  ngAfterViewInit() {
-    setTimeout(() => this.attachScrollListener(), 0);
-  }
-
-  ngOnDestroy() {
-    this.tableWrapper?.nativeElement.removeEventListener('scroll', this.boundScrollFn);
-  }
-
-  private attachScrollListener() {
-    const el = this.tableWrapper?.nativeElement;
-    if (el) el.addEventListener('scroll', this.boundScrollFn);
-  }
-
-  private checkScroll() {
-    const el = this.tableWrapper?.nativeElement;
-    if (!el) return;
-    const { scrollHeight, scrollTop, clientHeight } = el;
-    if (scrollHeight - scrollTop - clientHeight < 300 && this.hasMore && !this.loadingMore && !this.loading) {
+  /**
+   * Called by VirtualScrollContainerDirective when user scrolls near bottom
+   * Triggers batch loading for infinite scroll
+   */
+  onScrollNearBottom() {
+    if (this.hasMore && !this.loadingMore && !this.loading) {
       this.currentPage++;
       this.loadBatch(true);
     }
   }
 
   get filteredOptions(): string[] {
-    if (!this.filterSearchTerm) return this.filterOptions;
-    const q = this.filterSearchTerm.toLowerCase();
-    return this.filterOptions.filter(o => o.toLowerCase().includes(q));
+    return this.filterService.filteredOptions;
   }
 
   get activeFilterCount(): number {
-    return Object.keys(this.activeFilters).length;
+    return this.filterService.activeFilterCount;
   }
 
-  openColumnFilter(field: string, event: Event): void {
+  async openColumnFilter(field: string, event: Event): Promise<void> {
     event.stopPropagation();
-    this.activeFilterField = field;
-    this.filterSearchTerm = '';
-    this.filterOptions = [];
-    this.filterOptionsLoading = true;
-    this.ventesService.getDistinct(field, this.dateFrom || undefined, this.dateTo || undefined)
-      .subscribe(vals => { this.filterOptions = vals; this.filterOptionsLoading = false; });
+    await this.filterService.openColumnFilter(field, this.dateFrom || undefined, this.dateTo || undefined);
     this.filterPop.toggle(event);
   }
 
   applyColumnFilter(value: string | null): void {
-    if (value === null) {
-      delete this.activeFilters[this.activeFilterField!];
-    } else {
-      this.activeFilters[this.activeFilterField!] = value;
-    }
+    this.filterService.applyColumnFilter(value);
     this.filterPop.hide();
     this.reset();
   }
 
   removeFilter(field: string): void {
-    delete this.activeFilters[field];
+    this.filterService.removeFilter(field);
     this.reset();
   }
 
   clearAllColumnFilters(): void {
-    this.activeFilters = {};
+    this.filterService.clearAllColumnFilters();
     this.reset();
   }
 
   getColumnFilter(field: string): string | undefined {
-    return this.activeFilters[field];
+    return this.filterService.getColumnFilter(field);
   }
 
   getActiveFilterChips(): { field: string; label: string; value: string }[] {
-    return Object.entries(this.activeFilters).map(([field, value]) => ({
-      field,
-      label: this.allColumns.find(c => c.field === field)?.header ?? field,
-      value: value as string,
-    }));
+    return this.filterService.getActiveFilterChips(this.allColumns);
   }
 
   onRangeChange(range: { from: string; to: string }): void {
@@ -216,7 +190,7 @@ export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
     this.selectedClient = null;
     this.selectedFamille = null;
     this.selectedDistributeur = null;
-    this.activeFilters = {};
+    this.filterService.clearAllColumnFilters();
     this.loadFdvsAndClients();
     this.reset();
   }
@@ -238,11 +212,13 @@ export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
   onFdvChange(): void {
     this.selectedClient = null;
     this.ventesService.getClients(this.dateFrom || undefined, this.dateTo || undefined, this.selectedFdv || undefined)
+      .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(d => this.clients = d);
     this.reset();
   }
 
-  onDistributeurChange(): void {
+  onDistributeurChange(value: string | null): void {
+    this.selectedDistributeur = value;
     this.reset();
   }
 
@@ -259,10 +235,15 @@ export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private loadFdvsAndClients(): void {
-    this.ventesService.getFdvs(this.dateFrom || undefined, this.dateTo || undefined).subscribe(d => this.fdvs = d);
-    this.ventesService.getClients(this.dateFrom || undefined, this.dateTo || undefined).subscribe(d => this.clients = d);
-    this.ventesService.getFamilles(this.dateFrom || undefined, this.dateTo || undefined).subscribe(d => this.familles = d);
-    this.ventesService.getDistinct('nom_distributeur', this.dateFrom || undefined, this.dateTo || undefined).subscribe(d => this.distributeurs = d);
+    this.ventesService.getFdvs(this.dateFrom || undefined, this.dateTo || undefined)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(d => this.fdvs = d);
+    this.ventesService.getClients(this.dateFrom || undefined, this.dateTo || undefined)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(d => this.clients = d);
+    this.ventesService.getFamilles(this.dateFrom || undefined, this.dateTo || undefined)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(d => this.familles = d);
   }
 
   private reset() {
@@ -277,7 +258,7 @@ export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
     if (append) this.loadingMore = true;
     else this.loading = true;
 
-    const f = this.activeFilters;
+    const f = this.filterService.activeFilters;
     this.ventesService.list({
       page: this.currentPage,
       per_page: BATCH_SIZE,
@@ -299,20 +280,22 @@ export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
       nom_distributeur: (f['nom_distributeur'] as string) || this.selectedDistributeur || undefined,
       nom_client: this.selectedClient || undefined,
       search: this.searchTerm || undefined,
-    }).subscribe({
-      next: res => {
-        this.pagination.handleBatchLoad(res, this.rows, append, (items, total) => {
-          this.rows = items;
-          this.total = total;
-        });
-        this.loading = false;
-        this.loadingMore = false;
-      },
-      error: () => {
-        this.loading = false;
-        this.loadingMore = false;
-      },
-    });
+    })
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: res => {
+          this.pagination.handleBatchLoad(res, this.rows, append, (items, total) => {
+            this.rows = items;
+            this.total = total;
+          });
+          this.loading = false;
+          this.loadingMore = false;
+        },
+        error: () => {
+          this.loading = false;
+          this.loadingMore = false;
+        },
+      });
   }
 
   private loadColumnState() {
@@ -323,7 +306,7 @@ export class VentesComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.familleColorService.getStyle(famille);
   }
 
-  getRowValue(row: VenteRead, field: string): any {
-    return (row as any)[field] ?? '—';
+  getRowValue(row: VenteRead, field: string): unknown {
+    return (row as unknown as Record<string, unknown>)[field] ?? '—';
   }
 }

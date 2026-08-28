@@ -41,8 +41,8 @@
         <span class="drop-zone__text">Déposer un fichier ici</span>
         <span class="drop-zone__hint">ou cliquer pour sélectionner</span>
         <div class="drop-zone__badges">
-          <span class="badge badge--info">.xlsx</span>
-          <span class="badge badge--info">.xls</span>
+          <span class="upload-badge">.xlsx</span>
+          <span class="upload-badge">.xls</span>
         </div>
       }
     </div>
@@ -60,22 +60,22 @@
     <!-- File info stats -->
     @if (fileInfo()) {
       <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-card__icon-wrap">
-            <i class="pi pi-calendar stat-card__icon"></i>
+        <div class="upload-stat">
+          <div class="upload-stat__icon-wrap">
+            <i class="pi pi-calendar upload-stat__icon"></i>
           </div>
-          <div class="stat-card__body">
-            <span class="stat-card__value">{{ fileInfo()!.date_min }} → {{ fileInfo()!.date_max }}</span>
-            <span class="stat-card__label">Période</span>
+          <div class="upload-stat__body">
+            <span class="upload-stat__value">{{ fileInfo()!.date_min }} → {{ fileInfo()!.date_max }}</span>
+            <span class="upload-stat__label">Période</span>
           </div>
         </div>
-        <div class="stat-card">
-          <div class="stat-card__icon-wrap">
-            <i class="pi pi-database stat-card__icon"></i>
+        <div class="upload-stat">
+          <div class="upload-stat__icon-wrap">
+            <i class="pi pi-database upload-stat__icon"></i>
           </div>
-          <div class="stat-card__body">
-            <span class="stat-card__value">{{ fileInfo()!.total_rows | number }}</span>
-            <span class="stat-card__label">Lignes</span>
+          <div class="upload-stat__body">
+            <span class="upload-stat__value">{{ fileInfo()!.total_rows | number }}</span>
+            <span class="upload-stat__label">Lignes</span>
           </div>
         </div>
       </div>

@@ -18,18 +18,18 @@
     </div>
     <div class="an-header__controls">
       <!-- Unite toggle -->
-      <div class="canal-btns">
+      <div class="seg-control seg-control--glass">
         @for (u of unites; track u.value) {
-          <button class="canal-btn" [class.active]="unite() === u.value" (click)="setUnite(u.value)">
+          <button class="seg-btn" [class.seg-btn--active]="unite() === u.value" (click)="setUnite(u.value)">
             {{ u.label }}
           </button>
         }
       </div>
 
       <!-- Canal toggle -->
-      <div class="canal-btns">
+      <div class="seg-control seg-control--glass">
         @for (c of canals; track c.value) {
-          <button class="canal-btn" [class.active]="canal() === c.value" (click)="setCanal(c.value)">
+          <button class="seg-btn" [class.seg-btn--active]="canal() === c.value" (click)="setCanal(c.value)">
             {{ c.label }}
           </button>
         }

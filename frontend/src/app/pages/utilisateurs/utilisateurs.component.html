@@ -3,17 +3,18 @@
 <app-page-layout
   icon="pi-shield"
   title="Fonctionnaires"
-  [subtitle]="users.length + ' fonctionnaires enregistrés'"
+  [subtitle]="users().length + ' fonctionnaires enregistrés'"
   [toolbar]="toolbarContent">
 
   <!-- Toolbar Template -->
   <ng-template #toolbarContent>
     <div class="table-header">
       <div class="table-header-left">
-        <div class="table-search">
-          <div class="search-icon"><i class="pi pi-search"></i></div>
-          <input placeholder="Rechercher…" [(ngModel)]="searchQuery" />
-        </div>
+        <app-search-input
+          [value]="searchQuery()"
+          placeholder="Rechercher…"
+          (valueChange)="searchQuery.set($event)">
+        </app-search-input>
       </div>
       <div class="table-actions">
         <button class="btn-add" (click)="openAdd()">
@@ -25,25 +26,28 @@
   </ng-template>
 
   <div class="table-wrapper">
-      @if (loading) {
+      @if (loading()) {
         @for (_ of [1,2,3,4,5]; track $index) {
           <div style="padding:0.65rem 1rem;border-bottom:1px solid var(--border-color-light)">
             <div style="height:1rem;border-radius:6px;background:var(--surface-200);animation:skeleton 1.2s infinite alternate"></div>
           </div>
         }
-      } @else if (sorted.length === 0) {
-        <div class="table-empty">
-          {{ searchQuery ? 'Aucun résultat pour "' + searchQuery + '"' : 'Aucun fonctionnaire enregistré' }}
-        </div>
+      } @else if (sorted().length === 0) {
+        <app-empty-state
+          icon="pi-users"
+          [message]="searchQuery() ? 'Aucun résultat pour « ' + searchQuery() + ' »' : 'Aucun fonctionnaire enregistré'">
+        </app-empty-state>
       } @else {
         <table class="table">
           <thead>
             <tr>
-              <th class="th-sort" (click)="sortBy('full_name')"
-                [class.th-sort--asc]="sortCol==='full_name'&&sortDir===1"
-                [class.th-sort--desc]="sortCol==='full_name'&&sortDir===-1">
-                Nom complet <i class="pi pi-sort-alt"></i>
-              </th>
+              <app-sort-header
+                field="full_name"
+                [currentSortField]="sortCol()"
+                [sortDir]="sortDir()"
+                (sortChange)="sortBy($event)">
+                Nom complet
+              </app-sort-header>
               <th>Code employé</th>
               <th>Téléphone</th>
               <th>Rôle</th>
@@ -53,7 +57,7 @@
             </tr>
           </thead>
           <tbody>
-            @for (u of sorted; track u.id; let i = $index) {
+            @for (u of sorted(); track u.id; let i = $index) {
               <tr class="table-row-animate" [style.--row-delay]="i * 20 + 'ms'">
                 <td>
                   <div class="table-item-info">
@@ -70,14 +74,10 @@
                 <td><span [class]="roleBadge[u.role]" [ngClass]="{'text-muted': u.role === 'prevendeur' || u.role === 'prevender'}" [style.font-size.%]="(u.role === 'prevendeur' || u.role === 'prevender') ? 90 : 100">{{ roleLabel[u.role] }}</span></td>
                 <td><span class="text-muted">{{ getDistributorName(u.distributor_id) }}</span></td>
                 <td>
-                  @if (u.is_active) {
-                    <span class="badge badge--success">Actif</span>
-                  } @else {
-                    <span class="badge badge--danger">Inactif</span>
-                  }
+                  <app-status-badge [isActive]="u.is_active"></app-status-badge>
                 </td>
                 <td class="actions-cell">
-                  @if (isAdmin) {
+                  @if (auth.isAdmin) {
                     <button class="table-action-btn" title="Modifier" (click)="openEdit(u)">
                       <i class="pi pi-pencil"></i>
                     </button>
@@ -98,9 +98,9 @@
 
 <!-- Delete confirmation dialog -->
 <app-confirm-dialog
-  [visible]="showConfirmDelete"
+  [visible]="showConfirmDelete()"
   title="Supprimer un utilisateur"
-  [message]="'Êtes-vous sûr de vouloir supprimer « ' + (userToDelete?.full_name ?? '') + ' » ?'"
+  [message]="'Êtes-vous sûr de vouloir supprimer « ' + (userToDelete()?.full_name ?? '') + ' » ?'"
   confirmLabel="Supprimer"
   cancelLabel="Annuler"
   (onConfirmed)="onDeleteConfirmed()"

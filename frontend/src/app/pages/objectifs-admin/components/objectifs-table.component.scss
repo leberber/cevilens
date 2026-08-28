@@ -1,0 +1,166 @@
+// ── Sortable header ─────────────────────────────────────────────────────────────
+.th-sort {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  font-size: 0.8rem;
+
+  i {
+    font-size: 0.7rem;
+    opacity: 0.55;
+    margin-left: 0.25rem;
+    vertical-align: middle;
+    transition: opacity 0.15s;
+  }
+
+  &:hover i { opacity: 0.85; }
+
+  i.pi-sort-amount-up-alt,
+  i.pi-sort-amount-down-alt { opacity: 1; color: var(--obj-accent, var(--primary-color)); }
+}
+
+.th-num { text-align: right !important; }
+
+// ── Column colour headers ───────────────────────────────────────────────────────
+.th-tonne  { border-top: 2px solid var(--color-indigo) !important; }
+.th-packs  { border-top: 2px solid var(--color-warning) !important; }
+.th-vd     { color: var(--primary-color) !important; }
+.th-vh     { color: var(--color-success-dark, #16a34a) !important; }
+.th-per-route { color: var(--text-color-secondary); font-style: italic; }
+.td-per-route { color: var(--text-color-secondary); font-style: italic; font-size: 0.75rem; }
+
+// ── VD / VH focus colours ───────────────────────────────────────────────────────
+.td-vd input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(var(--primary-rgb), 0.12);
+}
+.td-vh input:focus {
+  border-color: var(--color-success-dark);
+  box-shadow: 0 0 0 3px rgba(var(--color-success-dark-rgb), 0.12);
+}
+
+// ── Family / sub-family rows ────────────────────────────────────────────────────
+.obj-fam-row {
+  cursor: pointer;
+  user-select: none;
+
+  td {
+    padding: 0.65rem 1.25rem;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    border-top: 1px solid transparent;
+    border-bottom: 1px solid transparent;
+  }
+
+  &:hover td { filter: brightness(0.95); }
+}
+
+.obj-fam-inner  { display: flex; align-items: center; gap: 0.5rem; }
+.obj-fam-chevron { font-size: 0.7rem; transition: transform 0.18s ease; flex-shrink: 0; }
+.obj-fam-total  { text-align: right; font-weight: 800; }
+
+.obj-fam-count {
+  margin-left: auto;
+  font-size: 0.68rem;
+  font-weight: 500;
+  opacity: 0.65;
+  letter-spacing: 0;
+}
+
+.obj-sf-row td {
+  padding: 0.45rem 1.25rem 0.45rem 2rem;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-color-secondary);
+  border-bottom: 1px solid var(--surface-border);
+  font-style: italic;
+}
+
+.obj-sf-total { text-align: right; font-weight: 600; }
+
+// ── Product rows ────────────────────────────────────────────────────────────────
+.obj-row--dirty { background: rgba(var(--obj-accent-rgb, 37 99 235), 0.04) !important; }
+
+.td-nom {
+  max-width: 20rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: var(--font-weight-medium);
+  font-size: 0.82rem;
+}
+
+.td-num {
+  text-align: right;
+  font-weight: var(--font-weight-semibold);
+  color: var(--text-color);
+  white-space: nowrap;
+  font-size: 0.82rem;
+}
+
+.td-small { font-size: 0.72rem; white-space: nowrap; }
+
+// ── Edit input cells ────────────────────────────────────────────────────────────
+.td-input {
+  padding: 0.15rem 0.4rem;
+
+  input {
+    width: 100%;
+    min-width: 5.5rem;
+    padding: 0.25rem 0.45rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text-color);
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: var(--font-weight-semibold);
+    text-align: right;
+    outline: none;
+    transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+
+    &::placeholder { color: var(--text-color-muted); font-weight: 400; }
+    &:hover { border-color: var(--surface-border); background: var(--surface-ground); }
+    &:focus {
+      background: var(--surface-card);
+      border-color: var(--obj-accent, var(--primary-color));
+      box-shadow: 0 0 0 3px rgba(var(--obj-accent-rgb, 37 99 235), 0.12);
+    }
+
+    &::-webkit-inner-spin-button,
+    &::-webkit-outer-spin-button { -webkit-appearance: none; }
+    -moz-appearance: textfield;
+  }
+}
+
+// ── Code chip + famille pill ────────────────────────────────────────────────────
+.code-chip {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-md);
+  background: var(--surface-ground);
+  color: var(--text-color-secondary);
+  font-size: 0.72rem;
+  font-family: 'Menlo', 'Monaco', monospace;
+  letter-spacing: 0.02em;
+}
+
+.famille-pill-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+// ── Skeleton rows ───────────────────────────────────────────────────────────────
+.sk-row td { padding: 0.6rem 1rem; }
+
+.sk-bar {
+  height: 1rem;
+  border-radius: var(--radius-sm);
+  background: var(--surface-200);
+  animation: skeleton 1.2s infinite alternate;
+}

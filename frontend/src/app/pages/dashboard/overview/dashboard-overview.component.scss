@@ -1,0 +1,323 @@
+// =============================================================================
+// KPI GRID
+// =============================================================================
+
+.db-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 1rem;
+  padding: 0 1.5rem 1rem;
+  transition: grid-template-columns 0.2s ease;
+
+  &--selection {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+
+  &--compact {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+
+    .db-kpi-card {
+      padding: 0.5rem;
+
+      &__top { margin-bottom: 0.2rem; }
+      &__label { font-size: 0.7rem; }
+      &__body { margin: 0.2rem 0; }
+      &__value { font-size: 1.1rem; }
+      &__unit { font-size: 0.65rem; }
+      &__ca { font-size: 0.7rem; }
+      &__prev { font-size: 0.65rem; }
+      &__weeks { gap: 0.25rem; }
+      &__week-val { font-size: 0.6rem; }
+      &__week-lbl { font-size: 0.55rem; }
+      &__spark { height: 16px; }
+    }
+  }
+}
+
+// =============================================================================
+// KPI CARD
+// =============================================================================
+
+.db-kpi-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--primary-rgb), 0.12);
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(4px);
+  cursor: pointer;
+  transition: all 0.18s ease;
+  text-align: left;
+
+  &:hover {
+    border-color: rgba(var(--primary-rgb), 0.25);
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  }
+
+  &--active {
+    background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.08), rgba(var(--primary-rgb), 0.04));
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.12);
+  }
+
+  &__top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.3rem;
+  }
+
+  &__label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-color);
+    flex: 1;
+  }
+
+  &__top-right {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-shrink: 0;
+  }
+
+  &__body {
+    display: flex;
+    align-items: baseline;
+    gap: 0.3rem;
+    margin: 0.4rem 0;
+  }
+
+  &__value {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--text-color);
+    line-height: 1;
+  }
+
+  &__unit {
+    font-size: 0.75rem;
+    color: var(--text-color-secondary);
+    font-weight: 500;
+  }
+
+  &__ca {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--primary-color);
+  }
+
+  &__prev {
+    font-size: 0.75rem;
+    color: var(--text-color-secondary);
+  }
+
+  &__weeks {
+    display: flex;
+    gap: 0.4rem;
+    margin-top: 0.2rem;
+  }
+
+  &__week {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+    flex: 1;
+  }
+
+  &__week-val {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: var(--text-color);
+  }
+
+  &__week-lbl {
+    font-size: 0.65rem;
+    color: var(--text-color-secondary);
+  }
+
+  &__spark {
+    height: 28px;
+    margin-top: 0.2rem;
+  }
+
+  &__arrow {
+    color: var(--text-color-secondary);
+    transition: transform 0.2s ease;
+
+    &--open {
+      transform: rotate(90deg);
+    }
+  }
+}
+
+// =============================================================================
+// KPI BADGE (delta)
+// =============================================================================
+
+.db-kpi-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+
+  &--up {
+    background: rgba(34, 197, 94, 0.12);
+    color: #16a34a;
+  }
+
+  &--down {
+    background: rgba(239, 68, 68, 0.12);
+    color: #dc2626;
+  }
+
+  &--flat {
+    background: rgba(107, 114, 128, 0.12);
+    color: #6b7280;
+  }
+
+  i { font-size: 0.65rem; }
+}
+
+// =============================================================================
+// PIN BUTTON
+// =============================================================================
+
+.db-pin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-color-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: rgba(var(--primary-rgb), 0.08);
+    color: var(--primary-color);
+  }
+
+  &--active {
+    color: var(--primary-color);
+    background: rgba(var(--primary-rgb), 0.15);
+  }
+
+  i { font-size: 0.9rem; }
+}
+
+// =============================================================================
+// OBJECTIVE BAR
+// =============================================================================
+
+.db-kpi-obj {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  padding: 0.4rem 0;
+}
+
+.db-kpi-obj__bar-track {
+  height: 4px;
+  background: var(--surface-border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.db-kpi-obj__bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.db-kpi-obj__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-color);
+}
+
+.db-kpi-obj__sub {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-color-secondary);
+  margin-left: 0.25rem;
+}
+
+// =============================================================================
+// SKELETON LOADING
+// =============================================================================
+
+.db-kpi-sk {
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-ground);
+  animation: pulse 1.5s ease-in-out infinite;
+
+  &__label {
+    height: 0.75rem;
+    width: 60%;
+    background: var(--surface-300);
+    border-radius: 3px;
+    margin-bottom: 0.6rem;
+  }
+
+  &__value {
+    height: 1.8rem;
+    width: 70%;
+    background: var(--surface-300);
+    border-radius: 4px;
+    margin-bottom: 0.4rem;
+  }
+
+  &__prev {
+    height: 0.65rem;
+    width: 50%;
+    background: var(--surface-300);
+    border-radius: 3px;
+    margin-bottom: 0.4rem;
+  }
+
+  &__bar {
+    height: 4px;
+    width: 100%;
+    background: var(--surface-300);
+    border-radius: 2px;
+    margin-bottom: 0.4rem;
+  }
+
+  &__weeks {
+    display: flex;
+    gap: 0.4rem;
+    margin-bottom: 0.4rem;
+  }
+
+  &__week {
+    height: 2.5rem;
+    flex: 1;
+    background: var(--surface-300);
+    border-radius: 3px;
+  }
+
+  &__spark {
+    height: 28px;
+    background: var(--surface-300);
+    border-radius: 4px;
+  }
+}
+
+

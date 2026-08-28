@@ -31,50 +31,17 @@
     </div>
 
     @if (selectedFdv) {
-      <button class="rf-clients-pill"
-        [class.rf-clients-pill--loading]="loadingClients"
-        (click)="!loadingClients && clientsPopover.toggle($event)">
-        @if (loadingClients) {
-          <i class="pi pi-spinner pi-spin"></i>
-          <span>Chargement…</span>
-        } @else {
-          <i class="pi pi-users"></i>
-          <span>{{ selectedClients.size }}<span class="rf-pill-sep">/{{ allClients.length }}</span></span>
-        }
-      </button>
-
-      <p-popover #clientsPopover>
-        <div class="rf-pop">
-          <div class="rf-pop__head">
-            <span class="rf-pop__title">Clients</span>
-            <div class="rf-pop__actions">
-              <button class="btn-text" (click)="selectAll()">Tous</button>
-              <span class="rf-pop__dot">·</span>
-              <button class="btn-text" (click)="deselectAll()">Aucun</button>
-            </div>
-          </div>
-          <div class="table-search rf-pop-search">
-            <div class="search-icon"><i class="pi pi-search"></i></div>
-            <input [(ngModel)]="clientSearch" placeholder="Rechercher un client…" />
-          </div>
-          <div class="rf-pop__list">
-            @for (c of filteredClients; track c) {
-              <div class="rf-client-item"
-                [class.rf-client-item--on]="selectedClients.has(c)"
-                (click)="toggleClient(c)">
-                <span class="rf-avatar">{{ initials(c) }}</span>
-                <span class="rf-client-name">{{ c }}</span>
-                @if (selectedClients.has(c)) {
-                  <span class="rf-check"><i class="pi pi-check"></i></span>
-                }
-              </div>
-            }
-            @if (filteredClients.length === 0) {
-              <p class="rf-no-results">Aucun résultat</p>
-            }
-          </div>
-        </div>
-      </p-popover>
+      <app-rf-client-popover
+        [loading]="clientFilterService.loadingClients"
+        [allClients]="clientFilterService.allClients"
+        [selectedClients]="clientFilterService.selectedClients"
+        [filteredClients]="filteredClients"
+        [searchTerm]="clientFilterService.clientSearch"
+        (searchChange)="clientFilterService.clientSearch = $event"
+        (toggle)="toggleClient($event)"
+        (selectAll)="selectAll()"
+        (deselectAll)="deselectAll()">
+      </app-rf-client-popover>
     }
   </ng-template>
 
@@ -103,14 +70,14 @@
       }
       @if (rapport) {
         <div class="rf-actions-sep"></div>
-        <div class="rf-seg">
-          <button class="rf-seg__btn" [class.rf-seg__btn--active]="displayMode === 'brut'" (click)="displayMode = 'brut'">Brut</button>
-          <button class="rf-seg__btn" [class.rf-seg__btn--active]="displayMode === 'unites'" (click)="displayMode = 'unites'">Unités</button>
+        <div class="seg-control seg-control--glass">
+          <button class="seg-btn" [class.seg-btn--active]="displayMode === 'brut'" (click)="displayMode = 'brut'">Brut</button>
+          <button class="seg-btn" [class.seg-btn--active]="displayMode === 'unites'" (click)="displayMode = 'unites'">Unités</button>
         </div>
         <div class="rf-actions-sep"></div>
       }
       @if (selectedFdv) {
-        <button class="rf-btn rf-btn--excel" (click)="exportZip()" [disabled]="selectedClients.size === 0 || exporting">
+        <button class="rf-btn rf-btn--excel" (click)="exportZip()" [disabled]="clientFilterService.selectedClients.size === 0 || exporting">
           <i class="pi" [class.pi-download]="!exporting" [class.pi-spin]="exporting" [class.pi-spinner]="exporting"></i>
           <span>{{ exporting ? 'Export…' : 'Excel' }}</span>
         </button>
@@ -156,11 +123,11 @@
         }
       </div>
     } @else if (!rapport) {
-      <div class="table-empty rf-empty">
-        <i class="pi pi-file-pdf rf-empty__icon"></i>
-        <p>Le rapport apparaîtra ici</p>
-        <span>Sélectionnez la période et le prévendeur</span>
-      </div>
+      <app-empty-state
+        icon="pi-file-pdf"
+        message="Le rapport apparaîtra ici"
+        subMessage="Sélectionnez la période et le prévendeur">
+      </app-empty-state>
     } @else {
       <div class="rapport-print">
 

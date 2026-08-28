@@ -1,11 +1,11 @@
-import { Component, OnInit, inject, TemplateRef, ViewChild } from '@angular/core';
+import { Component, OnInit, inject, DestroyRef, ChangeDetectionStrategy } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { FormsModule } from '@angular/forms';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
 import { getFamilyColor } from '../../core/constants/colors';
 import { TooltipModule } from 'primeng/tooltip';
 import { Select } from 'primeng/select';
-import { Popover } from 'primeng/popover';
 import { ToggleSwitch } from 'primeng/toggleswitch';
 
 import { VentesService } from '../../core/services/ventes.service';
@@ -13,26 +13,30 @@ import { RapportsService, RapportFacturation } from '../../core/services/rapport
 import { DateHelper } from '../../core/services/date.helper';
 import { ExportHelper } from '../../core/services/export.helper';
 import { FormatService } from '../../core/services/format.service';
-import { DateRangePickerComponent, DateRange } from '../../shared/components/date-range-picker.component';
+import { DateRangePickerComponent, DateRange } from '../../shared/components/date-range-picker/date-range-picker.component';
 import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
+import { EmptyStateComponent } from '../../shared/components/empty-state/empty-state.component';
+import { RapportClientFilterService } from './services/rapport-client-filter.service';
+import { RfClientPopoverComponent } from './components/rf-client-popover.component';
 
 @Component({
   selector: 'app-rapport-facturation',
   standalone: true,
-  imports: [FormsModule, DatePipe, TooltipModule, Select, Popover, ToggleSwitch, DateRangePickerComponent, PageLayoutComponent],
+  imports: [FormsModule, DatePipe, TooltipModule, Select, ToggleSwitch, DateRangePickerComponent, PageLayoutComponent, EmptyStateComponent, RfClientPopoverComponent],
   templateUrl: './rapport-facturation.component.html',
   styleUrl: './rapport-facturation.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class RapportFacturationComponent implements OnInit {
-  private router     = inject(Router);
-  private route      = inject(ActivatedRoute);
-  private ventesSvc  = inject(VentesService);
-  private rapportSvc = inject(RapportsService);
-  private dateHelper = inject(DateHelper);
-  private exportHelper = inject(ExportHelper);
-  private formatService = inject(FormatService);
-
-  @ViewChild('toolbarContent') toolbarContent!: TemplateRef<any>;
+  private readonly router            = inject(Router);
+  private readonly route             = inject(ActivatedRoute);
+  private readonly ventesSvc         = inject(VentesService);
+  private readonly rapportSvc        = inject(RapportsService);
+  private readonly dateHelper        = inject(DateHelper);
+  private readonly exportHelper      = inject(ExportHelper);
+  private readonly formatService     = inject(FormatService);
+  private readonly destroyRef        = inject(DestroyRef);
+  readonly clientFilterService       = inject(RapportClientFilterService);
 
   periodes: string[] = [];
   fdvs: string[] = [];
@@ -40,14 +44,8 @@ export class RapportFacturationComponent implements OnInit {
   dateTo   = '';
   selectedFdv = '';
 
-  allClients: string[]      = [];
-  selectedClients: Set<string> = new Set();
-  clientSearch = '';
-
   get filteredClients(): string[] {
-    const q = this.clientSearch.trim().toLowerCase();
-    const list = q ? this.allClients.filter(c => c.toLowerCase().includes(q)) : this.allClients;
-    return [...list].sort((a, b) => this.formatService.localeCompare(a, b));
+    return this.clientFilterService.filteredClients;
   }
 
   initials(name: string): string {
@@ -77,48 +75,52 @@ export class RapportFacturationComponent implements OnInit {
     const initTo   = qp.get('date_to')   ?? '';
     const initFdv  = qp.get('nom_fdv')   ?? '';
 
-    this.ventesSvc.getPeriodes().subscribe(periodes => {
-      this.periodes = periodes;
-      if (initFrom && initTo) {
-        this.dateFrom = initFrom;
-        this.dateTo   = initTo;
-      } else if (periodes.length) {
-        this.dateFrom = this.dateHelper.getFirstDayOfMonth(periodes[0]);
-        this.dateTo   = this.dateHelper.getLastDayOfMonth(periodes[0]);
-      }
-      this.loadFdvs();
-      if (initFdv) {
-        this.selectedFdv = initFdv;
-        this.loadClients();
-        this.rapportSvc.getSourceStats(this.dateFrom, this.dateTo, this.selectedFdv)
-          .subscribe(d => this._sourceStats = d);
-      }
-    });
+    this.ventesSvc.getPeriodes()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(periodes => {
+        this.periodes = periodes;
+        if (initFrom && initTo) {
+          this.dateFrom = initFrom;
+          this.dateTo   = initTo;
+        } else if (periodes.length) {
+          this.dateFrom = this.dateHelper.getFirstDayOfMonth(periodes[0]);
+          this.dateTo   = this.dateHelper.getLastDayOfMonth(periodes[0]);
+        }
+        this.loadFdvs();
+        if (initFdv) {
+          this.selectedFdv = initFdv;
+          this.loadClients();
+          this.rapportSvc.getSourceStats(this.dateFrom, this.dateTo, this.selectedFdv)
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe(d => this._sourceStats = d);
+        }
+      });
   }
 
   onRangeChange(range: DateRange): void {
     this.dateFrom    = range.from;
     this.dateTo      = range.to;
     this.selectedFdv = '';
-    this.allClients  = [];
-    this.selectedClients = new Set();
+    this.clientFilterService.reset();
     this.rapport     = null;
     this._sourceStats = null;
     this.loadFdvs();
   }
 
   private loadFdvs(): void {
-    this.ventesSvc.getFdvs(this.dateFrom, this.dateTo).subscribe(d => this.fdvs = d);
+    this.ventesSvc.getFdvs(this.dateFrom, this.dateTo)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(d => this.fdvs = d);
   }
 
   onFdvChange(): void {
-    this.allClients = [];
-    this.selectedClients = new Set();
+    this.clientFilterService.reset();
     this.rapport = null;
     this._sourceStats = null;
     if (this.selectedFdv) {
       this.loadClients();
       this.rapportSvc.getSourceStats(this.dateFrom, this.dateTo, this.selectedFdv)
+        .pipe(takeUntilDestroyed(this.destroyRef))
         .subscribe(d => this._sourceStats = d);
     }
   }
@@ -131,54 +133,52 @@ export class RapportFacturationComponent implements OnInit {
   }
 
   loadClients(): void {
-    if (!this.dateFrom || !this.selectedFdv) return;
-    this.loadingClients = true;
-    this.rapportSvc.getClients(this.dateFrom, this.dateTo, this.selectedFdv, this.source).subscribe({
-      next: d => {
-        this.allClients = d;
-        this.selectedClients = new Set(d);
-        this.loadingClients = false;
-        this.generate();
-      },
-      error: () => this.loadingClients = false,
-    });
+    this.clientFilterService.loadClients(
+      this.dateFrom,
+      this.dateTo,
+      this.selectedFdv,
+      this.source,
+      () => this.generate()
+    );
   }
 
   toggleClient(name: string): void {
-    const s = new Set(this.selectedClients);
-    s.has(name) ? s.delete(name) : s.add(name);
-    this.selectedClients = s;
+    this.clientFilterService.toggleClient(name);
     this.generate();
   }
 
-  selectAll(): void   { this.selectedClients = new Set(this.allClients); this.generate(); }
-  deselectAll(): void { this.selectedClients = new Set(); this.rapport = null; }
+  selectAll(): void   { this.clientFilterService.selectAll(); this.generate(); }
+  deselectAll(): void { this.clientFilterService.deselectAll(); this.rapport = null; }
 
   generate(): void {
-    const clients = [...this.selectedClients];
+    const clients = [...this.clientFilterService.selectedClients];
     if (!clients.length) return;
     this.loading = true;
-    this.rapportSvc.getFacturation(this.dateFrom, this.dateTo, this.selectedFdv, clients, this.source).subscribe({
-      next: d => { this.rapport = d; this.loading = false; },
-      error: () => this.loading = false,
-    });
+    this.rapportSvc.getFacturation(this.dateFrom, this.dateTo, this.selectedFdv, clients, this.source)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: d => { this.rapport = d; this.loading = false; },
+        error: () => this.loading = false,
+      });
   }
 
   print(): void { window.print(); }
 
   exportZip(): void {
-    const clients = [...this.selectedClients];
+    const clients = [...this.clientFilterService.selectedClients];
     if (!clients.length || this.exporting) return;
     const filename = `export_${this.selectedFdv}_${this.dateFrom}_${this.dateTo}.zip`;
     const obs = this.rapportSvc.exportClientsZip(this.dateFrom, this.dateTo, this.selectedFdv, clients, this.displayMode, this.source);
     this.exporting = true;
-    obs.subscribe({
-      next: blob => {
-        this.exportHelper.downloadBlob(blob, filename);
-        this.exporting = false;
-      },
-      error: () => { this.exporting = false; },
-    });
+    obs
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: blob => {
+          this.exportHelper.downloadBlob(blob, filename);
+          this.exporting = false;
+        },
+        error: () => { this.exporting = false; },
+      });
   }
 
   get periodLabel(): string {

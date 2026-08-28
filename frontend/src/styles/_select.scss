@@ -1,0 +1,159 @@
+// =============================================================================
+// SELECT
+// =============================================================================
+// PrimeNG Select component and autocomplete overlay styling.
+// Uses variables from: _colors.scss, _spacing.scss, _effects.scss
+// =============================================================================
+
+// =============================================================================
+// SELECT OVERLAY (glass effect)
+// =============================================================================
+
+.p-select-overlay,
+.p-autocomplete-overlay {
+  backdrop-filter: blur(20px) saturate(1.5) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(1.5) !important;
+  background: color-mix(in srgb, var(--surface-card) 85%, transparent) !important;
+  border: var(--border-width) solid color-mix(in srgb, var(--surface-border) 60%, transparent) !important;
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.12),
+    0 2px 10px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25) !important;
+  border-radius: var(--radius-xl) !important;
+  overflow: hidden !important;
+}
+
+// =============================================================================
+// SELECT OVERLAY SIZING VARIANTS
+// =============================================================================
+
+// Filter card dropdown — constrained width
+.filter-card-panel.p-select-overlay {
+  max-width: 220px !important;
+  width: 220px !important;
+}
+
+// Period selector dropdown — narrow width
+.period-panel.p-select-overlay {
+  max-width: 90px !important;
+  width: 90px !important;
+}
+
+// =============================================================================
+// SELECT FILTER INPUT (search box in dropdown)
+// =============================================================================
+
+.p-select-filter-container {
+  padding: 0.4rem 0.5rem !important;
+  border-bottom: 1px solid var(--border-color-light) !important;
+
+  .p-select-filter {
+    border-radius: var(--radius-lg) !important;
+    font-size: var(--font-size-sm) !important;
+    padding: 0.4rem 0.75rem !important;
+    background: var(--surface-ground) !important;
+    border-color: transparent !important;
+    width: 100% !important;
+    transition: border-color 0.12s, box-shadow 0.12s !important;
+
+    &:focus {
+      border-color: var(--primary-color) !important;
+      box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.12) !important;
+    }
+  }
+}
+
+// =============================================================================
+// SELECT LIST & OPTIONS
+// =============================================================================
+
+.p-select-list {
+  padding: 0.3rem !important;
+}
+
+.p-select-option {
+  border-radius: var(--radius-md) !important;
+  font-size: var(--font-size-sm) !important;
+  padding: 0.45rem 0.65rem !important;
+  transition: background 0.12s, color 0.12s !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+
+  &.p-focus:not(.p-select-option-selected) {
+    background: color-mix(in srgb, var(--primary-color) 8%, transparent) !important;
+  }
+
+  &.p-select-option-selected {
+    background: color-mix(in srgb, var(--primary-color) 12%, transparent) !important;
+    color: var(--primary-color) !important;
+    font-weight: var(--font-weight-semibold) !important;
+
+    &::after {
+      content: '\e909'; // pi-check
+      font-family: 'primeicons';
+      margin-left: auto;
+      font-size: 0.7rem;
+      opacity: 0.8;
+    }
+  }
+}
+
+// =============================================================================
+// SELECT EMPTY MESSAGE
+// =============================================================================
+
+.p-select-empty-message {
+  padding: 0.75rem 1rem !important;
+  font-size: var(--font-size-sm) !important;
+  color: var(--text-color-secondary) !important;
+  text-align: center !important;
+}
+
+// =============================================================================
+// GLASS FILTER SELECT TRIGGER
+// =============================================================================
+// Apply with: styleClass="filter-select--glass" panelStyleClass="filter-select-panel--glass"
+
+.p-select.filter-select--glass {
+  background: var(--glass-bg);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-md);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+
+  &:hover {
+    border-color: rgba(var(--primary-rgb), 0.35);
+    box-shadow: var(--shadow-lg);
+  }
+
+  &.p-focus,
+  &:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: 0 4px 20px rgba(var(--primary-rgb), 0.18);
+    outline: none;
+  }
+
+  &.p-filled .p-select-label {
+    color: var(--primary-color);
+    font-weight: var(--font-weight-semibold);
+  }
+}
+
+// Panel: stronger highlight on selected option
+.filter-select-panel--glass {
+  .p-select-option.p-select-option-selected {
+    background: var(--primary-gradient) !important;
+    color: white !important;
+
+    &::after { display: none; }
+  }
+}
+
+// =============================================================================
+// SELECT BASE STYLES (kept in _inputs.scss, here for reference)
+// =============================================================================
+// Note: Base .p-select, .p-inputnumber-input, etc. should remain in _inputs.scss
+// This file focuses on overlay panels and dropdown-specific styling

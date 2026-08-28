@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed, OnInit, OnDestroy, TemplateRef, ViewChild } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { FormatService } from '../../core/services/format.service';
@@ -38,19 +38,16 @@ type Unite = 'packs' | 'tonnes';
   styleUrl:    './analytics.component.scss',
 })
 export class AnalyticsComponent implements OnInit, OnDestroy {
-  private http = inject(HttpClient);
-  private format = inject(FormatService);
-  private loadingManager = inject(LoadingManager);
-  private period = inject(PeriodService);
+  private readonly http          = inject(HttpClient);
+  private readonly format        = inject(FormatService);
+  private readonly loadingManager = inject(LoadingManager);
+  private readonly period        = inject(PeriodService);
 
   readonly data        = signal<AnalyticsData | null>(null);
   readonly loading     = signal(true);
   readonly mapData     = signal<CommuneDatum[]>([]);
   readonly fdvBarData  = signal<HBarItem[]>([]);
   readonly prodBarData = signal<HBarItem[]>([]);
-
-  // Template references for PageLayout
-  @ViewChild('headerActions') headerActions!: TemplateRef<any>;
 
   displayKpis = { total_ventes: 0, nb_fdvs: 0 };
   private _animInterval: ReturnType<typeof setInterval> | null = null;

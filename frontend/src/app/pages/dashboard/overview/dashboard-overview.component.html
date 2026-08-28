@@ -1,0 +1,97 @@
+<div class="db-kpi-grid" [class.db-kpi-grid--selection]="selectedFamille" [class.db-kpi-grid--compact]="compactCards">
+  @if (loading) {
+    @for (_ of skeletonRows; track $index; let i = $index) {
+      <div class="db-kpi-sk" [style.animation-delay]="i * 80 + 'ms'">
+        <div class="db-kpi-sk__label"></div>
+        <div class="db-kpi-sk__value"></div>
+        <div class="db-kpi-sk__prev"></div>
+        <div class="db-kpi-sk__bar"></div>
+        <div class="db-kpi-sk__weeks">
+          <div class="db-kpi-sk__week"></div>
+          <div class="db-kpi-sk__week"></div>
+          <div class="db-kpi-sk__week"></div>
+          <div class="db-kpi-sk__week"></div>
+        </div>
+        <div class="db-kpi-sk__spark"></div>
+      </div>
+    }
+  }
+  @if (!loading && data && data.familles.length === 0) {
+    <div class="db-no-data"><i class="pi pi-inbox"></i><span>Aucune donnée pour cette période</span></div>
+  }
+  @if (data) {
+    @for (f of data.familles; track f.nom) {
+      <button class="db-kpi-card"
+              [class.db-kpi-card--active]="selectedFamille?.nom === f.nom"
+              [style.--fc]="familyColor(f.nom)"
+              [style.--fbg]="familyBg(f.nom)"
+              (click)="onSelectFamille(f)">
+        <div class="db-kpi-card__top">
+          <span class="db-kpi-card__label">{{ capitalize(f.nom) || 'Autres' }}</span>
+          <div class="db-kpi-card__top-right">
+            @if (f.delta_pct !== null) {
+              <span class="db-kpi-badge"
+                    [class.db-kpi-badge--up]="f.delta_pct > 0"
+                    [class.db-kpi-badge--down]="f.delta_pct < 0"
+                    [class.db-kpi-badge--flat]="f.delta_pct === 0">
+                <i class="pi" [class.pi-arrow-up-right]="f.delta_pct > 0" [class.pi-arrow-down-right]="f.delta_pct <= 0"></i>
+                {{ formatDelta(f.delta_pct) }}
+              </span>
+            }
+            <button class="db-pin-btn"
+                    [class.db-pin-btn--active]="pinnedFamilies.has(f.nom)"
+                    (click)="onPin(f.nom, $event)"
+                    [title]="pinnedFamilies.has(f.nom) ? 'Retirer de la comparaison' : 'Ajouter à la comparaison'">
+              <i class="pi" [class.pi-bookmark-fill]="pinnedFamilies.has(f.nom)" [class.pi-bookmark]="!pinnedFamilies.has(f.nom)"></i>
+            </button>
+            <i class="pi pi-chevron-right db-kpi-card__arrow"
+               [class.db-kpi-card__arrow--open]="selectedFamille?.nom === f.nom"></i>
+          </div>
+        </div>
+
+        <div class="db-kpi-card__body">
+          <span class="db-kpi-card__value">{{ displayVal(displayValues[f.nom], f.objectif_packs, f.objectif_tonne) }}</span>
+          <span class="db-kpi-card__unit">{{ unitLabel }}</span>
+        </div>
+
+        @if (f.ca) {
+          <div class="db-kpi-card__ca">{{ formatCa(f.ca) }}</div>
+        }
+
+        <div class="db-kpi-card__prev">
+          vs {{ formatNum(f.total_prev) }} mois préc.
+        </div>
+
+        @if (f.objectif_packs) {
+          <div class="db-kpi-obj">
+            <div class="db-kpi-obj__bar-track">
+              <div class="db-kpi-obj__bar-fill"
+                   [style.width.%]="Math.min(objPct(f), 100)"
+                   [style.background]="familyColor(f.nom)"></div>
+            </div>
+            <span class="db-kpi-obj__label">
+              {{ objPct(f) }}% <span class="db-kpi-obj__sub">/ {{ displayObjVal(f.objectif_packs, f.objectif_tonne) }} obj.</span>
+            </span>
+          </div>
+        }
+
+        <!-- Weekly breakdown -->
+        <div class="db-kpi-card__weeks">
+          @for (lbl of WEEK_LABELS; track lbl; let i = $index) {
+            <div class="db-kpi-card__week">
+              <span class="db-kpi-card__week-val">{{ formatNum(f.weeks[i]) }}</span>
+              <span class="db-kpi-card__week-lbl">{{ lbl }}</span>
+            </div>
+          }
+        </div>
+
+        <svg class="db-kpi-card__spark" viewBox="0 0 120 28" preserveAspectRatio="none">
+          <path [attr.d]="areaPath(f.weeks, 120, 28)"
+                [attr.fill]="familyColor(f.nom)" fill-opacity="0.18"/>
+          <path [attr.d]="linePath(f.weeks, 120, 28)"
+                fill="none" [attr.stroke]="familyColor(f.nom)" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </button>
+    }
+  }
+</div>

@@ -1,5 +1,4 @@
 import { Component, Input } from '@angular/core';
-import { CommonModule } from '@angular/common';
 
 /**
  * Reusable empty state component
@@ -8,7 +7,7 @@ import { CommonModule } from '@angular/common';
 @Component({
   selector: 'app-empty-state',
   standalone: true,
-  imports: [CommonModule],
+  imports: [],
   template: `
     <div class="empty-state-wrapper">
       @if (loading) {
@@ -74,7 +73,7 @@ import { CommonModule } from '@angular/common';
       height: 16px;
       background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
       background-size: 200% 100%;
-      animation: loading 1.5s infinite;
+      animation: shimmer 1.5s infinite;
       border-radius: 4px;
       margin: 0.5rem 0;
     }
@@ -92,10 +91,6 @@ import { CommonModule } from '@angular/common';
       margin-right: auto;
     }
 
-    @keyframes loading {
-      0% { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
-    }
   `]
 })
 export class EmptyStateComponent {
