@@ -55,16 +55,16 @@ export class UtilisateurFormComponent implements OnInit {
   }
 
   private readonly allRoleOptions = [
-    { label: '🔑 Platform Admin',      value: 'platform_admin',     adminOnly: true  },
-    { label: '📦 Distributor Admin',   value: 'distributor_admin',  adminOnly: true  },
-    { label: '👮 Superviseur',         value: 'superviseur',        adminOnly: true  },
-    { label: '🚚 Prévendeur',          value: 'prevendeur',         adminOnly: false },
+    { label: '🔑 Platform Admin',      value: 'platform_admin',     platformOnly: true  },
+    { label: '📦 Distributor Admin',   value: 'distributor_admin',  platformOnly: true  },
+    { label: '👮 Superviseur',         value: 'superviseur',        platformOnly: false },
+    { label: '🚚 Prévendeur',          value: 'prevendeur',         platformOnly: false },
   ];
 
   get roleOptions() {
-    return this.roleService.isAdmin()
+    return this.roleService.isPlatformAdmin()
       ? this.allRoleOptions
-      : this.allRoleOptions.filter(r => !r.adminOnly);
+      : this.allRoleOptions.filter(r => !r.platformOnly);
   }
 
   readonly roleBadgeMap: Record<string, string> = {
