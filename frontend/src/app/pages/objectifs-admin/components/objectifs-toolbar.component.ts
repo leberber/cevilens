@@ -66,7 +66,7 @@ import { PeriodStepperComponent } from '../../../shared/period-stepper/period-st
                 <i class="pi pi-pencil"></i> Modifier
               </button>
             } @else {
-              <button class="btn-add" (click)="enterEditMode.emit()">
+              <button class="btn-add" (click)="defineObjectifs.emit()">
                 <i class="pi pi-plus"></i> Définir les objectifs
               </button>
             }
@@ -129,6 +129,7 @@ export class ObjectifsToolbarComponent {
   @Output() routesVDChange = new EventEmitter<number>();
   @Output() routesVHChange = new EventEmitter<number>();
   @Output() resetSort = new EventEmitter<void>();
+  @Output() defineObjectifs = new EventEmitter<void>();
   @Output() enterEditMode = new EventEmitter<void>();
   @Output() nextMissing = new EventEmitter<void>();
   @Output() fileSelected = new EventEmitter<Event>();

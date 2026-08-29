@@ -75,7 +75,7 @@ export interface FamGroupe {
           @if (loading) {
             @for (_ of [1,2,3,4,5,6,7,8]; track $index) {
               <tr class="sk-row">
-                <td colspan="9"><div class="sk-bar"></div></td>
+                <td colspan="10"><div class="sk-bar"></div></td>
               </tr>
             }
           } @else if (isFlatSort) {
@@ -120,7 +120,7 @@ export interface FamGroupe {
               @let fRows = famRows(fam);
               @let sfBg = famBgLight(fam.nom);
               <tr class="obj-fam-row" (click)="familyToggle.emit(fam.nom)" title="Cliquer pour réduire / développer">
-                <td colspan="3" class="obj-fam-cell"
+                <td colspan="4" class="obj-fam-cell"
                   [style.background]="fBg" [style.color]="fColor"
                   [style.border-top-color]="fBorder" [style.border-bottom-color]="fBorder">
                   <div class="obj-fam-inner">
@@ -135,18 +135,18 @@ export interface FamGroupe {
                 <td class="td-num td-per-route obj-fam-total td-tonne" [style.background]="fBg" [style.color]="fColor" [style.border-top-color]="fBorder" [style.border-bottom-color]="fBorder">{{ perRouteTonne(sumTonne(fRows)) }}</td>
                 <td class="td-num obj-fam-total td-packs" [style.background]="fBg" [style.color]="fColor" [style.border-top-color]="fBorder" [style.border-bottom-color]="fBorder">{{ sumPacks(fRows) != null ? (sumPacks(fRows) | number:'1.0-0') : '—' }}</td>
                 <td class="td-num td-per-route obj-fam-total td-packs" [style.background]="fBg" [style.color]="fColor" [style.border-top-color]="fBorder" [style.border-bottom-color]="fBorder">{{ sumPacksTournee(fRows) != null ? (sumPacksTournee(fRows) | number:'1.0-0') : '—' }}</td>
-                <td colspan="2" [style.background]="fBg" [style.border-top-color]="fBorder" [style.border-bottom-color]="fBorder"></td>
+                <td colspan="3" [style.background]="fBg" [style.border-top-color]="fBorder" [style.border-bottom-color]="fBorder"></td>
               </tr>
 
               @if (!isFamilyCollapsed(fam.nom)) {
                 @for (sf of fam.sfs; track sf.nom) {
                   <tr class="obj-sf-row">
-                    <td colspan="3" [style.background]="sfBg">{{ sf.nom }}</td>
+                    <td colspan="4" [style.background]="sfBg">{{ sf.nom }}</td>
                     <td class="td-num obj-sf-total td-tonne" [style.background]="sfBg">{{ sumTonne(sf.rows) != null ? (sumTonne(sf.rows) | number:'1.0-2') : '—' }}</td>
                     <td class="td-num td-per-route obj-sf-total td-tonne" [style.background]="sfBg">{{ perRouteTonne(sumTonne(sf.rows)) }}</td>
                     <td class="td-num obj-sf-total td-packs" [style.background]="sfBg">{{ sumPacks(sf.rows) != null ? (sumPacks(sf.rows) | number:'1.0-0') : '—' }}</td>
                     <td class="td-num td-per-route obj-sf-total td-packs" [style.background]="sfBg">{{ sumPacksTournee(sf.rows) != null ? (sumPacksTournee(sf.rows) | number:'1.0-0') : '—' }}</td>
-                    <td colspan="2" [style.background]="sfBg"></td>
+                    <td colspan="3" [style.background]="sfBg"></td>
                   </tr>
 
                   @for (row of sf.rows; track row.code_produit) {
