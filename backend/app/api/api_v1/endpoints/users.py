@@ -88,8 +88,6 @@ def update_user(
     if not user:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable")
 
-    print(f"DEBUG UPDATE: Received data: {user_in.model_dump()}")
-
     # Distributor admins can only edit users in their own distributor
     if current_user.role == UserRole.DISTRIBUTOR_ADMIN:
         if user.distributor_id != current_user.distributor_id:
@@ -99,7 +97,6 @@ def update_user(
             raise HTTPException(status_code=403, detail="Vous ne pouvez pas assigner les rôles administrateur")
 
     data = user_in.model_dump(exclude_unset=True)
-    print(f"DEBUG UPDATE: Data after exclude_unset: {data}")
     if "phone" in data:
         data["phone"] = data["phone"].replace(" ", "")
     if "password" in data:
@@ -109,7 +106,6 @@ def update_user(
     session.add(user)
     session.commit()
     session.refresh(user)
-    print(f"DEBUG UPDATE: After commit, user.distributor_id={user.distributor_id}")
     return user
 
 

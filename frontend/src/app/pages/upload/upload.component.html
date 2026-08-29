@@ -12,112 +12,132 @@
       </div>
     </div>
 
-    <!-- Drop zone -->
-    <div
-      class="drop-zone"
-      [class.drop-zone--over]="dragOver()"
-      [class.drop-zone--loading]="loading()"
-      (dragover)="onDragOver($event)"
-      (dragleave)="onDragLeave()"
-      (drop)="onDrop($event)"
-      (click)="!loading() && !overlap() && fileInput.click()"
-    >
+    <!-- Success state replaces drop zone (overlay mode only) -->
+    @if (successStyle === 'overlay' && result()?.success) {
+      <div class="upload-success">
+        <div class="upload-success__icon-wrap">
+          <i class="pi pi-check upload-success__icon"></i>
+        </div>
+        <p class="upload-success__message">{{ result()!.message }}</p>
+      </div>
+    } @else {
+
+      <!-- Drop zone -->
+      <div
+        class="drop-zone"
+        [class.drop-zone--over]="dragOver()"
+        [class.drop-zone--loading]="loading()"
+        (dragover)="onDragOver($event)"
+        (dragleave)="onDragLeave()"
+        (drop)="onDrop($event)"
+        (click)="!loading() && !overlap() && fileInput.click()"
+      >
+        @if (loading()) {
+          <div class="skeleton-wrap">
+            <div class="skeleton-row">
+              <div class="skeleton-block skeleton-block--icon"></div>
+            </div>
+            <div class="skeleton-block skeleton-block--title"></div>
+            <div class="skeleton-block skeleton-block--sub"></div>
+            <div class="skeleton-lines">
+              <div class="skeleton-block skeleton-block--line skeleton-block--line-a"></div>
+              <div class="skeleton-block skeleton-block--line skeleton-block--line-b"></div>
+              <div class="skeleton-block skeleton-block--line skeleton-block--line-c"></div>
+            </div>
+            <span class="skeleton-label">{{ progressMessage() || 'Traitement en cours…' }}</span>
+          </div>
+        } @else if (selectedFile()) {
+          <div class="file-info-content">
+            <i class="pi pi-file-excel"></i>
+            <div class="file-info-details">
+              <span class="file-name">{{ selectedFile()!.name }}</span>
+              <span class="file-size">{{ (selectedFile()!.size / 1024).toFixed(1) }} KB</span>
+            </div>
+          </div>
+        } @else if (!autoUpload && !selectedCanal) {
+          <div class="canal-warning">
+            <i class="pi pi-exclamation-triangle"></i>
+            <span>Veuillez sélectionner le type de vente d'abord</span>
+          </div>
+        } @else {
+          <i class="pi pi-cloud-upload drop-zone__icon"></i>
+          <span class="drop-zone__text">Déposer un fichier ici</span>
+          <span class="drop-zone__hint">ou cliquer pour sélectionner</span>
+          <div class="drop-zone__badges">
+            <span class="upload-badge">.xlsx</span>
+            <span class="upload-badge">.xls</span>
+          </div>
+        }
+      </div>
+
+      <!-- Progress bar -->
       @if (loading()) {
-        <div class="skeleton-wrap">
-          <div class="skeleton-row">
-            <div class="skeleton-block skeleton-block--icon"></div>
+        <div class="progress-section">
+          <div class="progress-bar-track">
+            <div class="progress-bar-fill" [style.width.%]="progress()"></div>
           </div>
-          <div class="skeleton-block skeleton-block--title"></div>
-          <div class="skeleton-block skeleton-block--sub"></div>
-          <div class="skeleton-lines">
-            <div class="skeleton-block skeleton-block--line skeleton-block--line-a"></div>
-            <div class="skeleton-block skeleton-block--line skeleton-block--line-b"></div>
-            <div class="skeleton-block skeleton-block--line skeleton-block--line-c"></div>
-          </div>
-          <span class="skeleton-label">{{ progressMessage() || 'Traitement en cours…' }}</span>
-        </div>
-      } @else if (selectedFile()) {
-        <div class="file-info-content">
-          <i class="pi pi-file-excel"></i>
-          <div class="file-info-details">
-            <span class="file-name">{{ selectedFile()!.name }}</span>
-            <span class="file-size">{{ (selectedFile()!.size / 1024).toFixed(1) }} KB</span>
-          </div>
-        </div>
-      } @else if (!autoUpload && !selectedCanal) {
-        <div class="canal-warning">
-          <i class="pi pi-exclamation-triangle"></i>
-          <span>Veuillez sélectionner le type de vente d'abord</span>
-        </div>
-      } @else {
-        <i class="pi pi-cloud-upload drop-zone__icon"></i>
-        <span class="drop-zone__text">Déposer un fichier ici</span>
-        <span class="drop-zone__hint">ou cliquer pour sélectionner</span>
-        <div class="drop-zone__badges">
-          <span class="upload-badge">.xlsx</span>
-          <span class="upload-badge">.xls</span>
+          <span class="progress-pct">{{ progress() }}%</span>
         </div>
       }
-    </div>
 
-    <!-- Progress bar -->
-    @if (loading()) {
-      <div class="progress-section">
-        <div class="progress-bar-track">
-          <div class="progress-bar-fill" [style.width.%]="progress()"></div>
+      <!-- File info stats -->
+      @if (fileInfo()) {
+        <div class="stats-grid">
+          <div class="upload-stat">
+            <div class="upload-stat__icon-wrap">
+              <i class="pi pi-calendar upload-stat__icon"></i>
+            </div>
+            <div class="upload-stat__body">
+              <span class="upload-stat__value">{{ fileInfo()!.date_min }} → {{ fileInfo()!.date_max }}</span>
+              <span class="upload-stat__label">Période</span>
+            </div>
+          </div>
+          <div class="upload-stat">
+            <div class="upload-stat__icon-wrap">
+              <i class="pi pi-database upload-stat__icon"></i>
+            </div>
+            <div class="upload-stat__body">
+              <span class="upload-stat__value">{{ fileInfo()!.total_rows | number }}</span>
+              <span class="upload-stat__label">Lignes</span>
+            </div>
+          </div>
         </div>
-        <span class="progress-pct">{{ progress() }}%</span>
-      </div>
-    }
+      }
 
-    <!-- File info stats -->
-    @if (fileInfo()) {
-      <div class="stats-grid">
-        <div class="upload-stat">
-          <div class="upload-stat__icon-wrap">
-            <i class="pi pi-calendar upload-stat__icon"></i>
-          </div>
-          <div class="upload-stat__body">
-            <span class="upload-stat__value">{{ fileInfo()!.date_min }} → {{ fileInfo()!.date_max }}</span>
-            <span class="upload-stat__label">Période</span>
+      <!-- Overlap dialog -->
+      @if (overlap()) {
+        <div class="overlap-box">
+          <div class="overlap-box__icon"><i class="pi pi-exclamation-triangle"></i></div>
+          <div class="overlap-box__body">
+            <p class="overlap-box__title">Données déjà présentes</p>
+            <p class="overlap-box__msg">
+              {{ overlap()!.overlap_count }} dates déjà dans la base
+              ({{ overlap()!.overlap_min }} → {{ overlap()!.overlap_max }}).
+              Que souhaitez-vous faire ?
+            </p>
+            <div class="overlap-box__actions">
+              <button class="btn-overlap btn-overlap--skip" (click)="skip()">
+                <i class="pi pi-forward"></i> Ignorer ces dates
+              </button>
+              <button class="btn-overlap btn-overlap--replace" (click)="replace()">
+                <i class="pi pi-refresh"></i> Remplacer
+              </button>
+              <button class="btn-overlap btn-overlap--cancel" (click)="cancel()">
+                Annuler
+              </button>
+            </div>
           </div>
         </div>
-        <div class="upload-stat">
-          <div class="upload-stat__icon-wrap">
-            <i class="pi pi-database upload-stat__icon"></i>
-          </div>
-          <div class="upload-stat__body">
-            <span class="upload-stat__value">{{ fileInfo()!.total_rows | number }}</span>
-            <span class="upload-stat__label">Lignes</span>
-          </div>
-        </div>
-      </div>
-    }
+      }
 
-    <!-- Overlap dialog -->
-    @if (overlap()) {
-      <div class="overlap-box">
-        <div class="overlap-box__icon"><i class="pi pi-exclamation-triangle"></i></div>
-        <div class="overlap-box__body">
-          <p class="overlap-box__title">Données déjà présentes</p>
-          <p class="overlap-box__msg">
-            {{ overlap()!.overlap_count }} dates déjà dans la base
-            ({{ overlap()!.overlap_min }} → {{ overlap()!.overlap_max }}).
-            Que souhaitez-vous faire ?
-          </p>
-          <div class="overlap-box__actions">
-            <button class="btn-overlap btn-overlap--skip" (click)="skip()">
-              <i class="pi pi-forward"></i> Ignorer ces dates
-            </button>
-            <button class="btn-overlap btn-overlap--replace" (click)="replace()">
-              <i class="pi pi-refresh"></i> Remplacer
-            </button>
-            <button class="btn-overlap btn-overlap--cancel" (click)="cancel()">
-              Annuler
-            </button>
-          </div>
+      <!-- Result banner (success or error) -->
+      @if (result()) {
+        <div class="upload-result" [class.upload-result--success]="result()!.success" [class.upload-result--error]="!result()!.success">
+          <i class="pi" [class.pi-check-circle]="result()!.success" [class.pi-times-circle]="!result()!.success"></i>
+          <span>{{ result()!.message }}</span>
         </div>
-      </div>
+      }
+
     }
 
     <input
@@ -127,13 +147,6 @@
       style="display:none"
       (change)="onFileSelect($event)"
     />
-
-    @if (result()) {
-      <div class="upload-result" [class.upload-result--success]="result()!.success" [class.upload-result--error]="!result()!.success">
-        <i [class]="result()!.success ? 'pi pi-check-circle' : 'pi pi-times-circle'"></i>
-        <span>{{ result()!.message }}</span>
-      </div>
-    }
 
   </div>
 </div>

@@ -17,9 +17,11 @@ class Objectif(SQLModel, table=True):
     nom_distributeur: Optional[str] = Field(default=None, max_length=100)
 
     objectif_tonne_vd: Optional[float] = Field(default=None)
+    objectif_tonne_vd_tournee: Optional[float] = Field(default=None)
     objectif_packs_vd: Optional[float] = Field(default=None)
     objectif_packs_vd_tournee: Optional[float] = Field(default=None)
     objectif_tonne_vh: Optional[float] = Field(default=None)
+    objectif_tonne_vh_tournee: Optional[float] = Field(default=None)
     objectif_packs_vh: Optional[float] = Field(default=None)
     objectif_packs_vh_tournee: Optional[float] = Field(default=None)
 

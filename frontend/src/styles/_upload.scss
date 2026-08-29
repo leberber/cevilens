@@ -453,6 +453,43 @@
   color: var(--text-color-secondary);
 }
 
+// ── Upload success state ───────────────────────────────────────────────────
+
+.upload-success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.25rem;
+  padding: 3rem 2rem;
+  text-align: center;
+  animation: card-in 0.3s ease;
+
+  &__icon-wrap {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, var(--color-emerald), var(--color-emerald-light));
+    box-shadow: 0 8px 24px color-mix(in srgb, var(--color-emerald) 35%, transparent);
+  }
+
+  &__icon {
+    font-size: 2rem;
+    color: var(--color-white);
+  }
+
+  &__message {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--color-success-darker);
+    margin: 0;
+    line-height: 1.5;
+  }
+}
+
 // ── Canal warning message ──────────────────────────────────────────────────
 
 .canal-warning {

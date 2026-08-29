@@ -261,29 +261,36 @@ async def preview_objectifs(
 
     try:
         import openpyxl
-        wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+        try:
+            wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+        except Exception:
+            return {"error": "Format de fichier invalide. Veuillez utiliser un fichier Excel (.xlsx ou .xls)"}
         ws = wb.active
 
         rows = list(ws.iter_rows(values_only=True))
         if not rows:
             return {"error": "Fichier vide"}
 
-        # Parse header - look for exact matches or partial matches
+        # Parse header
         header_raw = rows[0]
         header_lower = [str(c).strip().lower() if c else "" for c in header_raw]
 
-        # Find column indices with flexible matching
-        code_idx = next((i for i, h in enumerate(header_lower) if 'code' in h), 0)
+        # Validate required columns
+        code_idx = next((i for i, h in enumerate(header_lower) if 'code' in h), None)
         mois_idx = next((i for i, h in enumerate(header_lower) if 'mois' in h), None)
+        tonne_idx = next((i for i, h in enumerate(header_lower) if 'tonne' in h), None)
+        pack_idx  = next((i for i, h in enumerate(header_lower) if 'pack'  in h), None)
 
-        if mois_idx is None:
-            # Fallback: try to find it by position (usually 2nd column)
-            mois_idx = 1 if len(header_raw) > 1 else None
+        missing = []
+        if code_idx  is None: missing.append("Code")
+        if mois_idx  is None: missing.append("Mois")
+        if tonne_idx is None: missing.append("Tonne")
+        if pack_idx  is None: missing.append("Pack")
 
-        logger.info(f"Preview: header={header_raw}, code_idx={code_idx}, mois_idx={mois_idx}")
+        if missing:
+            return {"error": f"Colonnes manquantes dans le fichier : {', '.join(missing)}. Vérifiez que le fichier est bien un fichier objectifs."}
 
-        if mois_idx is None:
-            return {"error": "Colonne 'Mois' introuvable dans le fichier"}
+        logger.info(f"Preview: header={header_raw}")
 
         # Normalised header labels (keep originals for display)
         headers = [str(c).strip() if c else "" for c in header_raw]
@@ -390,7 +397,11 @@ async def upload_objectifs(
 
         try:
             import openpyxl
-            wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+            try:
+                wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)
+            except Exception:
+                yield event({"error": "Format de fichier invalide. Veuillez utiliser un fichier Excel (.xlsx ou .xls)"})
+                return
             ws = wb.active
 
             rows = list(ws.iter_rows(values_only=True))
@@ -398,15 +409,23 @@ async def upload_objectifs(
                 yield event({"error": "Fichier vide"})
                 return
 
-            # Parse header
-            header_raw = [str(c).strip().lower() if c else "" for c in rows[0]]
-            header = {i: h for i, h in enumerate(header_raw)}
+            # Parse and validate header
+            header_lower = [str(c).strip().lower() if c else "" for c in rows[0]]
 
-            # Find column indices
-            code_idx = next((i for i, h in header.items() if 'code' in h), 0)
-            mois_idx = next((i for i, h in header.items() if 'mois' in h), 1)
-            tonne_idx = next((i for i, h in header.items() if 'tonne' in h), 3)
-            pack_idx = next((i for i, h in header.items() if 'pack' in h), 4)
+            code_idx  = next((i for i, h in enumerate(header_lower) if 'code'  in h), None)
+            mois_idx  = next((i for i, h in enumerate(header_lower) if 'mois'  in h), None)
+            tonne_idx = next((i for i, h in enumerate(header_lower) if 'tonne' in h), None)
+            pack_idx  = next((i for i, h in enumerate(header_lower) if 'pack'  in h), None)
+
+            missing = []
+            if code_idx  is None: missing.append("Code")
+            if mois_idx  is None: missing.append("Mois")
+            if tonne_idx is None: missing.append("Tonne")
+            if pack_idx  is None: missing.append("Pack")
+
+            if missing:
+                yield event({"error": f"Colonnes manquantes : {', '.join(missing)}. Vérifiez que le fichier est bien un fichier objectifs."})
+                return
 
             # Parse data rows
             data = []
@@ -444,20 +463,21 @@ async def upload_objectifs(
                 tonne_raw = float(row[tonne_idx]) if tonne_idx < len(row) and row[tonne_idx] is not None else None
                 packs_raw = float(row[pack_idx]) if pack_idx < len(row) and row[pack_idx] is not None else None
 
-                # Divide by route count to get per-route objective
-                tonne = tonne_raw / route_count if tonne_raw is not None else None
-                packs = packs_raw / route_count if packs_raw is not None else None
-                packs_tournee = round(packs) if packs is not None else None
+                # Per-route calculations
+                tonne_tournee = tonne_raw / route_count if tonne_raw is not None else None
+                packs_tournee = packs_raw / route_count if packs_raw is not None else None
 
                 # Transform based on canal
                 item = {"code_produit": code}
                 if canal == "VD":
-                    item["objectif_tonne_vd"] = tonne
-                    item["objectif_packs_vd"] = packs
+                    item["objectif_tonne_vd"] = tonne_raw
+                    item["objectif_tonne_vd_tournee"] = tonne_tournee
+                    item["objectif_packs_vd"] = packs_raw
                     item["objectif_packs_vd_tournee"] = packs_tournee
                 else:  # VH
-                    item["objectif_tonne_vh"] = tonne
-                    item["objectif_packs_vh"] = packs
+                    item["objectif_tonne_vh"] = tonne_raw
+                    item["objectif_tonne_vh_tournee"] = tonne_tournee
+                    item["objectif_packs_vh"] = packs_raw
                     item["objectif_packs_vh_tournee"] = packs_tournee
 
                 data.append(item)
@@ -495,9 +515,11 @@ async def upload_objectifs(
                     continue
 
                 tonne_vd      = item.get("objectif_tonne_vd")
+                tonne_vd_t    = item.get("objectif_tonne_vd_tournee")
                 packs_vd      = item.get("objectif_packs_vd")
                 packs_vd_t    = item.get("objectif_packs_vd_tournee")
                 tonne_vh      = item.get("objectif_tonne_vh")
+                tonne_vh_t    = item.get("objectif_tonne_vh_tournee")
                 packs_vh      = item.get("objectif_packs_vh")
                 packs_vh_t    = item.get("objectif_packs_vh_tournee")
 
@@ -505,10 +527,12 @@ async def upload_objectifs(
                 if obj:
                     if canal == "VD":
                         obj.objectif_tonne_vd          = tonne_vd
+                        obj.objectif_tonne_vd_tournee  = tonne_vd_t
                         obj.objectif_packs_vd          = packs_vd
                         obj.objectif_packs_vd_tournee  = packs_vd_t
                     else:
                         obj.objectif_tonne_vh          = tonne_vh
+                        obj.objectif_tonne_vh_tournee  = tonne_vh_t
                         obj.objectif_packs_vh          = packs_vh
                         obj.objectif_packs_vh_tournee  = packs_vh_t
                     obj.updated_by_id = current_user.id
@@ -520,9 +544,11 @@ async def upload_objectifs(
                         annee=annee,
                         distributor_id=target_distributor.id,
                         objectif_tonne_vd=tonne_vd,
+                        objectif_tonne_vd_tournee=tonne_vd_t,
                         objectif_packs_vd=packs_vd,
                         objectif_packs_vd_tournee=packs_vd_t,
                         objectif_tonne_vh=tonne_vh,
+                        objectif_tonne_vh_tournee=tonne_vh_t,
                         objectif_packs_vh=packs_vh,
                         objectif_packs_vh_tournee=packs_vh_t,
                         created_by_id=current_user.id,

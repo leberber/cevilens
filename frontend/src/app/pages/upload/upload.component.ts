@@ -1,22 +1,35 @@
-import { Component, Input, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, inject, signal } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
 
 interface UploadResult { success: boolean; message: string; }
 interface OverlapInfo { overlap_min: string; overlap_max: string; overlap_count: number; }
 interface FileInfo { total_rows: number; date_min: string; date_max: string; }
+interface StreamEvent {
+  error?: string;
+  type?: string;
+  file_info?: FileInfo;
+  progress?: number;
+  message?: string;
+  done?: boolean;
+  overlap_min?: string;
+  overlap_max?: string;
+  overlap_count?: number;
+}
 
 @Component({
   selector: 'app-upload',
   standalone: true,
   imports: [CommonModule, DecimalPipe],
   templateUrl: './upload.component.html',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class UploadComponent {
-  private auth = inject(AuthService);
+  private readonly auth = inject(AuthService);
 
   @Input() selectedCanal: 'VD' | 'VH' | null = null;
   @Input() autoUpload: boolean = true;
+  @Input() successStyle: 'banner' | 'overlay' = 'banner';
 
   uploadType: 'ventes' | 'objectifs' = 'ventes';
   uploadCanal: 'VD' | 'VH' | null = null;
@@ -116,15 +129,15 @@ export class UploadComponent {
     }
   }
 
-  private handleEvent(data: any) {
+  private handleEvent(data: StreamEvent) {
     if (data.error) {
       this.loading.set(false);
       this.result.set({ success: false, message: data.error });
       return;
     }
-    if (data.type === 'overlap') {
+    if (data.type === 'overlap' && data.overlap_min && data.overlap_max && data.overlap_count !== undefined) {
       this.loading.set(false);
-      this.overlap.set(data);
+      this.overlap.set({ overlap_min: data.overlap_min, overlap_max: data.overlap_max, overlap_count: data.overlap_count });
       return;
     }
     if (data.file_info) {
@@ -136,7 +149,7 @@ export class UploadComponent {
     }
     if (data.done) {
       this.loading.set(false);
-      this.result.set({ success: true, message: data.message });
+      this.result.set({ success: true, message: data.message ?? '' });
     }
   }
 
@@ -156,14 +169,14 @@ export class UploadComponent {
 
       if (!response.ok) {
         const error = await response.text();
-        console.error('Preview error:', error);
+        this.result.set({ success: false, message: error || 'Erreur lors de la lecture du fichier' });
         return null;
       }
 
       const preview = await response.json();
 
       if (preview.error) {
-        console.error('Preview error:', preview.error);
+        this.result.set({ success: false, message: preview.error });
         return null;
       }
 
@@ -174,8 +187,8 @@ export class UploadComponent {
         headers: preview.headers || [],
         products: preview.products || [],
       };
-    } catch (error) {
-      console.error('Error previewing file:', error);
+    } catch {
+      this.result.set({ success: false, message: 'Erreur de connexion lors de la lecture du fichier' });
       return null;
     }
   }
@@ -194,4 +207,15 @@ export class UploadComponent {
   skip()    { if (this.pendingFile) this.startUpload(this.pendingFile, 'skip'); }
   replace() { if (this.pendingFile) this.startUpload(this.pendingFile, 'replace'); }
   cancel()  { this.overlap.set(null); this.pendingFile = null; }
+
+  reset() {
+    this.selectedFile.set(null);
+    this.result.set(null);
+    this.overlap.set(null);
+    this.fileInfo.set(null);
+    this.loading.set(false);
+    this.progress.set(0);
+    this.progressMessage.set('');
+    this.pendingFile = null;
+  }
 }

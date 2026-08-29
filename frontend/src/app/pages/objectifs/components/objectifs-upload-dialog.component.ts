@@ -1,10 +1,9 @@
-import { Component, Input, Output, EventEmitter, ViewChild, inject, signal, computed, OnInit, DestroyRef } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, Output, EventEmitter, ViewChild, inject, signal, computed, OnInit, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Dialog } from 'primeng/dialog';
 import { Select } from 'primeng/select';
-import { TooltipModule } from 'primeng/tooltip';
 import { HttpClient } from '@angular/common/http';
 import { DistributorContextService } from '../../../core/services/distributor-context.service';
 import { RoleService } from '../../../core/services/role.service';
@@ -15,12 +14,13 @@ import { UploadComponent } from '../../upload/upload.component';
 @Component({
   selector: 'app-objectifs-upload-dialog',
   standalone: true,
-  imports: [CommonModule, FormsModule, Dialog, Select, TooltipModule, UploadComponent],
+  imports: [CommonModule, FormsModule, Dialog, Select, UploadComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <p-dialog
       [visible]="visible"
       [modal]="true"
-      [header]="confirmState().visible ? 'Confirmation — Ajouter les objectifs' : 'Ajouter les objectifs'"
+      [header]="uploadComponent?.result()?.success ? 'Import réussi' : confirmState().visible ? 'Confirmation — Ajouter les objectifs' : 'Ajouter les objectifs'"
       [style]="{ width: '1000px' }"
       [styleClass]="'objectifs-dialog'"
       (visibleChange)="onVisibleChange($event)">
@@ -28,7 +28,7 @@ import { UploadComponent } from '../../upload/upload.component';
       <div class="objectifs-dialog-content">
 
         <!-- Header -->
-        @if (!confirmState().visible) {
+        @if (!confirmState().visible && !uploadComponent?.result()?.success) {
         <div class="dialog-header">
           <div class="header-meta">
             @if (isPlatformAdmin) {
@@ -74,7 +74,7 @@ import { UploadComponent } from '../../upload/upload.component';
 
         <!-- Upload view (always mounted so @ViewChild stays valid) -->
         <div class="upload-zone-wrapper" [hidden]="confirmState().visible">
-          <app-upload #uploadComponent [autoUpload]="false" [selectedCanal]="selectedCanal()"></app-upload>
+          <app-upload #uploadComponent [autoUpload]="false" [selectedCanal]="selectedCanal()" [successStyle]="'overlay'"></app-upload>
         </div>
 
         <!-- Confirmation view -->
@@ -91,7 +91,9 @@ import { UploadComponent } from '../../upload/upload.component';
               <div class="confirm-row">
                 <span class="confirm-label"><i class="pi pi-tag"></i> Canal</span>
                 <span class="confirm-value">
-                  <span class="badge badge--info">{{ confirmState().canal }}</span>
+                  <span class="canal-chip" [class.canal-chip--vd]="confirmState().canal === 'VD'" [class.canal-chip--vh]="confirmState().canal === 'VH'">
+                    {{ confirmState().canal === 'VD' ? 'VD — Vente Directe' : 'VH — Vente Horeca' }}
+                  </span>
                 </span>
               </div>
               <div class="confirm-row">
@@ -101,6 +103,10 @@ import { UploadComponent } from '../../upload/upload.component';
                     {{ confirmState().mois | number: '2.0-0' }}/{{ confirmState().annee }}
                   } @else { N/A }
                 </span>
+              </div>
+              <div class="confirm-row">
+                <span class="confirm-label"><i class="pi pi-users"></i> Prévendeurs</span>
+                <span class="confirm-value">{{ confirmState().routeCount }}</span>
               </div>
               <div class="confirm-row confirm-row--clickable" (click)="productsExpanded.set(!productsExpanded())">
                 <span class="confirm-label"><i class="pi pi-box"></i> Produits</span>
@@ -134,12 +140,22 @@ import { UploadComponent } from '../../upload/upload.component';
                 </div>
               }
             </div>
+            @if (confirmState().routeCount > 0) {
+              <div class="confirm-calc-note">
+                <i class="pi pi-info-circle"></i>
+                Objectif par prévendeur&nbsp;=&nbsp;Total&nbsp;÷&nbsp;{{ confirmState().routeCount }}&nbsp;prévendeurs
+              </div>
+            }
           </div>
         }
 
         <!-- Footer -->
         <div class="dialog-footer">
-          @if (confirmState().visible) {
+          @if (uploadComponent?.result()?.success) {
+            <button class="btn-secondary" type="button" (click)="onDialogClose()">
+              <i class="pi pi-times"></i> Fermer
+            </button>
+          } @else if (confirmState().visible) {
             <button class="btn-secondary" type="button" (click)="onCancelConfirm()">
               <i class="pi pi-arrow-left"></i> Retour
             </button>
@@ -291,19 +307,6 @@ import { UploadComponent } from '../../upload/upload.component';
       flex-shrink: 0;
     }
 
-    .prevendeur-text {
-      font-size: 0.9rem;
-      color: var(--text-color-secondary);
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-    }
-
-    .prevendeur-text strong {
-      color: var(--primary-color);
-      font-weight: 700;
-    }
-
     .prevendeur-separator {
       color: var(--surface-border);
       font-weight: 300;
@@ -386,23 +389,6 @@ import { UploadComponent } from '../../upload/upload.component';
       opacity: 0.7;
     }
 
-    .error-message {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      padding: 1rem 2rem;
-      background: rgba(var(--red-rgb), 0.1);
-      border-left: 4px solid var(--red-500);
-      color: var(--red-600);
-      font-size: 0.9rem;
-      font-weight: 500;
-    }
-
-    .error-message i {
-      font-size: 1rem;
-      color: var(--red-500);
-    }
-
     :host ::ng-deep .upload-zone-wrapper .upload-page {
       display: flex;
       align-items: center;
@@ -425,10 +411,6 @@ import { UploadComponent } from '../../upload/upload.component';
     }
 
     :host ::ng-deep .upload-zone-wrapper .upload-page .overlap-box {
-      display: none;
-    }
-
-    :host ::ng-deep .upload-zone-wrapper .upload-page .upload-result {
       display: none;
     }
 
@@ -585,26 +567,6 @@ import { UploadComponent } from '../../upload/upload.component';
       box-shadow: 0 10px 28px rgba(var(--primary-rgb), 0.5);
     }
 
-    .canal-required-message {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.75rem;
-      padding: 3rem 2rem;
-      min-height: 280px;
-      border: 2px dashed var(--surface-300);
-      border-radius: 1.25rem;
-      background: var(--surface-ground);
-      color: var(--text-color-secondary);
-      font-size: 0.95rem;
-      font-weight: 500;
-
-      i {
-        font-size: 1.5rem;
-        color: var(--primary-color);
-      }
-    }
-
     .confirmation-body {
       padding: 2rem;
       display: flex;
@@ -669,6 +631,46 @@ import { UploadComponent } from '../../upload/upload.component';
       font-size: 0.9rem;
       font-weight: 600;
       color: var(--text-color);
+    }
+
+    .canal-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.35rem 0.9rem;
+      border-radius: 999px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+
+      &--vd {
+        background: color-mix(in srgb, var(--primary-color) 15%, transparent);
+        color: var(--primary-color);
+        border: 1px solid color-mix(in srgb, var(--primary-color) 30%, transparent);
+      }
+
+      &--vh {
+        background: color-mix(in srgb, #8b5cf6 15%, transparent);
+        color: #7c3aed;
+        border: 1px solid color-mix(in srgb, #8b5cf6 30%, transparent);
+      }
+    }
+
+    .confirm-calc-note {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.7rem 1rem;
+      border-radius: 0.625rem;
+      background: color-mix(in srgb, var(--primary-color) 6%, var(--surface-ground));
+      border: 1px dashed color-mix(in srgb, var(--primary-color) 25%, transparent);
+      font-size: 0.8rem;
+      color: var(--text-color-secondary);
+      width: 100%;
+
+      i {
+        color: var(--primary-color);
+        flex-shrink: 0;
+      }
     }
 
     .confirm-value--toggle {
@@ -794,11 +796,11 @@ import { UploadComponent } from '../../upload/upload.component';
   `],
 })
 export class ObjectifsUploadDialogComponent implements OnInit {
-  private readonly http = inject(HttpClient);
+  private readonly http       = inject(HttpClient);
   private readonly distContext = inject(DistributorContextService);
   private readonly roleService = inject(RoleService);
-  private readonly notify = inject(NotificationService);
-  private readonly destroyRef = inject(DestroyRef);
+  private readonly notify      = inject(NotificationService);
+  private readonly destroyRef  = inject(DestroyRef);
 
   @Input() visible = false;
   @Output() visibleChange = new EventEmitter<boolean>();
@@ -809,7 +811,6 @@ export class ObjectifsUploadDialogComponent implements OnInit {
   readonly loadingCounts = signal(false);
   readonly distributors = signal<Distributor[]>([]);
   readonly selectedCanal = signal<'VD' | 'VH' | null>(null);
-  readonly errorMessage = signal<string | null>(null);
   readonly isImportDisabled = computed(() => {
     if (!this.selectedCanal()) return true;
     if (!this.uploadComponent || !this.uploadComponent.selectedFile()) return true;
@@ -823,9 +824,10 @@ export class ObjectifsUploadDialogComponent implements OnInit {
     annee: number | null;
     rowCount: number | null;
     canal: 'VD' | 'VH' | null;
+    routeCount: number;
     headers: string[];
     products: Record<string, unknown>[];
-  }>({ visible: false, distributor: '', mois: null, annee: null, rowCount: null, canal: null, headers: [], products: [] });
+  }>({ visible: false, distributor: '', mois: null, annee: null, rowCount: null, canal: null, routeCount: 0, headers: [], products: [] });
 
   readonly productsExpanded = signal(false);
 
@@ -904,14 +906,23 @@ export class ObjectifsUploadDialogComponent implements OnInit {
 
   onVisibleChange(value: boolean) {
     if (!value) {
+      this.resetDialog();
       this.visibleChange.emit(false);
       this.close.emit();
     }
   }
 
   onDialogClose() {
+    this.resetDialog();
     this.visibleChange.emit(false);
     this.close.emit();
+  }
+
+  private resetDialog() {
+    this.uploadComponent?.reset();
+    this.confirmState.set({ visible: false, distributor: '', mois: null, annee: null, rowCount: null, canal: null, routeCount: 0, headers: [], products: [] });
+    this.productsExpanded.set(false);
+    this.selectedCanal.set(null);
   }
 
   async onImport() {
@@ -930,6 +941,8 @@ export class ObjectifsUploadDialogComponent implements OnInit {
       ? this.distributors().find(d => d.id === this.selectedDistributor)?.nom || 'Inconnu'
       : this.distributorName() || 'Distributeur';
 
+    const canal = this.selectedCanal()!;
+    const routeCount = canal === 'VD' ? this.prevendeurVDValue : this.prevendeurVHValue;
     this.productsExpanded.set(false);
     this.confirmState.set({
       visible: true,
@@ -937,7 +950,8 @@ export class ObjectifsUploadDialogComponent implements OnInit {
       mois: preview.mois,
       annee: preview.annee,
       rowCount: preview.rowCount,
-      canal: this.selectedCanal(),
+      canal,
+      routeCount,
       headers: preview.headers,
       products: preview.products,
     });
