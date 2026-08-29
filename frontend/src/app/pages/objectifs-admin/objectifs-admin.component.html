@@ -13,13 +13,25 @@
 
   <ng-template #toolbarTemplate>
     <div class="obj-filters">
+      <div class="filter-card filter-card--compact">
+        <div class="filter-card__icon">
+          <i class="pi pi-search"></i>
+        </div>
+        <input
+          class="filter-card-search"
+          type="search"
+          placeholder="Rechercher un produit..."
+          [value]="search()"
+          (input)="search.set($any($event.target).value)"
+        />
+      </div>
       <app-canal-toggle [canal]="canal()" (canalChange)="canal.set($event)"></app-canal-toggle>
       <app-period-stepper [mois]="mois()" [annee]="annee()" (periodChange)="onPeriodChange($event)"></app-period-stepper>
     </div>
   </ng-template>
 
   <app-objectifs-table
-    [rows]="sortedRows()"
+    [rows]="filteredRows()"
     [loading]="loading()"
     [canal]="canal()"
     [sortCol]="sortCol()"

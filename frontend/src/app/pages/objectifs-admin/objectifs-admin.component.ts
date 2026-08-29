@@ -38,6 +38,7 @@ export class ObjectifsAdminComponent {
   readonly rows    = signal<ObjectifRow[]>([]);
   readonly sortCol = signal('');
   readonly sortDir = signal<1 | -1>(1);
+  readonly search  = signal('');
   readonly showUploadDialog = signal(false);
 
   readonly sortedRows = computed((): ObjectifRow[] => {
@@ -67,6 +68,16 @@ export class ObjectifsAdminComponent {
     const selector = selectors[col];
     if (!selector) return rows;
     return [...rows].sort((a, b) => this.sortHelper.compare(selector(a), selector(b), 'auto', dir));
+  });
+
+  readonly filteredRows = computed(() => {
+    const q = this.search().trim().toLowerCase();
+    if (!q) return this.sortedRows();
+    return this.sortedRows().filter(r =>
+      r.code_produit?.toLowerCase().includes(q) ||
+      r.nom_produit?.toLowerCase().includes(q) ||
+      r.nom_distributeur?.toLowerCase().includes(q)
+    );
   });
 
   readonly filledProducts = computed(() =>

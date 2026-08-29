@@ -60,6 +60,40 @@
   // (component-specific styling if needed)
 }
 
+// Compact filter card — same height as seg-control (~40px)
+.filter-card--compact {
+  padding: 0.3rem 0.85rem 0.3rem 0.5rem;
+
+  .filter-card__icon {
+    width: 30px;
+    height: 30px;
+    border-radius: var(--radius-lg);
+    font-size: 0.875rem;
+  }
+}
+
+// Bare search input inside a filter-card
+.filter-card-search {
+  border: none;
+  background: transparent;
+  outline: none;
+  padding: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--text-color);
+  font-family: inherit;
+  min-width: 260px;
+
+  &::placeholder {
+    color: var(--text-color-muted, var(--text-color-secondary));
+    font-weight: var(--font-weight-normal, 400);
+  }
+
+  &::-webkit-search-cancel-button {
+    cursor: pointer;
+  }
+}
+
 // Generic inline filters toolbar row
 .obj-filters {
   display: flex;
@@ -117,7 +151,7 @@
   background: var(--surface-ground);
   border: var(--border-width) solid var(--border-color-light);
   border-radius: var(--radius-lg);
-  padding: 0.25rem;
+  padding: 0.35rem;
 
   &--rounded {
     border-radius: 9999px;
@@ -146,10 +180,11 @@
   font-weight: var(--font-weight-medium);
   cursor: pointer;
   transition: all var(--transition-fast);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
 
   &:hover {
-    background: var(--overlay-soft, rgba(0, 0, 0, 0.04));
+    background: rgba(var(--primary-rgb), 0.08);
+    color: var(--primary-color);
   }
 
   &--active {
