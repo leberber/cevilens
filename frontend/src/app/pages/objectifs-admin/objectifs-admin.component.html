@@ -1,94 +1,42 @@
 <app-page-layout
   icon="pi-bullseye"
   title="Objectifs"
-  [subtitle]="!editMode ? (filledProducts + ' / ' + totalProducts + ' produits renseignés') : ('Mode édition — ' + periodLabel + ' — ' + canalLabel)"
-  [toolbar]="toolbarContent">
+  [subtitle]="filledProducts() + ' / ' + totalProducts() + ' produits renseignés'"
+  [actions]="actionsTemplate"
+  [toolbar]="toolbarTemplate">
 
-  <!-- Toolbar Template -->
-  <ng-template #toolbarContent>
-    <app-objectifs-toolbar
-      [canal]="canal"
-      [mois]="mois"
-      [annee]="annee"
-      [editMode]="editMode"
-      [isSaving]="isSaving"
-      [isImporting]="isImporting"
-      [loading]="loading"
-      [hasGoals]="hasGoals"
-      [distributeurs]="distributeurs"
-      [selectedDistributeur]="selectedDistributeur"
-      [routesVD]="routesVD"
-      [routesVH]="routesVH"
-      [routesFallbackMois]="routesFallbackMois"
-      [sortCol]="sortCol"
-      [dirtyCount]="dirtyCount"
-      [nextMissingLabel]="nextMissingLabel"
-      [isNextMissingPeriod]="isNextMissingPeriod"
-      [prevMonthLabel]="prevMonthLabel"
-      (canalChange)="canal = $event; load()"
-      (periodChange)="onPeriodChange($event)"
-      (distributeurChange)="selectedDistributeur = $event"
-      (routesVDChange)="routesVD = $event"
-      (routesVHChange)="routesVH = $event"
-      (resetSort)="resetSort()"
-      (enterEditMode)="enterEditMode()"
-      (nextMissing)="goToNextMissing()"
-      (fileSelected)="onFileSelected($event)"
-      (copyFromPrevious)="copyFromPrevious()"
-      (cancel)="cancelEdit()"
-      (save)="requestSave()">
-    </app-objectifs-toolbar>
+  <ng-template #actionsTemplate>
+    <button class="btn-add" type="button" (click)="showUploadDialog.set(true)">
+      <i class="pi pi-upload"></i> Importer les objectifs
+    </button>
   </ng-template>
 
-  <!-- Import result banner -->
-  <app-objectifs-import-banner
-    [importResult]="importResult"
-    [showDetail]="showNotFoundDetail"
-    (showDetailChange)="showNotFoundDetail = $event"
-    (dismiss)="importResult = null; showNotFoundDetail = false">
-  </app-objectifs-import-banner>
+  <ng-template #toolbarTemplate>
+    <div class="obj-filters">
+      <app-canal-toggle [canal]="canal()" (canalChange)="canal.set($event)"></app-canal-toggle>
+      <app-period-stepper [mois]="mois()" [annee]="annee()" (periodChange)="onPeriodChange($event)"></app-period-stepper>
+    </div>
+  </ng-template>
 
-  <!-- Table -->
   <app-objectifs-table
-    [rows]="rows"
-    [grouped]="grouped"
-    [editMode]="editMode"
-    [loading]="loading"
-    [canal]="canal"
-    [sortCol]="sortCol"
-    [sortDir]="sortDir"
-    [collapsedFamilies]="collapsedFamilies"
-    [isFlatSort]="isFlatSort"
-    [sortedRows]="sortedRows"
-    [routeCount]="routeCount"
+    [rows]="rows()"
+    [grouped]="grouped()"
+    [loading]="loading()"
+    [canal]="canal()"
+    [sortCol]="sortCol()"
+    [sortDir]="sortDir()"
+    [collapsedFamilies]="collapsedFamilies()"
+    [isFlatSort]="isFlatSort()"
+    [sortedRows]="sortedRows()"
+    [routeCount]="routeCount()"
     (sortChange)="setSort($event)"
     (familyToggle)="toggleFamily($event)">
   </app-objectifs-table>
 
 </app-page-layout>
 
-<!-- Import dialog -->
-<app-objectifs-import-dialog
-  [visible]="showImportDialog"
-  [importFile]="importFile"
-  [importMois]="importMois"
-  [importAnnee]="importAnnee"
-  [importCanal]="importCanal"
-  [isImporting]="isImporting"
-  (periodChange)="onImportPeriodChange($event)"
-  (canalChange)="importCanal = $event"
-  (confirm)="confirmImport()"
-  (cancel)="cancelImport()">
-</app-objectifs-import-dialog>
-
-<!-- Confirmation dialog -->
-<app-confirm-dialog
-  [visible]="showConfirm"
-  title="Confirmer la sauvegarde"
-  [message]="'Sauvegarder les objectifs de ' + periodLabel + ' — ' + canalLabel + ' ? (' + dirtyCount + ' produit(s) modifié(s))'"
-  confirmLabel="Confirmer"
-  cancelLabel="Annuler"
-  [isLoading]="isSaving"
-  (onConfirmed)="confirmSave()"
-  (onCancelled)="showConfirm = false">
-</app-confirm-dialog>
+<app-objectifs-upload-dialog
+  [visible]="showUploadDialog()"
+  (visibleChange)="showUploadDialog.set($event)"
+  (close)="showUploadDialog.set(false); load()">
+</app-objectifs-upload-dialog>

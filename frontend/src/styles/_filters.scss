@@ -60,6 +60,14 @@
   // (component-specific styling if needed)
 }
 
+// Generic inline filters toolbar row
+.obj-filters {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
 // =============================================================================
 // FILTER CARD SELECT OVERRIDE
 // =============================================================================

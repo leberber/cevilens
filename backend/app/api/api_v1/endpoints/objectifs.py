@@ -153,39 +153,31 @@ def batch_upsert(
 def list_objectifs(
     mois: int = Query(..., ge=1, le=12),
     annee: int = Query(..., ge=2020),
-    edit: bool = Query(default=False),
     code_distributeur: Optional[str] = Query(None),
+    distributor_id: Optional[int] = Query(None),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
     current_distributor = Depends(get_current_distributor),
 ) -> Any:
-    # TODO: Join with Produit table once model is created
-    # For now, just query Objectif
-    base = select(Objectif).order_by(Objectif.code_produit)
+    q = select(Objectif).where(
+        Objectif.mois == mois,
+        Objectif.annee == annee,
+        (Objectif.objectif_tonne_vd.isnot(None)) |
+        (Objectif.objectif_packs_vd.isnot(None)) |
+        (Objectif.objectif_tonne_vh.isnot(None)) |
+        (Objectif.objectif_packs_vh.isnot(None)),
+    ).order_by(Objectif.code_produit)
 
-    join_condition = (
-        (Objectif.mois == mois) &
-        (Objectif.annee == annee)
-    )
     if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-        join_condition = join_condition & (Objectif.distributor_id == current_distributor.id)
-    if code_distributeur:
-        join_condition = join_condition & (Objectif.code_distributeur == code_distributeur)
+        q = q.where(Objectif.distributor_id == current_distributor.id)
+    elif distributor_id:
+        q = q.where(Objectif.distributor_id == distributor_id)
+    elif code_distributeur:
+        q = q.where(Objectif.code_distributeur == code_distributeur)
 
-    if edit:
-        stmt = base.outerjoin(Objectif, join_condition)
-    else:
-        stmt = base.join(Objectif, join_condition).where(
-            (Objectif.objectif_tonne_vd.isnot(None)) |
-            (Objectif.objectif_packs_vd.isnot(None)) |
-            (Objectif.objectif_tonne_vh.isnot(None)) |
-            (Objectif.objectif_packs_vh.isnot(None))
-        )
+    rows = session.exec(q).all()
 
-    rows = session.exec(stmt).all()
-
-    # Batch-load users referenced by objectives
-    user_ids = {obj.updated_by_id for _, obj in rows if obj and obj.updated_by_id}
+    user_ids = {obj.updated_by_id for obj in rows if obj.updated_by_id}
     users_map: dict = {}
     if user_ids:
         users = session.exec(select(User).where(User.id.in_(user_ids))).all()
@@ -194,10 +186,13 @@ def list_objectifs(
     return [
         {
             "code_produit": obj.code_produit,
+            "nom_distributeur": obj.nom_distributeur,
             "objectif_tonne_vd": obj.objectif_tonne_vd,
+            "objectif_tonne_vd_tournee": obj.objectif_tonne_vd_tournee,
             "objectif_packs_vd": obj.objectif_packs_vd,
             "objectif_packs_vd_tournee": obj.objectif_packs_vd_tournee,
             "objectif_tonne_vh": obj.objectif_tonne_vh,
+            "objectif_tonne_vh_tournee": obj.objectif_tonne_vh_tournee,
             "objectif_packs_vh": obj.objectif_packs_vh,
             "objectif_packs_vh_tournee": obj.objectif_packs_vh_tournee,
             "updated_at": obj.updated_at.isoformat() if obj.updated_at else None,
@@ -497,66 +492,87 @@ async def upload_objectifs(
                 "file_info": {"total_rows": total_rows, "date_min": f"{mois:02d}/{annee}", "date_max": f"{mois:02d}/{annee}"},
             })
 
-            yield event({"progress": 30, "message": "Sauvegarde en base de données..."})
+            yield event({"progress": 30, "message": "Suppression des anciens objectifs..."})
 
-            # Call batch_upsert logic directly
             now = datetime.now(timezone.utc)
 
-            # Load existing objectifs
-            q = select(Objectif).where(Objectif.mois == mois, Objectif.annee == annee)
-            q = q.where(Objectif.distributor_id == target_distributor.id)
-            existing = session.exec(q).all()
+            # Load all existing rows for this distributor/mois/annee
+            existing = session.exec(
+                select(Objectif).where(
+                    Objectif.mois == mois,
+                    Objectif.annee == annee,
+                    Objectif.distributor_id == target_distributor.id,
+                )
+            ).all()
             obj_map = {o.code_produit: o for o in existing}
 
+            # Step 1 — clear the canal being replaced on every existing row
+            for obj in existing:
+                if canal == "VD":
+                    obj.objectif_tonne_vd         = None
+                    obj.objectif_tonne_vd_tournee = None
+                    obj.objectif_packs_vd         = None
+                    obj.objectif_packs_vd_tournee = None
+                else:
+                    obj.objectif_tonne_vh         = None
+                    obj.objectif_tonne_vh_tournee = None
+                    obj.objectif_packs_vh         = None
+                    obj.objectif_packs_vh_tournee = None
+
+            yield event({"progress": 50, "message": "Sauvegarde en base de données..."})
+
+            # Step 2 — upsert uploaded rows
             saved_count = 0
             for item in data:
                 code = item.get("code_produit")
                 if not code:
                     continue
 
-                tonne_vd      = item.get("objectif_tonne_vd")
-                tonne_vd_t    = item.get("objectif_tonne_vd_tournee")
-                packs_vd      = item.get("objectif_packs_vd")
-                packs_vd_t    = item.get("objectif_packs_vd_tournee")
-                tonne_vh      = item.get("objectif_tonne_vh")
-                tonne_vh_t    = item.get("objectif_tonne_vh_tournee")
-                packs_vh      = item.get("objectif_packs_vh")
-                packs_vh_t    = item.get("objectif_packs_vh_tournee")
-
                 obj = obj_map.get(code)
                 if obj:
+                    obj.code_distributeur = target_distributor.code
+                    obj.nom_distributeur  = target_distributor.nom
                     if canal == "VD":
-                        obj.objectif_tonne_vd          = tonne_vd
-                        obj.objectif_tonne_vd_tournee  = tonne_vd_t
-                        obj.objectif_packs_vd          = packs_vd
-                        obj.objectif_packs_vd_tournee  = packs_vd_t
+                        obj.objectif_tonne_vd          = item.get("objectif_tonne_vd")
+                        obj.objectif_tonne_vd_tournee  = item.get("objectif_tonne_vd_tournee")
+                        obj.objectif_packs_vd          = item.get("objectif_packs_vd")
+                        obj.objectif_packs_vd_tournee  = item.get("objectif_packs_vd_tournee")
                     else:
-                        obj.objectif_tonne_vh          = tonne_vh
-                        obj.objectif_tonne_vh_tournee  = tonne_vh_t
-                        obj.objectif_packs_vh          = packs_vh
-                        obj.objectif_packs_vh_tournee  = packs_vh_t
+                        obj.objectif_tonne_vh          = item.get("objectif_tonne_vh")
+                        obj.objectif_tonne_vh_tournee  = item.get("objectif_tonne_vh_tournee")
+                        obj.objectif_packs_vh          = item.get("objectif_packs_vh")
+                        obj.objectif_packs_vh_tournee  = item.get("objectif_packs_vh_tournee")
                     obj.updated_by_id = current_user.id
-                    obj.updated_at = now
+                    obj.updated_at    = now
                 else:
                     session.add(Objectif(
                         code_produit=code,
                         mois=mois,
                         annee=annee,
                         distributor_id=target_distributor.id,
-                        objectif_tonne_vd=tonne_vd,
-                        objectif_tonne_vd_tournee=tonne_vd_t,
-                        objectif_packs_vd=packs_vd,
-                        objectif_packs_vd_tournee=packs_vd_t,
-                        objectif_tonne_vh=tonne_vh,
-                        objectif_tonne_vh_tournee=tonne_vh_t,
-                        objectif_packs_vh=packs_vh,
-                        objectif_packs_vh_tournee=packs_vh_t,
+                        code_distributeur=target_distributor.code,
+                        nom_distributeur=target_distributor.nom,
+                        objectif_tonne_vd=item.get("objectif_tonne_vd"),
+                        objectif_tonne_vd_tournee=item.get("objectif_tonne_vd_tournee"),
+                        objectif_packs_vd=item.get("objectif_packs_vd"),
+                        objectif_packs_vd_tournee=item.get("objectif_packs_vd_tournee"),
+                        objectif_tonne_vh=item.get("objectif_tonne_vh"),
+                        objectif_tonne_vh_tournee=item.get("objectif_tonne_vh_tournee"),
+                        objectif_packs_vh=item.get("objectif_packs_vh"),
+                        objectif_packs_vh_tournee=item.get("objectif_packs_vh_tournee"),
                         created_by_id=current_user.id,
                         updated_by_id=current_user.id,
                         created_at=now,
                         updated_at=now,
                     ))
                 saved_count += 1
+
+            # Step 3 — delete rows where both canals are now fully empty
+            for obj in existing:
+                has_vd = any([obj.objectif_tonne_vd, obj.objectif_packs_vd])
+                has_vh = any([obj.objectif_tonne_vh, obj.objectif_packs_vh])
+                if not has_vd and not has_vh:
+                    session.delete(obj)
 
             session.commit()
 

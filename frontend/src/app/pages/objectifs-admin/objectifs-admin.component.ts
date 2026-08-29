@@ -1,345 +1,151 @@
-import { Component, inject, DestroyRef } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, inject, signal, computed, effect, untracked, DestroyRef, ChangeDetectionStrategy } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { VentesService } from '../../core/services/ventes.service';
-import { CanalHelper } from '../../core/services/canal.helper';
-import { SortHelper } from '../../core/services/sort.helper';
-import { AggregateHelper } from '../../core/services/aggregate.helper';
-import { ObjectifsBaseComponent, BaseRow, FamGroupe } from '../../core/base/objectifs-base';
-import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog/confirm-dialog.component';
 import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
-import { FileUploadHelper } from '../../core/services/file-upload.helper';
-import { ObjectifsDirtyTrackerService } from './services/objectifs-dirty-tracker.service';
+import { CanalToggleComponent } from '../../shared/components/canal-toggle/canal-toggle.component';
+import { PeriodStepperComponent } from '../../shared/period-stepper/period-stepper.component';
+import { ObjectifsTableComponent, ObjectifRow, FamGroupe } from './components/objectifs-table.component';
+import { ObjectifsUploadDialogComponent } from '../objectifs/components/objectifs-upload-dialog.component';
+import { DistributorContextService } from '../../core/services/distributor-context.service';
 import { ObjectifsRouteCountService } from './services/objectifs-route-count.service';
-import { ObjectifsToolbarComponent } from './components/objectifs-toolbar.component';
-import { ObjectifsTableComponent } from './components/objectifs-table.component';
-import { ObjectifsImportBannerComponent } from './components/objectifs-import-banner.component';
-import { ObjectifsImportDialogComponent } from './components/objectifs-import-dialog.component';
-import { CANAL_OPTIONS, CANAL_DISPLAY } from '../../core/constants/canal.constants';
-
-interface ObjectifRow extends BaseRow {
-  objectif_tonne_vd:          number | null;
-  objectif_packs_vd:          number | null;
-  objectif_packs_vd_tournee:  number | null;
-  objectif_tonne_vh:          number | null;
-  objectif_packs_vh:          number | null;
-  objectif_packs_vh_tournee:  number | null;
-  nom_distributeur:           string | null;
-  _tonne:        number | null;
-  _packs:        number | null;
-  _packs_tournee: number | null;
-}
+import { SortHelper } from '../../core/services/sort.helper';
+import { CanalHelper } from '../../core/services/canal.helper';
 
 @Component({
   selector: 'app-objectifs-admin',
   standalone: true,
-  imports: [FormsModule, ConfirmDialogComponent, PageLayoutComponent, ObjectifsToolbarComponent, ObjectifsTableComponent, ObjectifsImportBannerComponent, ObjectifsImportDialogComponent],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
+    PageLayoutComponent,
+    CanalToggleComponent,
+    PeriodStepperComponent,
+    ObjectifsTableComponent,
+    ObjectifsUploadDialogComponent,
+  ],
   templateUrl: './objectifs-admin.component.html',
   styleUrl: './objectifs-admin.component.scss',
 })
-export class ObjectifsAdminComponent extends ObjectifsBaseComponent<ObjectifRow> {
-  private readonly ventesService    = inject(VentesService);
-  private readonly canalHelper      = inject(CanalHelper);
-  private readonly sortHelper       = inject(SortHelper);
-  private readonly aggregateHelper  = inject(AggregateHelper);
-  private readonly fileUploadHelper = inject(FileUploadHelper);
-  private readonly destroyRef       = inject(DestroyRef);
-  readonly dirtyTracker             = inject(ObjectifsDirtyTrackerService);
-  readonly routeCountService        = inject(ObjectifsRouteCountService);
+export class ObjectifsAdminComponent {
+  private readonly http              = inject(HttpClient);
+  private readonly destroyRef        = inject(DestroyRef);
+  private readonly distContext       = inject(DistributorContextService);
+  private readonly routeCountService = inject(ObjectifsRouteCountService);
+  private readonly sortHelper        = inject(SortHelper);
+  private readonly canalHelper       = inject(CanalHelper);
 
-  canal: 'VD' | 'VH' = 'VD';
-  importCanal: 'VD' | 'VH' = 'VD';
-  selectedDistributeur: string | null = null;
-  distributeurs: string[] = [];
+  readonly canal   = signal<'VD' | 'VH'>('VD');
+  readonly mois    = signal(new Date().getMonth() + 1);
+  readonly annee   = signal(new Date().getFullYear());
+  readonly loading = signal(false);
+  readonly rows    = signal<ObjectifRow[]>([]);
+  readonly sortCol = signal('');
+  readonly sortDir = signal<1 | -1>(1);
+  readonly collapsedFamilies = signal(new Set<string>());
+  readonly showUploadDialog  = signal(false);
 
-  protected override get nextMissingUrl(): string {
-    return '/api/v1/objectifs/next-missing';
-  }
+  private readonly FLAT_SORT_COLS = new Set(['tonne', 'tonne_route', 'packs', 'packs_route']);
+  readonly isFlatSort = computed(() => this.FLAT_SORT_COLS.has(this.sortCol()));
+  readonly routeCount = computed(() => this.routeCountService.getRouteCount(this.canal()));
 
-  override ngOnInit() {
-    super.ngOnInit();
-    this.ventesService.getDistinct('nom_distributeur')
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe(vals => {
-        this.distributeurs = vals;
-      });
-  }
+  readonly sortedRows = computed((): ObjectifRow[] => {
+    const rows  = this.rows();
+    const col   = this.sortCol();
+    const dir   = this.sortDir();
+    const canal = this.canal();
+    const rc    = this.routeCount();
+    if (!col) return rows;
 
-  // Getters for service properties
-  get routesVD(): number { return this.routeCountService.routesVD; }
-  set routesVD(val: number) { this.routeCountService.routesVD = val; }
+    const tonne  = (r: ObjectifRow) => this.canalHelper.selectByCanal(canal, r.objectif_tonne_vd, r.objectif_tonne_vh);
+    const packs  = (r: ObjectifRow) => this.canalHelper.selectByCanal(canal, r.objectif_packs_vd, r.objectif_packs_vh);
+    const packsT = (r: ObjectifRow) => this.canalHelper.selectByCanal(canal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee);
 
-  get routesVH(): number { return this.routeCountService.routesVH; }
-  set routesVH(val: number) { this.routeCountService.routesVH = val; }
+    const selectors: Record<string, (r: ObjectifRow) => unknown> = {
+      famille:      (r) => r.famille,
+      code:         (r) => r.code_produit,
+      produit:      (r) => r.nom_produit,
+      distributeur: (r) => r.nom_distributeur,
+      tonne:        (r) => tonne(r),
+      tonne_route:  (r) => rc ? (tonne(r) ?? 0) / rc : 0,
+      packs:        (r) => packs(r),
+      packs_route:  (r) => packsT(r),
+      updated_by:   (r) => r.updated_by,
+      updated_at:   (r) => r.updated_at,
+    };
 
-  get routesFallbackMois(): string | null { return this.routeCountService.routesFallbackMois; }
-  set routesFallbackMois(val: string | null) { this.routeCountService.routesFallbackMois = val; }
+    const selector = selectors[col];
+    if (!selector) return rows;
+    return [...rows].sort((a, b) => this.sortHelper.compare(selector(a), selector(b), 'auto', dir));
+  });
 
-  protected override onFileSelectedHook(): void {
-    this.importCanal = this.canal;
-  }
-
-  // ── Load ─────────────────────────────────────────────────────────────────────
-  load(): void {
-    if (this.editMode) return;
-    this.loading = true;
-    let url = `/api/v1/objectifs?mois=${this.mois}&annee=${this.annee}`;
-    if (this.selectedDistributeur) {
-      url += `&code_distributeur=${encodeURIComponent(this.selectedDistributeur)}`;
+  readonly grouped = computed((): FamGroupe[] => {
+    const famMap = new Map<string, Map<string, ObjectifRow[]>>();
+    for (const row of this.sortedRows()) {
+      const f  = row.famille      || '(Sans famille)';
+      const sf = row.sous_famille || '(Sans sous-famille)';
+      if (!famMap.has(f)) famMap.set(f, new Map());
+      const sfMap = famMap.get(f)!;
+      if (!sfMap.has(sf)) sfMap.set(sf, []);
+      sfMap.get(sf)!.push(row);
     }
-    this.http.get<any[]>(url)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: data => {
-          this.rows     = data.map(d => ({ ...d, _tonne: null, _packs: null, _packs_tournee: null }));
-          this.hasGoals = data.some(d =>
-            d.objectif_tonne_vd != null || d.objectif_packs_vd != null ||
-            d.objectif_tonne_vh != null || d.objectif_packs_vh != null
-          );
-          this.loading = false;
-        },
-        error: () => { this.loading = false; },
-      });
-    this.routeCountService.loadRouteCounts(this.mois, this.annee);
-  }
-
-  // ── Edit mode ─────────────────────────────────────────────────────────────────
-  enterEditMode(): void {
-    this.loading = true;
-    let url = `/api/v1/objectifs?mois=${this.mois}&annee=${this.annee}&edit=true`;
-    if (this.selectedDistributeur) {
-      url += `&code_distributeur=${encodeURIComponent(this.selectedDistributeur)}`;
-    }
-    this.http.get<any[]>(url)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: data => {
-          this.rows = data.map(d => ({ ...d, _tonne: null, _packs: null, _packs_tournee: null }));
-          for (const r of this.rows) {
-            const tonne        = this.canalHelper.selectByCanal(this.canal, r.objectif_tonne_vd, r.objectif_tonne_vh);
-            const packs        = this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd, r.objectif_packs_vh);
-            const packs_tournee = this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee);
-            r._tonne = tonne; r._packs = packs; r._packs_tournee = packs_tournee;
-          }
-          this.dirtyTracker.captureSnapshot(this.rows);
-          this.loading  = false;
-          this.editMode = true;
-        },
-        error: () => { this.loading = false; },
-      });
-  }
-
-  // ── Save ──────────────────────────────────────────────────────────────────────
-  confirmSave(): void {
-    this.showConfirm = false;
-    this.isSaving    = true;
-    const body = this.rows.map(r => ({
-      code_produit:              r.code_produit,
-      objectif_tonne_vd:         this.canal === 'VD' ? r._tonne         : r.objectif_tonne_vd,
-      objectif_packs_vd:         this.canal === 'VD' ? r._packs         : r.objectif_packs_vd,
-      objectif_packs_vd_tournee: this.canal === 'VD' ? r._packs_tournee : r.objectif_packs_vd_tournee,
-      objectif_tonne_vh:         this.canal === 'VH' ? r._tonne         : r.objectif_tonne_vh,
-      objectif_packs_vh:         this.canal === 'VH' ? r._packs         : r.objectif_packs_vh,
-      objectif_packs_vh_tournee: this.canal === 'VH' ? r._packs_tournee : r.objectif_packs_vh_tournee,
+    return Array.from(famMap.entries()).map(([f, sfMap]) => ({
+      nom: f,
+      sfs: Array.from(sfMap.entries()).map(([sf, rowList]) => ({ nom: sf, rows: rowList })),
     }));
-    this.http.post(`/api/v1/objectifs/batch?mois=${this.mois}&annee=${this.annee}`, body)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: () => {
-          this.isSaving = false;
-          this.editMode = false;
-          this.load();
-          this.loadNextMissing();
-        },
-        error: () => { this.isSaving = false; },
-      });
+  });
+
+  readonly filledProducts = computed(() =>
+    this.rows().filter(r =>
+      (this.canal() === 'VD' ? r.objectif_packs_vd : r.objectif_packs_vh) != null
+    ).length
+  );
+  readonly totalProducts = computed(() => this.rows().length);
+
+  constructor() {
+    effect(() => {
+      this.distContext.selectedDistributorId(); // track distributor changes from sidebar
+      untracked(() => this.load());
+    });
   }
 
-  // ── Excel import ──────────────────────────────────────────────────────────────
-  confirmImport(): void {
-    if (!this.importFile) return;
-    this.isImporting = true;
-    const fd = this.fileUploadHelper.createFormData(this.importFile);
+  onPeriodChange(e: { mois: number; annee: number }): void {
+    this.mois.set(e.mois);
+    this.annee.set(e.annee);
+    this.load();
+  }
 
-    type ImportRow = { code_produit: string | null; nom_produit?: string; tonne: number | null; packs: number | null; packs_tournee: number | null };
+  load(): void {
+    this.loading.set(true);
+    let url = `/api/v1/objectifs?mois=${this.mois()}&annee=${this.annee()}`;
+    const distId = this.distContext.selectedDistributorId();
+    if (distId) url += `&distributor_id=${distId}`;
 
-    const applyImport = (data: ImportRow[]) => {
-      if (this.importCanal !== this.canal) {
-        this.canal = this.importCanal;
-        for (const r of this.rows) {
-          r._tonne         = this.canalHelper.selectByCanal(this.canal, r.objectif_tonne_vd, r.objectif_tonne_vh);
-          r._packs         = this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd, r.objectif_packs_vh);
-          r._packs_tournee = this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee);
-        }
-      }
-      let imported = 0;
-      const notFound: string[] = [];
-      for (const item of data) {
-        const row = item.code_produit
-          ? this.rows.find(r => r.code_produit === item.code_produit)
-          : this.rows.find(r => r.nom_produit.trim().toLowerCase() === (item.nom_produit ?? '').trim().toLowerCase());
-        if (row) {
-          row._tonne         = item.tonne ?? null;
-          row._packs         = item.packs != null ? Math.round(item.packs) : null;
-          row._packs_tournee = item.packs_tournee != null
-            ? Math.round(item.packs_tournee)
-            : (item.packs != null && this.routeCount > 0 ? Math.round(item.packs / this.routeCount) : null);
-          imported++;
-        } else {
-          notFound.push(item.code_produit ?? item.nom_produit ?? '?');
-        }
-      }
-      this.showImportDialog   = false;
-      this.isImporting        = false;
-      this.importFile         = null;
-      this.importResult       = { imported, notFound };
-      this.showNotFoundDetail = false;
-    };
-
-    const monthChanged = this.importMois !== this.mois || this.importAnnee !== this.annee;
-
-    this.http.post<ImportRow[]>('/api/v1/objectifs/parse-excel', fd)
+    this.http.get<ObjectifRow[]>(url)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: data => {
-          if (monthChanged) {
-            this.mois  = this.importMois;
-            this.annee = this.importAnnee;
-            this.http.get<any[]>(`/api/v1/objectifs?mois=${this.mois}&annee=${this.annee}&edit=true`)
-              .pipe(takeUntilDestroyed(this.destroyRef))
-              .subscribe({
-                next: rows => {
-                  this.rows = rows.map(d => ({ ...d, _packs: null, _packs_tournee: null }));
-                  for (const r of this.rows) {
-                    const t  = this.canalHelper.selectByCanal(this.importCanal, r.objectif_tonne_vd, r.objectif_tonne_vh);
-                    const p  = this.canalHelper.selectByCanal(this.importCanal, r.objectif_packs_vd, r.objectif_packs_vh);
-                    const pt = this.canalHelper.selectByCanal(this.importCanal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee);
-                    r._tonne = t; r._packs = p; r._packs_tournee = pt;
-                  }
-                  this.dirtyTracker.captureSnapshot(this.rows);
-                  applyImport(data);
-                },
-                error: () => { this.isImporting = false; },
-              });
-          } else {
-            applyImport(data);
-          }
+          this.rows.set(data);
+          this.loading.set(false);
+          this.routeCountService.loadRouteCounts(this.mois(), this.annee());
         },
-        error: () => { this.isImporting = false; },
+        error: () => this.loading.set(false),
       });
   }
 
-  // ── Copy from previous ────────────────────────────────────────────────────────
-  copyFromPrevious(): void {
-    let pm = this.mois - 1, pa = this.annee;
-    if (pm === 0) { pm = 12; pa--; }
-    this.http.get<any[]>(`/api/v1/objectifs?mois=${pm}&annee=${pa}`)
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: data => {
-          const map = new Map(data.map((d: any) => [d.code_produit, d]));
-          for (const r of this.rows) {
-            const prev = map.get(r.code_produit) as any;
-            if (prev) {
-              r._tonne         = this.canalHelper.selectByCanal(this.canal, prev.objectif_tonne_vd, prev.objectif_tonne_vh);
-              r._packs         = this.canalHelper.selectByCanal(this.canal, prev.objectif_packs_vd, prev.objectif_packs_vh);
-              r._packs_tournee = this.canalHelper.selectByCanal(this.canal, prev.objectif_packs_vd_tournee, prev.objectif_packs_vh_tournee);
-            }
-          }
-        },
-      });
+  setSort(col: string): void {
+    if (this.sortCol() === col) {
+      this.sortDir.update(d => d === 1 ? -1 : 1);
+    } else {
+      this.sortCol.set(col);
+      this.sortDir.set(1);
+    }
   }
 
-  // ── Dirty tracking ────────────────────────────────────────────────────────────
-  isDirtyRow(r: ObjectifRow): boolean {
-    return this.dirtyTracker.isDirtyRow(r);
+  toggleFamily(nom: string): void {
+    this.collapsedFamilies.update(prev => {
+      const next = new Set(prev);
+      if (next.has(nom)) next.delete(nom);
+      else next.add(nom);
+      return next;
+    });
   }
-
-  get dirtyCount(): number {
-    return this.dirtyTracker.getDirtyCount(this.rows);
-  }
-
-  // ── Sorting ───────────────────────────────────────────────────────────────────
-  readonly FLAT_SORT_COLS = new Set(['tonne', 'tonne_route', 'packs', 'packs_route']);
-
-  get isFlatSort(): boolean { return this.FLAT_SORT_COLS.has(this.sortCol); }
-
-  resetSort(): void { this.sortCol = ''; this.sortDir = 1; }
-
-  get sortedRows(): ObjectifRow[] {
-    if (!this.sortCol) return this.rows;
-    const tonne  = (r: ObjectifRow) => this.editMode ? r._tonne  : this.canalHelper.selectByCanal(this.canal, r.objectif_tonne_vd, r.objectif_tonne_vh);
-    const packs  = (r: ObjectifRow) => this.editMode ? r._packs  : this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd, r.objectif_packs_vh);
-    const packsT = (r: ObjectifRow) => this.editMode ? r._packs_tournee : this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee);
-
-    const selectors: Record<string, (r: ObjectifRow) => any> = {
-      famille: (r) => r.famille,
-      code: (r) => r.code_produit,
-      produit: (r) => r.nom_produit,
-      tonne: (r) => tonne(r),
-      tonne_route: (r) => this.routeCount ? (tonne(r) ?? 0) / this.routeCount : 0,
-      packs: (r) => packs(r),
-      packs_route: (r) => packsT(r),
-      updated_by: (r) => r.updated_by,
-      updated_at: (r) => r.updated_at,
-    };
-
-    const selector = selectors[this.sortCol];
-    if (!selector) return this.rows;
-
-    return [...this.rows].sort((a, b) =>
-      this.sortHelper.compare(selector(a), selector(b), 'auto', this.sortDir)
-    );
-  }
-
-  // ── Per-route helpers ─────────────────────────────────────────────────────────
-  get routeCount(): number { return this.canal === 'VD' ? this.routesVD : this.routesVH; }
-
-  perRouteTonne(val: number | null): string {
-    if (val == null || this.routeCount === 0) return '—';
-    return (val / this.routeCount).toLocaleString('fr-FR', { maximumFractionDigits: 2 });
-  }
-
-  perRoute(val: number | null): string {
-    if (val == null) return '—';
-    return val.toLocaleString('fr-FR', { maximumFractionDigits: 2 });
-  }
-
-  // ── Aggregates ────────────────────────────────────────────────────────────────
-  private rowTonne(r: ObjectifRow): number | null {
-    return this.editMode ? r._tonne : this.canalHelper.selectByCanal(this.canal, r.objectif_tonne_vd, r.objectif_tonne_vh);
-  }
-
-  private rowPacks(r: ObjectifRow): number | null {
-    return this.editMode ? r._packs : this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd, r.objectif_packs_vh);
-  }
-
-  private rowPacksTournee(r: ObjectifRow): number | null {
-    return this.editMode ? r._packs_tournee : this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee);
-  }
-
-  sumTonne(rows: ObjectifRow[]): number | null {
-    return this.aggregateHelper.sum(rows, r => this.rowTonne(r));
-  }
-
-  sumPacks(rows: ObjectifRow[]): number | null {
-    return this.aggregateHelper.sum(rows, r => this.rowPacks(r));
-  }
-
-  sumPacksTournee(rows: ObjectifRow[]): number | null {
-    return this.aggregateHelper.sum(rows, r => this.rowPacksTournee(r));
-  }
-
-  get filledProducts(): number {
-    return this.rows.filter(r =>
-      (this.canal === 'VD' ? r.objectif_packs_vd : r.objectif_packs_vh) != null
-    ).length;
-  }
-
-  get totalProducts(): number { return this.rows.length; }
-
-  readonly canalOptions = CANAL_OPTIONS;
-
-  get canalLabel(): string { return CANAL_DISPLAY(this.canal); }
-
 }

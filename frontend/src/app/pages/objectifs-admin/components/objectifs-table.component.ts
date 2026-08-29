@@ -1,15 +1,14 @@
 import { Component, Input, Output, EventEmitter, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { CanalHelper } from '../../../core/services/canal.helper';
 import { FamilleColorService } from '../../../core/services/famille-color.service';
 import { AggregateHelper } from '../../../core/services/aggregate.helper';
-import { ObjectifsDirtyTrackerService } from '../services/objectifs-dirty-tracker.service';
 
 export interface ObjectifRow {
   code_produit: string;
   nom_produit: string;
   famille: string;
+  sous_famille?: string | null;
   nom_distributeur?: string | null;
   objectif_tonne_vd?: number | null;
   objectif_packs_vd?: number | null;
@@ -17,9 +16,6 @@ export interface ObjectifRow {
   objectif_tonne_vh?: number | null;
   objectif_packs_vh?: number | null;
   objectif_packs_vh_tournee?: number | null;
-  _tonne?: number | null;
-  _packs?: number | null;
-  _packs_tournee?: number | null;
   updated_by?: string | null;
   updated_at?: string | null;
 }
@@ -32,7 +28,7 @@ export interface FamGroupe {
 @Component({
   selector: 'app-objectifs-table',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule],
   styleUrl: './objectifs-table.component.scss',
   template: `
     <div class="table-wrapper">
@@ -79,9 +75,8 @@ export interface FamGroupe {
               </tr>
             }
           } @else if (isFlatSort) {
-            <!-- Flat view -->
             @for (row of sortedRows; track row.code_produit) {
-              <tr [class.obj-row--dirty]="editMode && isDirtyRow(row)">
+              <tr>
                 <td>
                   <span class="famille-pill-badge"
                     [style.background]="famBg(row.famille)"
@@ -90,35 +85,20 @@ export interface FamGroupe {
                 <td><span class="code-chip">{{ row.code_produit }}</span></td>
                 <td class="td-nom" [title]="row.nom_produit">{{ row.nom_produit }}</td>
                 <td class="td-nom" [title]="row.nom_distributeur || '—'">{{ row.nom_distributeur || '—' }}</td>
-                @if (editMode) {
-                  <td class="td-input td-tonne" [class.td-vd]="canal === 'VD'" [class.td-vh]="canal === 'VH'">
-                    <input type="number" step="0.01" min="0" [(ngModel)]="row._tonne" placeholder="—">
-                  </td>
-                  <td class="td-num td-per-route td-tonne" [class.td-vd]="canal === 'VD'" [class.td-vh]="canal === 'VH'">{{ perRouteTonne(row._tonne) }}</td>
-                  <td class="td-input td-packs" [class.td-vd]="canal === 'VD'" [class.td-vh]="canal === 'VH'">
-                    <input type="number" step="1" min="0" [(ngModel)]="row._packs" placeholder="—">
-                  </td>
-                  <td class="td-input td-packs" [class.td-vd]="canal === 'VD'" [class.td-vh]="canal === 'VH'">
-                    <input type="number" step="1" min="0" [(ngModel)]="row._packs_tournee" placeholder="—">
-                  </td>
-                } @else {
-                  <td class="td-num td-tonne">{{ formatNum(getRowTonne(row)) }}</td>
-                  <td class="td-num td-per-route td-tonne">{{ perRouteTonne(getRowTonne(row)) }}</td>
-                  <td class="td-num td-packs">{{ formatNum(getRowPacks(row)) }}</td>
-                  <td class="td-num td-per-route td-packs">{{ perRoute(getRowPacksTournee(row)) }}</td>
-                }
+                <td class="td-num td-tonne">{{ formatNum(rowTonne(row)) }}</td>
+                <td class="td-num td-per-route td-tonne">{{ perRouteTonne(rowTonne(row)) }}</td>
+                <td class="td-num td-packs">{{ formatNum(rowPacks(row)) }}</td>
+                <td class="td-num td-per-route td-packs">{{ perRoute(rowPacksTournee(row)) }}</td>
                 <td class="text-muted td-small">{{ row.updated_by || '—' }}</td>
                 <td class="text-muted td-small">{{ formatDate(row.updated_at) }}</td>
               </tr>
             }
           } @else {
-            <!-- Grouped view -->
             @for (fam of grouped; track fam.nom) {
               @let fBg = famBg(fam.nom);
               @let fColor = famColor(fam.nom);
               @let fBorder = fColor + '33';
-              @let fRows = famRows(fam);
-              @let sfBg = famBgLight(fam.nom);
+              @let fRows = famAllRows(fam);
               <tr class="obj-fam-row" (click)="familyToggle.emit(fam.nom)" title="Cliquer pour réduire / développer">
                 <td colspan="4" class="obj-fam-cell"
                   [style.background]="fBg" [style.color]="fColor"
@@ -140,6 +120,7 @@ export interface FamGroupe {
 
               @if (!isFamilyCollapsed(fam.nom)) {
                 @for (sf of fam.sfs; track sf.nom) {
+                  @let sfBg = famBgLight(fam.nom);
                   <tr class="obj-sf-row">
                     <td colspan="4" [style.background]="sfBg">{{ sf.nom }}</td>
                     <td class="td-num obj-sf-total td-tonne" [style.background]="sfBg">{{ sumTonne(sf.rows) != null ? (sumTonne(sf.rows) | number:'1.0-2') : '—' }}</td>
@@ -150,7 +131,7 @@ export interface FamGroupe {
                   </tr>
 
                   @for (row of sf.rows; track row.code_produit) {
-                    <tr [class.obj-row--dirty]="editMode && isDirtyRow(row)">
+                    <tr>
                       <td>
                         <span class="famille-pill-badge"
                           [style.background]="famBg(row.famille)"
@@ -159,23 +140,10 @@ export interface FamGroupe {
                       <td><span class="code-chip">{{ row.code_produit }}</span></td>
                       <td class="td-nom" [title]="row.nom_produit">{{ row.nom_produit }}</td>
                       <td class="td-nom" [title]="row.nom_distributeur || '—'">{{ row.nom_distributeur || '—' }}</td>
-                      @if (editMode) {
-                        <td class="td-input td-tonne" [class.td-vd]="canal === 'VD'" [class.td-vh]="canal === 'VH'">
-                          <input type="number" step="0.01" min="0" [(ngModel)]="row._tonne" placeholder="—">
-                        </td>
-                        <td class="td-num td-per-route td-tonne" [class.td-vd]="canal === 'VD'" [class.td-vh]="canal === 'VH'">{{ perRouteTonne(row._tonne) }}</td>
-                        <td class="td-input td-packs" [class.td-vd]="canal === 'VD'" [class.td-vh]="canal === 'VH'">
-                          <input type="number" step="1" min="0" [(ngModel)]="row._packs" placeholder="—">
-                        </td>
-                        <td class="td-input td-packs" [class.td-vd]="canal === 'VD'" [class.td-vh]="canal === 'VH'">
-                          <input type="number" step="1" min="0" [(ngModel)]="row._packs_tournee" placeholder="—">
-                        </td>
-                      } @else {
-                        <td class="td-num td-tonne">{{ formatNum(getRowTonne(row)) }}</td>
-                        <td class="td-num td-per-route td-tonne">{{ perRouteTonne(getRowTonne(row)) }}</td>
-                        <td class="td-num td-packs">{{ formatNum(getRowPacks(row)) }}</td>
-                        <td class="td-num td-per-route td-packs">{{ perRoute(getRowPacksTournee(row)) }}</td>
-                      }
+                      <td class="td-num td-tonne">{{ formatNum(rowTonne(row)) }}</td>
+                      <td class="td-num td-per-route td-tonne">{{ perRouteTonne(rowTonne(row)) }}</td>
+                      <td class="td-num td-packs">{{ formatNum(rowPacks(row)) }}</td>
+                      <td class="td-num td-per-route td-packs">{{ perRoute(rowPacksTournee(row)) }}</td>
                       <td class="text-muted td-small">{{ row.updated_by || '—' }}</td>
                       <td class="text-muted td-small">{{ formatDate(row.updated_at) }}</td>
                     </tr>
@@ -190,14 +158,12 @@ export interface FamGroupe {
   `,
 })
 export class ObjectifsTableComponent {
-  private canalHelper = inject(CanalHelper);
-  private familleColorService = inject(FamilleColorService);
-  private aggregateHelper = inject(AggregateHelper);
-  private dirtyTracker = inject(ObjectifsDirtyTrackerService);
+  private readonly canalHelper         = inject(CanalHelper);
+  private readonly familleColorService = inject(FamilleColorService);
+  private readonly aggregateHelper     = inject(AggregateHelper);
 
   @Input() rows: ObjectifRow[] = [];
   @Input() grouped: FamGroupe[] = [];
-  @Input() editMode: boolean = false;
   @Input() loading: boolean = false;
   @Input() canal: 'VD' | 'VH' = 'VD';
   @Input() sortCol: string = '';
@@ -207,19 +173,27 @@ export class ObjectifsTableComponent {
   @Input() sortedRows: ObjectifRow[] = [];
   @Input() routeCount: number = 0;
 
-  @Output() sortChange = new EventEmitter<string>();
+  @Output() sortChange   = new EventEmitter<string>();
   @Output() familyToggle = new EventEmitter<string>();
 
-  isDirtyRow(r: ObjectifRow): boolean {
-    return this.dirtyTracker.isDirtyRow(r);
+  famBg(famille: string): string      { return this.familleColorService.getStyle(famille).background; }
+  famColor(famille: string): string   { return this.familleColorService.getStyle(famille).color; }
+  famBgLight(_: string): string       { return 'rgba(0,0,0,0.02)'; }
+
+  famAllRows(fam: FamGroupe): ObjectifRow[] { return fam.sfs.flatMap(sf => sf.rows); }
+  isFamilyCollapsed(nom: string): boolean   { return this.collapsedFamilies.has(nom); }
+
+  rowTonne(r: ObjectifRow): number | null {
+    return this.canalHelper.selectByCanal(this.canal, r.objectif_tonne_vd, r.objectif_tonne_vh) ?? null;
   }
 
-  famBg(famille: string): string { return this.familleColorService.getStyle(famille).background; }
-  famColor(famille: string): string { return this.familleColorService.getStyle(famille).color; }
-  famBgLight(famille: string): string { return 'rgba(0,0,0,0.02)'; }
+  rowPacks(r: ObjectifRow): number | null {
+    return this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd, r.objectif_packs_vh) ?? null;
+  }
 
-  famRows(fam: FamGroupe): ObjectifRow[] { return fam.sfs.flatMap(sf => sf.rows); }
-  isFamilyCollapsed(nom: string): boolean { return this.collapsedFamilies.has(nom); }
+  rowPacksTournee(r: ObjectifRow): number | null {
+    return this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee) ?? null;
+  }
 
   sumTonne(rows: ObjectifRow[]): number | null {
     return this.aggregateHelper.sum(rows, r => this.rowTonne(r));
@@ -232,22 +206,6 @@ export class ObjectifsTableComponent {
   sumPacksTournee(rows: ObjectifRow[]): number | null {
     return this.aggregateHelper.sum(rows, r => this.rowPacksTournee(r));
   }
-
-  private rowTonne(r: ObjectifRow): number | null {
-    return this.editMode ? (r._tonne ?? null) : (this.canalHelper.selectByCanal(this.canal, r.objectif_tonne_vd, r.objectif_tonne_vh) ?? null);
-  }
-
-  private rowPacks(r: ObjectifRow): number | null {
-    return this.editMode ? (r._packs ?? null) : (this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd, r.objectif_packs_vh) ?? null);
-  }
-
-  private rowPacksTournee(r: ObjectifRow): number | null {
-    return this.editMode ? (r._packs_tournee ?? null) : (this.canalHelper.selectByCanal(this.canal, r.objectif_packs_vd_tournee, r.objectif_packs_vh_tournee) ?? null);
-  }
-
-  getRowTonne(row: ObjectifRow): number | null { return this.rowTonne(row); }
-  getRowPacks(row: ObjectifRow): number | null { return this.rowPacks(row); }
-  getRowPacksTournee(row: ObjectifRow): number | null { return this.rowPacksTournee(row); }
 
   perRouteTonne(val: number | null | undefined): string {
     if (val == null || this.routeCount === 0) return '—';

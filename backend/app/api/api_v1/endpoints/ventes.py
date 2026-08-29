@@ -558,7 +558,7 @@ async def upload_ventes(
             progress = 30 + int(65 * inserted / total)
             yield event({
                 "progress": progress,
-                "message": f"{inserted:,} / {total:,} lignes insérées...",
+                "message": f"[{distributor.nom}] {inserted:,} / {total:,} lignes insérées...",
             })
 
         # Upsert into VenteClientName lookup table
@@ -583,7 +583,7 @@ async def upload_ventes(
         session.commit()
 
         dominant_month = df['Date'].dt.strftime('%Y-%m').value_counts().idxmax()
-        msg = f"{total:,} lignes importées avec succès"
+        msg = f"{total:,} lignes importées avec succès pour {distributor.nom}"
         log_line = f"Upload terminé : {total:,} lignes importées ({dominant_month}) par {current_user.full_name}"
 
         # Check for FDV codes in the file that have no user account
