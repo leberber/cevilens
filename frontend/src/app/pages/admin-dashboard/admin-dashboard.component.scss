@@ -1,62 +1,26 @@
-// Admin dashboard — role summary cards, error state, table footer
-// Table styles → global .data-table in _table.scss
+// Admin dashboard overview
 
-.role-summary {
+.admin-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 1rem;
-  margin-bottom: 2rem;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color-light);
+
+  @media (max-width: 900px) { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 480px) { grid-template-columns: 1fr; }
 }
 
-.role-card {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem;
-  background: var(--surface-card);
-  border: 1px solid var(--surface-border);
-  border-radius: var(--radius-lg);
-  transition: transform 0.2s, box-shadow 0.2s;
+.admin-section {
+  padding: 1.25rem 1.5rem;
 
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  &:not(:last-child) { border-bottom: 1px solid var(--border-color-light); }
+
+  .card-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
+    i { font-size: 0.7rem; }
   }
-
-  &__color {
-    width: 12px;
-    height: 40px;
-    border-radius: 0.25rem;
-    flex-shrink: 0;
-  }
-
-  &__content { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
-  &__label   { font-size: var(--font-size-xs); font-weight: var(--font-weight-semibold); color: var(--text-color); }
-  &__count   { font-size: var(--font-size-xs); color: var(--text-color-secondary); }
-
-  &--platform_admin    .role-card__color { background: var(--color-error); }
-  &--distributor_admin .role-card__color { background: var(--color-warning); }
-  &--superviseur       .role-card__color { background: var(--primary-color); }
-  &--prevendeur        .role-card__color { background: var(--surface-400); }
-}
-
-.error-state {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1.5rem;
-  background: color-mix(in srgb, var(--color-error) 8%, transparent);
-  border-radius: var(--radius-lg);
-  color: var(--color-error);
-  font-size: var(--font-size-sm);
-}
-
-.table-footer {
-  padding: 1rem;
-  border-top: 1px solid var(--surface-border);
-  background: var(--surface-ground);
-  text-align: right;
-  font-size: var(--font-size-sm);
-  color: var(--text-color-secondary);
-  strong { color: var(--text-color); }
 }

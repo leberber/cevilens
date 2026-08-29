@@ -81,7 +81,7 @@
                     {{ roleLabel[u.role] }}
                   </span>
                 </td>
-                <td><span class="text-muted">{{ getDistributorName(u.distributor_id) }}</span></td>
+                <td><span class="text-muted" style="font-size: var(--font-size-xs)">{{ getDistributorName(u.distributor_id) }}</span></td>
                 <td>
                   <app-status-badge [isActive]="u.is_active"></app-status-badge>
                 </td>

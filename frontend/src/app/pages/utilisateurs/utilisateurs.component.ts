@@ -92,7 +92,7 @@ export class UtilisateursComponent implements OnInit {
       .subscribe({
         next: (dists) => {
           this.distributors.set(dists);
-          this.distributorMap.set(new Map(dists.map(d => [d.id, `${d.code} - ${d.nom}`])));
+          this.distributorMap.set(new Map(dists.map(d => [d.id, d.nom])));
         },
         error: () => {},
       });

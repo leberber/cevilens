@@ -1,79 +1,123 @@
 <app-page-layout
-  icon="pi-users"
-  title="Administration plateforme"
-  subtitle="Gestion globale des utilisateurs et des rôles">
+  icon="pi-home"
+  title="Vue d'ensemble"
+  subtitle="Tableau de bord plateforme">
 
-  <!-- Cartes résumé par rôle -->
-  <div class="role-summary">
-    @for (role of roles; track role) {
-      <div [class]="'role-card role-card--' + role">
-        <div class="role-card__color"></div>
-        <div class="role-card__content">
-          <span class="role-card__label">{{ roleLabels[role] }}</span>
-          <span class="role-card__count">{{ getRoleCount(role) }} utilisateur(s)</span>
+  @if (loading()) {
+    <app-skeleton-loader [rows]="6" [columns]="4" />
+  } @else {
+
+    <!-- KPI cards -->
+    <div class="admin-kpi-grid">
+      <div class="stat-card">
+        <div class="stat-card__icon stat-card__icon--primary"><i class="pi pi-building"></i></div>
+        <div class="stat-card__body">
+          <div class="stat-card__value">{{ totalDistributors() }}</div>
+          <div class="stat-card__label">Distributeurs</div>
+          <div class="stat-card__sub">{{ activeDistributors() }} actifs · {{ totalDistributors() - activeDistributors() }} inactifs</div>
         </div>
       </div>
-    }
-  </div>
-
-  <!-- États -->
-  @if (loading()) {
-    <app-loading-state message="Chargement des utilisateurs…" />
-  } @else if (error()) {
-    <div class="error-state">
-      <i class="pi pi-exclamation-triangle"></i>
-      <span>{{ error() }}</span>
-      <button class="btn-secondary" (click)="loadUsers()">
-        <i class="pi pi-refresh"></i> Réessayer
-      </button>
+      <div class="stat-card">
+        <div class="stat-card__icon stat-card__icon--info"><i class="pi pi-users"></i></div>
+        <div class="stat-card__body">
+          <div class="stat-card__value">{{ totalUsers() }}</div>
+          <div class="stat-card__label">Utilisateurs</div>
+          <div class="stat-card__sub">{{ activeUsers() }} actifs</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__icon stat-card__icon--warning"><i class="pi pi-shield"></i></div>
+        <div class="stat-card__body">
+          <div class="stat-card__value">{{ activeDistributors() }}</div>
+          <div class="stat-card__label">Distributeurs actifs</div>
+          <div class="stat-card__sub">sur {{ totalDistributors() }} au total</div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card__icon stat-card__icon--success"><i class="pi pi-check-circle"></i></div>
+        <div class="stat-card__body">
+          <div class="stat-card__value">{{ activeUsers() }}</div>
+          <div class="stat-card__label">Utilisateurs actifs</div>
+          <div class="stat-card__sub">sur {{ totalUsers() }} au total</div>
+        </div>
+      </div>
     </div>
-  } @else if (users().length === 0) {
-    <app-empty-state icon="pi-users" message="Aucun utilisateur trouvé" />
-  } @else {
-    <div class="table-container">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Nom</th>
-            <th>Téléphone</th>
-            <th>Rôle</th>
-            <th>Distributeur</th>
-            <th>Statut</th>
-            <th>Créé le</th>
-          </tr>
-        </thead>
-        <tbody>
-          @for (user of users(); track user.id) {
+
+    <!-- Distributor breakdown -->
+    <div class="admin-section">
+      <p class="card-label"><i class="pi pi-building"></i> Répartition par distributeur</p>
+      @if (distributorStats().length === 0) {
+        <app-empty-state icon="pi-building" message="Aucun distributeur" />
+      } @else {
+        <table class="table">
+          <thead>
             <tr>
-              <td><strong>#{{ user.id }}</strong></td>
-              <td>{{ user.full_name }}</td>
-              <td><code>{{ user.phone }}</code></td>
-              <td>
-                <span [class]="roleBadges[user.role] || 'badge'">
-                  {{ roleLabels[user.role] }}
-                </span>
-              </td>
-              <td>
-                @if (user.distributor_id) {
-                  <span class="badge badge--info">{{ user.distributor_id }}</span>
-                } @else {
-                  <span class="badge">—</span>
-                }
-              </td>
-              <td>
-                <app-status-badge [isActive]="user.is_active" activeLabel="Actif" inactiveLabel="Inactif" />
-              </td>
-              <td>{{ user.created_at | date: 'dd/MM/yyyy' }}</td>
+              <th>Distributeur</th>
+              <th>Statut</th>
+              <th>Admins</th>
+              <th>Superviseurs</th>
+              <th>Prévendeurs</th>
+              <th>Total</th>
             </tr>
-          }
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            @for (stat of distributorStats(); track stat.distributor.id; let i = $index) {
+              <tr class="table-row-animate" [style.--row-delay]="i * 20 + 'ms'">
+                <td>
+                  <div class="table-user-cell">
+                    <div class="table-user-avatar">{{ initials(stat.distributor.nom) }}</div>
+                    <div>
+                      <div class="table-item-name">{{ stat.distributor.nom }}</div>
+                      <div style="font-size: var(--font-size-xs); color: var(--text-color-secondary)">{{ stat.distributor.code }}</div>
+                    </div>
+                  </div>
+                </td>
+                <td><app-status-badge [isActive]="stat.distributor.is_active" /></td>
+                <td><span class="badge badge--danger">{{ stat.admins }}</span></td>
+                <td><span class="badge badge--info">{{ stat.superviseurs }}</span></td>
+                <td><span class="badge badge--neutral">{{ stat.prevendeurs }}</span></td>
+                <td><strong>{{ stat.total }}</strong></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
     </div>
 
-    <div class="table-footer">
-      <span>Total : <strong>{{ users().length }}</strong> utilisateurs</span>
+    <!-- Recent additions -->
+    <div class="admin-section">
+      <p class="card-label"><i class="pi pi-user-plus"></i> Derniers utilisateurs ajoutés</p>
+      @if (recentUsers().length === 0) {
+        <app-empty-state icon="pi-users" message="Aucun utilisateur" />
+      } @else {
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Utilisateur</th>
+              <th>Rôle</th>
+              <th>Distributeur</th>
+              <th>Ajouté le</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of recentUsers(); track u.id; let i = $index) {
+              <tr class="table-row-animate" [style.--row-delay]="i * 20 + 'ms'">
+                <td>
+                  <div class="table-user-cell">
+                    <div class="table-user-avatar">{{ initials(u.full_name) }}</div>
+                    <span class="table-item-name">{{ u.full_name }}</span>
+                  </div>
+                </td>
+                <td><span [class]="roleBadges[u.role]">{{ roleLabels[u.role] }}</span></td>
+                <td><span class="text-muted" style="font-size: var(--font-size-xs)">{{ distributorName(u.distributor_id) }}</span></td>
+                <td><span class="text-muted" style="font-size: var(--font-size-xs)">{{ u.created_at | date: 'd MMM yyyy' }}</span></td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      }
     </div>
+
   }
 
 </app-page-layout>

@@ -1,0 +1,99 @@
+<app-page-layout
+  icon="pi-list"
+  title="Logs serveur"
+  [subtitle]="stats() ? stats()!.file_size_human + ' · ' + (stats()!.total_lines | number) + ' lignes' : null"
+  [actions]="headerActions"
+  [toolbar]="toolbarContent">
+
+  <!-- Header Actions Template -->
+  <ng-template #headerActions>
+    <div class="logs-actions">
+      <button class="logs-btn" [class.logs-btn--active]="autoRefresh()" (click)="toggleAutoRefresh()" title="Auto-refresh 15s">
+        <i class="pi" [class.pi-play]="!autoRefresh()" [class.pi-pause]="autoRefresh()"></i>
+        {{ autoRefresh() ? 'Stop' : 'Auto' }}
+      </button>
+      <button class="logs-btn" (click)="load()" [disabled]="loading()" title="Rafraîchir">
+        <i class="pi pi-refresh" [class.pi-spin]="loading()"></i>
+      </button>
+    </div>
+  </ng-template>
+
+  <!-- Toolbar Template -->
+  <ng-template #toolbarContent>
+    <div class="logs-toolbar">
+    <!-- Level filter -->
+    <div class="logs-toolbar__group">
+      @for (opt of levelOptions; track opt.label) {
+        <button class="logs-seg-btn"
+                [class.logs-seg-btn--active]="selectedLevel() === opt.value"
+                (click)="selectedLevel.set(opt.value); load()">
+          {{ opt.label }}
+        </button>
+      }
+    </div>
+
+    <!-- Lines selector -->
+    <div class="logs-toolbar__group">
+      @for (n of linesOptions; track n) {
+        <button class="logs-seg-btn"
+                [class.logs-seg-btn--active]="selectedLines() === n"
+                (click)="selectedLines.set(n); load()">
+          {{ n }}
+        </button>
+      }
+    </div>
+
+    <!-- Badges -->
+    <div class="logs-toolbar__badges">
+      @if (errorCount() > 0) {
+        <span class="logs-badge logs-badge--error">{{ errorCount() }} erreurs</span>
+      }
+      @if (warnCount() > 0) {
+        <span class="logs-badge logs-badge--warn">{{ warnCount() }} warnings</span>
+      }
+    </div>
+
+    <!-- Scroll -->
+    <div class="logs-toolbar__scroll">
+      <button class="logs-btn logs-btn--icon" (click)="scrollTo('top')" title="Haut"><i class="pi pi-arrow-up"></i></button>
+      <button class="logs-btn logs-btn--icon" (click)="scrollTo('bottom')" title="Bas"><i class="pi pi-arrow-down"></i></button>
+    </div>
+    </div>
+  </ng-template>
+
+  <!-- Log entries -->
+  <div class="logs-body">
+    @if (loading()) {
+      <app-loading-state message="Chargement des logs..." [compact]="true"></app-loading-state>
+    } @else if (error()) {
+      <div class="logs-state logs-state--error">
+        <i class="pi pi-exclamation-circle"></i>
+        <span>{{ error() }}</span>
+        <button class="logs-btn" (click)="load()">
+          <i class="pi pi-refresh"></i> Réessayer
+        </button>
+      </div>
+    } @else if (filteredEntries().length === 0) {
+      <div class="logs-state">
+        <i class="pi pi-inbox"></i>
+        <span>Aucun log trouvé</span>
+      </div>
+    } @else {
+      @for (entry of filteredEntries(); track $index) {
+        <div class="log-entry" [class.log-entry--error]="entry.level === 'ERROR'" [class.log-entry--warn]="entry.level === 'WARNING'">
+          <span class="log-time">{{ entry.timestamp }}</span>
+          <span class="log-level" [class]="levelClass(entry.level)">{{ entry.level }}</span>
+          <span class="log-logger">{{ entry.logger }}</span>
+          <span class="log-msg">{{ entry.message }}</span>
+        </div>
+      }
+    }
+  </div>
+
+  @if (autoRefresh()) {
+    <div class="logs-refresh-indicator">
+      <i class="pi pi-sync pi-spin"></i> Auto-refresh actif (15s)
+    </div>
+  }
+
+</app-page-layout>

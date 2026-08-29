@@ -1,40 +1,50 @@
 <app-page-layout
-  icon="pi-sitemap"
-  title="Distributors"
-  subtitle="Manage all distributors in the system">
+  icon="pi-building"
+  title="Distributeurs"
+  [subtitle]="subtitle()"
+  [toolbar]="toolbarTpl">
+
+  <ng-template #toolbarTpl>
+    <div class="table-header">
+      <div class="table-header-left">
+        <app-search-input
+          [value]="search()"
+          placeholder="Rechercher…"
+          (valueChange)="search.set($event)" />
+      </div>
+    </div>
+  </ng-template>
 
   @if (loading()) {
-    <app-loading-state message="Chargement des distributeurs..."></app-loading-state>
-  } @else if (error) {
-    <div class="error">{{ error }}</div>
-  } @else if (distributors.length === 0) {
+    <app-skeleton-loader [rows]="5" [columns]="4" />
+  } @else if (error()) {
+    <app-empty-state icon="pi-exclamation-triangle" [message]="error()!" />
+  } @else if (filtered().length === 0) {
     <app-empty-state
-      icon="pi-inbox"
-      message="No distributors found">
-    </app-empty-state>
+      icon="pi-building"
+      [message]="search() ? 'Aucun résultat pour « ' + search() + ' »' : 'Aucun distributeur enregistré'" />
   } @else {
-    <table class="data-table">
+    <table class="table">
       <thead>
         <tr>
-          <th>ID</th>
+          <th>Distributeur</th>
           <th>Code</th>
-          <th>Name</th>
-          <th>Status</th>
-          <th>Created</th>
+          <th>Statut</th>
+          <th>Créé le</th>
         </tr>
       </thead>
       <tbody>
-        @for (distributor of distributors; track distributor.id) {
-          <tr>
-            <td>{{ distributor.id }}</td>
-            <td><strong>{{ distributor.code }}</strong></td>
-            <td>{{ distributor.nom }}</td>
+        @for (d of filtered(); track d.id; let i = $index) {
+          <tr class="table-row-animate" [style.--row-delay]="i * 20 + 'ms'">
             <td>
-              <span class="badge" [class.active]="distributor.is_active">
-                {{ distributor.is_active ? '✓ Active' : '✗ Inactive' }}
-              </span>
+              <div class="table-user-cell">
+                <div class="table-user-avatar">{{ initials(d.nom) }}</div>
+                <span class="table-item-name">{{ d.nom }}</span>
+              </div>
             </td>
-            <td>{{ distributor.created_at | date: 'short' }}</td>
+            <td><code class="font-mono text-muted">{{ d.code }}</code></td>
+            <td><app-status-badge [isActive]="d.is_active" /></td>
+            <td><span class="text-muted" style="font-size: var(--font-size-xs)">{{ d.created_at | date: 'd MMM yyyy' }}</span></td>
           </tr>
         }
       </tbody>
