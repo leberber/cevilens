@@ -4,8 +4,6 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 import { FormatService } from '../../core/services/format.service';
 import { LoadingManager } from '../../core/services/loading-manager.service';
 import { PeriodService } from '../../core/services/period.service';
-import { PageLayoutComponent } from '../../shared/components/page-layout/page-layout.component';
-
 import { D3AreaComponent, type AreaPoint } from './d3-area.component';
 import { D3HbarComponent, type HBarItem } from './d3-hbar.component';
 import { CommuneMapComponent, type CommuneDatum } from './commune-map.component';
@@ -33,7 +31,7 @@ type Unite = 'packs' | 'tonnes';
 @Component({
   selector: 'app-analytics',
   standalone: true,
-  imports: [DecimalPipe, D3AreaComponent, D3HbarComponent, CommuneMapComponent, PageLayoutComponent],
+  imports: [DecimalPipe, D3AreaComponent, D3HbarComponent, CommuneMapComponent],
   templateUrl: './analytics.component.html',
   styleUrl:    './analytics.component.scss',
 })

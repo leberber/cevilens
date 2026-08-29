@@ -88,6 +88,10 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.table-container--no-toolbar .table-wrapper {
+  height: var(--table-max-height, calc(100vh - 130px));
+}
+
 .table {
   width: 100%;
   border-collapse: collapse;

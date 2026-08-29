@@ -884,7 +884,9 @@ export class ObjectifsUploadDialogComponent implements OnInit {
         next: (dists) => {
           this.distributors.set(dists);
           if (dists.length > 0) {
-            this.selectedDistributor = dists[0].id;
+            const contextId = this.distContext.selectedDistributorId();
+            const match = contextId ? dists.find(d => d.id === contextId) : null;
+            this.selectedDistributor = match ? match.id : dists[0].id;
             this.loadPrevendeurCounts();
           }
         },

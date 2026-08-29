@@ -1,50 +1,38 @@
-<app-page-layout
-  icon="pi-chart-line"
-  title="Analytiques"
-  [actions]="headerActions">
-
-  <!-- Header Actions Template -->
-  <ng-template #headerActions>
-    <div class="an-header-tags">
-      @if (famille()) {
-        <span class="an-tag">{{ famille() }} <button (click)="clearFamille()">×</button></span>
-      }
-      @if (fdv()) {
-        <span class="an-tag">{{ fdv()!.nom }} <button (click)="clearFdv()">×</button></span>
-      }
-      @if (commune()) {
-        <span class="an-tag">{{ commune()!.name }} <button (click)="clearCommune()">×</button></span>
+<!-- ── Header ── -->
+<div class="an-header">
+  <div class="an-header__brand">
+    <div class="an-header__icon"><i class="pi pi-chart-line"></i></div>
+    <span class="an-header__title">Analytiques</span>
+    @if (famille()) {
+      <span class="an-tag">{{ famille() }} <button (click)="clearFamille()">×</button></span>
+    }
+    @if (fdv()) {
+      <span class="an-tag">{{ fdv()!.nom }} <button (click)="clearFdv()">×</button></span>
+    }
+    @if (commune()) {
+      <span class="an-tag">{{ commune()!.name }} <button (click)="clearCommune()">×</button></span>
+    }
+  </div>
+  <div class="an-header__controls">
+    <div class="seg-control seg-control--glass">
+      @for (u of unites; track u.value) {
+        <button class="seg-btn" [class.seg-btn--active]="unite() === u.value" (click)="setUnite(u.value)">{{ u.label }}</button>
       }
     </div>
-    <div class="an-header__controls">
-      <!-- Unite toggle -->
-      <div class="seg-control seg-control--glass">
-        @for (u of unites; track u.value) {
-          <button class="seg-btn" [class.seg-btn--active]="unite() === u.value" (click)="setUnite(u.value)">
-            {{ u.label }}
-          </button>
-        }
-      </div>
-
-      <!-- Canal toggle -->
-      <div class="seg-control seg-control--glass">
-        @for (c of canals; track c.value) {
-          <button class="seg-btn" [class.seg-btn--active]="canal() === c.value" (click)="setCanal(c.value)">
-            {{ c.label }}
-          </button>
-        }
-      </div>
-
-      <!-- Période -->
-      <select class="an-select" (change)="setPeriode($any($event.target).value)">
-        @for (p of periodes(); track p) {
-          <option [value]="p" [selected]="periode() === p">{{ formatPeriode(p) }}</option>
-        }
-      </select>
+    <div class="seg-control seg-control--glass">
+      @for (c of canals; track c.value) {
+        <button class="seg-btn" [class.seg-btn--active]="canal() === c.value" (click)="setCanal(c.value)">{{ c.label }}</button>
+      }
     </div>
-  </ng-template>
+    <select class="an-select" (change)="setPeriode($any($event.target).value)">
+      @for (p of periodes(); track p) {
+        <option [value]="p" [selected]="periode() === p">{{ formatPeriode(p) }}</option>
+      }
+    </select>
+  </div>
+</div>
 
-  <!-- ── KPI Strip ── -->
+<!-- ── KPI Strip ── -->
 <div class="an-kpis">
 
   <div class="an-kpi">
@@ -180,5 +168,3 @@
   </div>
 
   </div>
-
-</app-page-layout>
