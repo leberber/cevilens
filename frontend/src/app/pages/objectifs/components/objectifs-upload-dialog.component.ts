@@ -56,9 +56,16 @@ import { UploadComponent } from '../../upload/upload.component';
               @if (!loadingCounts()) {
                 <div class="prevendeur-select-wrapper">
                   <i class="pi pi-users"></i>
-                  <span class="prevendeur-text">VD: <strong>{{ prevendeurVDValue }}</strong></span>
+                  <span class="canal-type-label">Sélectionner type de vente</span>
+                  <button class="canal-btn" [class.active]="selectedCanal() === 'VD'" (click)="selectedCanal.set('VD')" type="button">
+                    @if (selectedCanal() === 'VD') { <i class="pi pi-check"></i> }
+                    VD: <strong>{{ prevendeurVDValue }}</strong>
+                  </button>
                   <span class="prevendeur-separator">|</span>
-                  <span class="prevendeur-text">VH: <strong>{{ prevendeurVHValue }}</strong></span>
+                  <button class="canal-btn" [class.active]="selectedCanal() === 'VH'" (click)="selectedCanal.set('VH')" type="button">
+                    @if (selectedCanal() === 'VH') { <i class="pi pi-check"></i> }
+                    VH: <strong>{{ prevendeurVHValue }}</strong>
+                  </button>
                 </div>
               }
             </div>
@@ -70,10 +77,21 @@ import { UploadComponent } from '../../upload/upload.component';
           <app-upload #uploadComponent></app-upload>
         </div>
 
+        <!-- Error Message -->
+        @if (errorMessage()) {
+          <div class="error-message">
+            <i class="pi pi-exclamation-circle"></i>
+            {{ errorMessage() }}
+          </div>
+        }
+
         <!-- Footer -->
         <div class="dialog-footer">
           <button class="btn-secondary" type="button" (click)="onDialogClose()" [disabled]="loadingCounts()">
             Annuler
+          </button>
+          <button class="btn-primary" type="button" (click)="onImport()">
+            <i class="pi pi-upload"></i> Importer
           </button>
         </div>
 
@@ -270,6 +288,90 @@ import { UploadComponent } from '../../upload/upload.component';
       display: flex;
       justify-content: flex-end;
       gap: 0.75rem;
+    }
+
+    .btn-primary {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.625rem 1.5rem;
+      border: none;
+      background: var(--primary-color);
+      color: white;
+      border-radius: var(--radius-md);
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(var(--primary-rgb), 0.2);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, var(--primary-color), rgba(var(--primary-rgb), 0.8));
+      box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
+      transform: translateY(-2px);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .canal-btn {
+      background: none;
+      border: none;
+      color: var(--text-color-secondary);
+      cursor: pointer;
+      font-size: 0.9rem;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      transition: all 0.2s ease;
+    }
+
+    .canal-btn:hover {
+      color: var(--primary-color);
+    }
+
+    .canal-btn.active {
+      color: var(--primary-color);
+      font-weight: 700;
+    }
+
+    .canal-btn i {
+      font-size: 0.8rem;
+    }
+
+    .canal-type-label {
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: var(--text-color-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      opacity: 0.7;
+    }
+
+    .error-message {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 1rem 2rem;
+      background: rgba(var(--red-rgb), 0.1);
+      border-left: 4px solid var(--red-500);
+      color: var(--red-600);
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .error-message i {
+      font-size: 1rem;
+      color: var(--red-500);
     }
 
     :host ::ng-deep .upload-zone-wrapper .upload-page {
@@ -470,6 +572,8 @@ export class ObjectifsUploadDialogComponent implements OnInit {
   readonly isPlatformAdmin = this.roleService.isPlatformAdmin();
   readonly loadingCounts = signal(false);
   readonly distributors = signal<Distributor[]>([]);
+  readonly selectedCanal = signal<'VD' | 'VH' | null>(null);
+  readonly errorMessage = signal<string | null>(null);
 
   prevendeurVDValue = 0;
   prevendeurVHValue = 0;
@@ -552,5 +656,14 @@ export class ObjectifsUploadDialogComponent implements OnInit {
   onDialogClose() {
     this.visibleChange.emit(false);
     this.close.emit();
+  }
+
+  onImport() {
+    if (!this.selectedCanal()) {
+      this.errorMessage.set('Veuillez sélectionner le type de vente d\'abord');
+      return;
+    }
+    this.errorMessage.set(null);
+    // Proceed with upload
   }
 }
