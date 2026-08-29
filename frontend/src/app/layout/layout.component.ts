@@ -1,6 +1,8 @@
 import { Component, inject, computed, signal, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterLinkActive, RouterOutlet, NavigationEnd } from '@angular/router';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { filter } from 'rxjs/operators';
 import { Divider } from 'primeng/divider';
 import { AuthService } from '../core/services/auth.service';
 import { RoleService } from '../core/services/role.service';
@@ -23,6 +25,16 @@ export class LayoutComponent {
   readonly auth = inject(AuthService);
   readonly roleService = inject(RoleService);
   readonly distributorContext = inject(DistributorContextService);
+  private readonly router = inject(Router);
+
+  constructor() {
+    this.router.events.pipe(
+      filter(e => e instanceof NavigationEnd),
+      takeUntilDestroyed(),
+    ).subscribe((e: NavigationEnd) => {
+      this.collapsed.set(e.urlAfterRedirects.startsWith('/carte'));
+    });
+  }
 
   readonly distributorName = computed(() => this.distributorContext.formattedName());
 

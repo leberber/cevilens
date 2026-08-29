@@ -1,0 +1,112 @@
+<div class="prod-tree">
+
+  @if (loading()) {
+    @for (sk of [1,2,3,4]; track sk) {
+      <div class="prod-tree__sk-node">
+        <div class="prod-tree__sk-name"></div>
+        <div class="prod-tree__sk-bar"></div>
+      </div>
+    }
+
+  } @else if (tree().length === 0) {
+    <div class="prod-tree__empty">
+      <i class="pi pi-inbox"></i>
+      <span>Aucune donnée</span>
+    </div>
+
+  } @else {
+    @for (f of tree(); track f.nom) {
+
+      <!-- ── Famille row ─────────────────────────────────────────────────── -->
+      <div class="prod-tree__node prod-tree__node--famille"
+           [class.prod-tree__node--active]="isFamilleActive(f)">
+        <button class="prod-tree__chevron"
+                (click)="toggleFamille(f.nom)"
+                [attr.aria-expanded]="isFamilleOpen(f.nom)"
+                [attr.aria-label]="isFamilleOpen(f.nom) ? 'Réduire ' + f.nom : 'Développer ' + f.nom">
+          <i [class]="isFamilleOpen(f.nom) ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"></i>
+        </button>
+        <button class="prod-tree__label" (click)="selectFamille(f)">
+          <span class="prod-tree__name">{{ f.nom }}</span>
+          <span class="prod-tree__meta">
+            <span class="prod-tree__total">{{ f.total | number:'1.0-0' }}</span>
+            @if (pct(f.total, f.objectif); as p) {
+              <span class="prod-tree__pct" [class]="pctClass(p)">{{ p }}%</span>
+            }
+          </span>
+        </button>
+        <div class="prod-tree__bar-row">
+          <div class="prod-tree__bar-track">
+            <div class="prod-tree__bar-fill"
+                 [class]="barFillClass(f.total, f.objectif)"
+                 [style.width]="barWidth(f.total, f.objectif)">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      @if (isFamilleOpen(f.nom)) {
+        @for (sf of f.sous_familles; track sf.nom) {
+
+          <!-- ── Sous-famille row ──────────────────────────────────────── -->
+          <div class="prod-tree__node prod-tree__node--sf"
+               [class.prod-tree__node--active]="isSfActive(f, sf)">
+            <button class="prod-tree__chevron prod-tree__chevron--sf"
+                    (click)="toggleSf(f.nom, sf.nom)"
+                    [attr.aria-expanded]="isSfOpen(f.nom, sf.nom)"
+                    [attr.aria-label]="isSfOpen(f.nom, sf.nom) ? 'Réduire ' + sf.nom : 'Développer ' + sf.nom">
+              <i [class]="isSfOpen(f.nom, sf.nom) ? 'pi pi-chevron-down' : 'pi pi-chevron-right'"></i>
+            </button>
+            <button class="prod-tree__label" (click)="selectSf(f, sf)">
+              <span class="prod-tree__name">{{ sf.nom }}</span>
+              <span class="prod-tree__meta">
+                <span class="prod-tree__total">{{ sf.total | number:'1.0-0' }}</span>
+                @if (pct(sf.total, sf.objectif); as p) {
+                  <span class="prod-tree__pct" [class]="pctClass(p)">{{ p }}%</span>
+                }
+              </span>
+            </button>
+            <div class="prod-tree__bar-row prod-tree__bar-row--sf">
+              <div class="prod-tree__bar-track">
+                <div class="prod-tree__bar-fill"
+                     [class]="barFillClass(sf.total, sf.objectif)"
+                     [style.width]="barWidth(sf.total, sf.objectif)">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          @if (isSfOpen(f.nom, sf.nom)) {
+            @for (p of sf.produits; track p.code) {
+
+              <!-- ── Produit row ──────────────────────────────────────── -->
+              <div class="prod-tree__node prod-tree__node--prod"
+                   [class.prod-tree__node--active]="isProdActive(p)">
+                <span class="prod-tree__dot"></span>
+                <button class="prod-tree__label" (click)="selectProd(f, sf, p)">
+                  <span class="prod-tree__name prod-tree__name--prod">{{ p.nom }}</span>
+                  <span class="prod-tree__meta">
+                    <span class="prod-tree__total">{{ p.total | number:'1.0-0' }}</span>
+                    @if (pct(p.total, p.objectif); as pv) {
+                      <span class="prod-tree__pct" [class]="pctClass(pv)">{{ pv }}%</span>
+                    }
+                  </span>
+                </button>
+                <div class="prod-tree__bar-row prod-tree__bar-row--prod">
+                  <div class="prod-tree__bar-track">
+                    <div class="prod-tree__bar-fill"
+                         [class]="barFillClass(p.total, p.objectif)"
+                         [style.width]="barWidth(p.total, p.objectif)">
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+            }
+          }
+        }
+      }
+    }
+  }
+
+</div>

@@ -1,3 +1,4 @@
+from collections import defaultdict
 from typing import Any, Optional
 import json as _json
 
@@ -49,6 +50,7 @@ def get_by_location(
     produit: Optional[str] = Query(None),
     fdv: Optional[str] = Query(None),
     famille: Optional[str] = Query(None),
+    sous_famille: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     current_distributor=Depends(get_current_distributor),
     session: Session = Depends(get_session),
@@ -80,6 +82,9 @@ def get_by_location(
     if famille:
         base_conditions.append("LOWER(v.famille) = LOWER(:famille)")
         params["famille"] = famille
+    if sous_famille:
+        base_conditions.append("LOWER(v.sous_famille) = LOWER(:sous_famille)")
+        params["sous_famille"] = sous_famille
 
     base_where = " AND ".join(base_conditions)
 
@@ -126,3 +131,124 @@ def get_by_location(
         }
         for row in rows
     ]
+
+
+@router.get("/product-tree")
+def get_product_tree(
+    annee_mois: str = Query(...),
+    canal: Optional[str] = Query(None),
+    commune: Optional[str] = Query(None),
+    fdv: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    current_distributor=Depends(get_current_distributor),
+    session: Session = Depends(get_session),
+) -> Any:
+    """
+    Returns a famille → sous_famille → produit hierarchy with sales totals
+    and objectives. Optionally filtered by commune (for map-click drill-down).
+    """
+    try:
+        annee = int(annee_mois[:4])
+        mois  = int(annee_mois[5:])
+    except (ValueError, IndexError):
+        return []
+
+    conds: list = [
+        "v.annee_mois = :annee_mois",
+        "v.statut_commande = 'Facturé'",
+        "v.famille IS NOT NULL",
+    ]
+    params: dict = {"annee_mois": annee_mois}
+
+    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        conds.append("(v.distributor_id = :dist_id OR v.distributor_id IS NULL)")
+        params["dist_id"] = current_distributor.id
+    if canal:
+        conds.append("v.canal = :canal")
+        params["canal"] = canal
+    if fdv:
+        conds.append("v.code_fdv = :fdv")
+        params["fdv"] = fdv
+    if commune:
+        conds.append("LOWER(v.commune) = LOWER(:commune)")
+        params["commune"] = commune
+
+    where = " AND ".join(conds)
+
+    rows = session.execute(text(f"""
+        SELECT
+            TRIM(v.famille)                           AS famille,
+            TRIM(COALESCE(v.sous_famille, 'Autres'))  AS sous_famille,
+            v.code_produit,
+            v.description_produit,
+            SUM(v.qte_livree)                          AS total
+        FROM ventes v
+        WHERE {where}
+        GROUP BY
+            TRIM(v.famille),
+            TRIM(COALESCE(v.sous_famille, 'Autres')),
+            v.code_produit,
+            v.description_produit
+    """), params).all()
+
+    # Objectives — rolled up per product then aggregated to sf/famille
+    if canal == "VD":
+        obj_expr = "COALESCE(o.objectif_tonne_vd, 0)"
+    elif canal == "VH":
+        obj_expr = "COALESCE(o.objectif_tonne_vh, 0)"
+    else:
+        obj_expr = "COALESCE(o.objectif_tonne_vd, 0) + COALESCE(o.objectif_tonne_vh, 0)"
+
+    obj_conds = ["o.annee = :annee", "o.mois = :mois"]
+    obj_params: dict = {"annee": annee, "mois": mois}
+    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        obj_conds.append("o.distributor_id = :dist_id")
+        obj_params["dist_id"] = current_distributor.id
+
+    obj_rows = session.execute(text(
+        f"SELECT o.code_produit, {obj_expr} AS obj FROM objectifs o WHERE {' AND '.join(obj_conds)}"
+    ), obj_params).all()
+    obj_by_code: dict = {r[0]: float(r[1] or 0) for r in obj_rows if r[0]}
+
+    # Build hierarchy: famille → sf → (code, nom) → {total, obj}
+    hier: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {"total": 0.0, "obj": 0.0})))
+    for famille, sf, code, nom, total in rows:
+        if not famille:
+            continue
+        key = (code or "", nom or code or "?")
+        hier[famille][sf][key]["total"] += float(total or 0)
+        hier[famille][sf][key]["obj"]   += obj_by_code.get(code or "", 0)
+
+    result = []
+    for famille, sf_map in hier.items():
+        sfs_out = []
+        f_total = f_obj = 0.0
+
+        for sf, prod_map in sf_map.items():
+            prods_out = []
+            sf_total = sf_obj = 0.0
+
+            for (code, nom), data in sorted(prod_map.items(), key=lambda x: -x[1]["total"]):
+                prods_out.append({
+                    "nom": nom, "code": code,
+                    "total": round(data["total"]),
+                    "objectif": round(data["obj"]) if data["obj"] else None,
+                })
+                sf_total += data["total"]
+                sf_obj   += data["obj"]
+
+            sfs_out.append({
+                "nom": sf, "total": round(sf_total),
+                "objectif": round(sf_obj) if sf_obj else None,
+                "produits": prods_out,
+            })
+            f_total += sf_total
+            f_obj   += sf_obj
+
+        result.append({
+            "nom": famille, "total": round(f_total),
+            "objectif": round(f_obj) if f_obj else None,
+            "sous_familles": sorted(sfs_out, key=lambda x: -x["total"]),
+        })
+
+    return sorted(result, key=lambda x: -x["total"])
