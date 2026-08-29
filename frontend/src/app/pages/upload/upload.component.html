@@ -44,7 +44,7 @@
             <span class="file-size">{{ (selectedFile()!.size / 1024).toFixed(1) }} KB</span>
           </div>
         </div>
-      } @else if (!selectedCanal) {
+      } @else if (!autoUpload && !selectedCanal) {
         <div class="canal-warning">
           <i class="pi pi-exclamation-triangle"></i>
           <span>Veuillez sélectionner le type de vente d'abord</span>

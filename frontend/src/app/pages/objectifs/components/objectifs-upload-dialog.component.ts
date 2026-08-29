@@ -621,13 +621,6 @@ export class ObjectifsUploadDialogComponent implements OnInit, AfterViewInit {
     }
   }
 
-  onDropZoneClick() {
-    if (!this.selectedCanal()) {
-      this.notify.warn('Veuillez sélectionner le type de vente d\'abord');
-      return;
-    }
-  }
-
   private loadDistributors() {
     this.http.get<Distributor[]>('/api/v1/distributors')
       .pipe(takeUntilDestroyed(this.destroyRef))

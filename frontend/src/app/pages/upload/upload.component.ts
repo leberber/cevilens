@@ -61,13 +61,17 @@ export class UploadComponent {
 
   private startUpload(file: File, mode?: string) {
     this.pendingFile = file;
+    this.resetUploadState();
+    this.streamUpload(file, mode);
+  }
+
+  private resetUploadState() {
     this.loading.set(true);
     this.result.set(null);
     this.overlap.set(null);
     this.fileInfo.set(null);
     this.progress.set(0);
     this.progressMessage.set('');
-    this.streamUpload(file, mode);
   }
 
   private async streamUpload(file: File, mode?: string) {
@@ -139,12 +143,7 @@ export class UploadComponent {
       this.uploadType = 'objectifs';
       this.uploadCanal = canal;
       this.pendingFile = file;
-      this.loading.set(true);
-      this.result.set(null);
-      this.overlap.set(null);
-      this.fileInfo.set(null);
-      this.progress.set(0);
-      this.progressMessage.set('');
+      this.resetUploadState();
       this.streamUpload(file);
     }
   }
