@@ -27,8 +27,8 @@ export class DistributorSwitcherComponent implements OnInit {
 
   readonly displayName = computed(() =>
     this.isPlatformAdmin
-      ? this.selected()?.nom ?? null
-      : this.distContext.distributor()?.nom ?? null
+      ? this.selected()?.nom ?? 'Sélectionner'
+      : this.distContext.distributor()?.nom ?? 'Aucun'
   );
 
   readonly distributorChange = output<Distributor | null>();

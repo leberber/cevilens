@@ -1,28 +1,23 @@
 <div class="dist-switcher">
-  <span class="dist-switcher__label">Données de vente</span>
+  <button
+    class="dist-switcher__name dist-switcher__name--btn"
+    [disabled]="!isPlatformAdmin"
+    (click)="toggleMenu($event)">
+    <i class="pi pi-building"></i>
+    {{ displayName() }}
+    <i class="pi pi-chevron-down dist-switcher__caret"></i>
+  </button>
 
-  @if (isPlatformAdmin) {
-    <button class="dist-switcher__name dist-switcher__name--btn" (click)="toggleMenu($event)">
-      <i class="pi pi-building"></i>
-      {{ displayName() ?? '…' }}
-      <i class="pi pi-chevron-down dist-switcher__caret"></i>
-    </button>
-    @if (showMenu() && distributors().length > 0) {
-      <div class="dist-switcher__menu">
-        @for (d of distributors(); track d.id) {
-          <button class="dist-switcher__item"
-            [class.dist-switcher__item--active]="selected()?.id === d.id"
-            (click)="select(d, $event)">
-            <i class="pi pi-building"></i>
-            {{ d.nom }}
-          </button>
-        }
-      </div>
-    }
-  } @else {
-    <span class="dist-switcher__name">
-      <i class="pi pi-building"></i>
-      {{ displayName() ?? '…' }}
-    </span>
+  @if (isPlatformAdmin && showMenu() && distributors().length > 0) {
+    <div class="dist-switcher__menu">
+      @for (d of distributors(); track d.id) {
+        <button class="dist-switcher__item"
+          [class.dist-switcher__item--active]="selected()?.id === d.id"
+          (click)="select(d, $event)">
+          <i class="pi pi-building"></i>
+          {{ d.nom }}
+        </button>
+      }
+    </div>
   }
 </div>

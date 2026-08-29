@@ -1,6 +1,7 @@
 import { Component, inject, computed, signal, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Divider } from 'primeng/divider';
 import { AuthService } from '../core/services/auth.service';
 import { RoleService } from '../core/services/role.service';
 import { DistributorContextService } from '../core/services/distributor-context.service';
@@ -11,7 +12,7 @@ import { Distributor } from '../core/models/distributor.model';
 @Component({
   selector: 'app-layout',
   standalone: true,
-  imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet, DistributorSwitcherComponent],
+  imports: [CommonModule, RouterLink, RouterLinkActive, RouterOutlet, DistributorSwitcherComponent, Divider],
   templateUrl: './layout.component.html',
   styleUrl: './layout.component.scss',
   encapsulation: ViewEncapsulation.None,

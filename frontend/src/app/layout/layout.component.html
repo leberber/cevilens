@@ -10,23 +10,15 @@
     <!-- Brand / Logo -->
     <div class="admin-sidebar__logo">
       <img src="cevilogo.webp" alt="Cevital" class="sidebar-logo-full" />
-      @if (isPlatformAdmin) {
-        <!-- Platform admin: show switcher below logo -->
-      } @else {
-        <!-- Distributor admin: show distributor name (read-only) -->
-        <div class="sidebar-brand-dist">
-          <i class="pi pi-building sidebar-brand-dist__icon"></i>
-          <span class="sidebar-brand-dist__name">{{ distributorName() ?? '…' }}</span>
-        </div>
-      }
     </div>
 
     <!-- Global Distributor Filter (centered under logo) -->
-    @if (isPlatformAdmin) {
-      <div class="sidebar-distributor-filter-centered">
-        <app-distributor-switcher (distributorChange)="onDistributorChange($event)" />
-      </div>
-    }
+    <div class="sidebar-distributor-filter-centered">
+      <app-distributor-switcher (distributorChange)="onDistributorChange($event)" />
+    </div>
+
+    <!-- Divider -->
+    <p-divider [layout]="'horizontal'" [style]="{'margin': '15px 0'}"></p-divider>
 
     <!-- Nav -->
     <nav class="admin-sidebar__nav">
