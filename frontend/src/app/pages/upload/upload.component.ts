@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, Input, inject, signal } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
 import { AuthService } from '../../core/services/auth.service';
 
@@ -14,6 +14,13 @@ interface FileInfo { total_rows: number; date_min: string; date_max: string; }
 })
 export class UploadComponent {
   private auth = inject(AuthService);
+
+  @Input() selectedCanal: 'VD' | 'VH' | null = null;
+
+  uploadType: 'ventes' | 'objectifs' = 'ventes';
+  uploadCanal: 'VD' | 'VH' | null = null;
+  autoUpload: boolean = true;
+  selectedFile = signal<File | null>(null);
 
   dragOver        = signal(false);
   loading         = signal(false);
@@ -31,12 +38,24 @@ export class UploadComponent {
     e.preventDefault();
     this.dragOver.set(false);
     const file = e.dataTransfer?.files[0];
-    if (file) this.startUpload(file);
+    if (file) {
+      if (this.autoUpload) {
+        this.startUpload(file);
+      } else {
+        this.selectedFile.set(file);
+      }
+    }
   }
 
   onFileSelect(e: Event) {
     const file = (e.target as HTMLInputElement).files?.[0];
-    if (file) this.startUpload(file);
+    if (file) {
+      if (this.autoUpload) {
+        this.startUpload(file);
+      } else {
+        this.selectedFile.set(file);
+      }
+    }
     (e.target as HTMLInputElement).value = '';
   }
 
@@ -54,7 +73,13 @@ export class UploadComponent {
   private async streamUpload(file: File, mode?: string) {
     const formData = new FormData();
     formData.append('file', file);
-    const url = mode ? `/api/v1/ventes/upload?mode=${mode}` : '/api/v1/ventes/upload';
+
+    let url: string;
+    if (this.uploadType === 'objectifs') {
+      url = `/api/v1/objectifs/upload?canal=${this.uploadCanal}`;
+    } else {
+      url = mode ? `/api/v1/ventes/upload?mode=${mode}` : '/api/v1/ventes/upload';
+    }
 
     try {
       const response = await fetch(url, {
@@ -105,6 +130,22 @@ export class UploadComponent {
     if (data.done) {
       this.loading.set(false);
       this.result.set({ success: true, message: data.message });
+    }
+  }
+
+  uploadObjectives(canal: 'VD' | 'VH') {
+    const file = this.selectedFile() || this.pendingFile;
+    if (file) {
+      this.uploadType = 'objectifs';
+      this.uploadCanal = canal;
+      this.pendingFile = file;
+      this.loading.set(true);
+      this.result.set(null);
+      this.overlap.set(null);
+      this.fileInfo.set(null);
+      this.progress.set(0);
+      this.progressMessage.set('');
+      this.streamUpload(file);
     }
   }
 

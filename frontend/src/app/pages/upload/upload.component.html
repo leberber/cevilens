@@ -36,6 +36,19 @@
           </div>
           <span class="skeleton-label">{{ progressMessage() || 'Traitement en cours…' }}</span>
         </div>
+      } @else if (selectedFile()) {
+        <div class="file-info-content">
+          <i class="pi pi-file-excel"></i>
+          <div class="file-info-details">
+            <span class="file-name">{{ selectedFile()!.name }}</span>
+            <span class="file-size">{{ (selectedFile()!.size / 1024).toFixed(1) }} KB</span>
+          </div>
+        </div>
+      } @else if (!selectedCanal) {
+        <div class="canal-warning">
+          <i class="pi pi-exclamation-triangle"></i>
+          <span>Veuillez sélectionner le type de vente d'abord</span>
+        </div>
       } @else {
         <i class="pi pi-cloud-upload drop-zone__icon"></i>
         <span class="drop-zone__text">Déposer un fichier ici</span>

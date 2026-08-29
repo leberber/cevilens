@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, inject, signal, computed, OnInit, DestroyRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ViewChild, inject, signal, computed, OnInit, AfterViewInit, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -74,7 +74,7 @@ import { UploadComponent } from '../../upload/upload.component';
 
         <!-- Main Upload Area -->
         <div class="upload-zone-wrapper">
-          <app-upload #uploadComponent></app-upload>
+          <app-upload #uploadComponent [selectedCanal]="selectedCanal()"></app-upload>
         </div>
 
         <!-- Error Message -->
@@ -90,7 +90,7 @@ import { UploadComponent } from '../../upload/upload.component';
           <button class="btn-secondary" type="button" (click)="onDialogClose()" [disabled]="loadingCounts()">
             Annuler
           </button>
-          <button class="btn-primary" type="button" (click)="onImport()">
+          <button class="btn-primary" type="button" (click)="onImport()" [disabled]="isImportDisabled()">
             <i class="pi pi-upload"></i> Importer
           </button>
         </div>
@@ -556,9 +556,29 @@ import { UploadComponent } from '../../upload/upload.component';
       box-shadow: 0 10px 28px rgba(var(--primary-rgb), 0.5);
     }
 
+    .canal-required-message {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.75rem;
+      padding: 3rem 2rem;
+      min-height: 280px;
+      border: 2px dashed var(--surface-300);
+      border-radius: 1.25rem;
+      background: var(--surface-ground);
+      color: var(--text-color-secondary);
+      font-size: 0.95rem;
+      font-weight: 500;
+
+      i {
+        font-size: 1.5rem;
+        color: var(--primary-color);
+      }
+    }
+
   `],
 })
-export class ObjectifsUploadDialogComponent implements OnInit {
+export class ObjectifsUploadDialogComponent implements OnInit, AfterViewInit {
   private readonly http = inject(HttpClient);
   private readonly distContext = inject(DistributorContextService);
   private readonly roleService = inject(RoleService);
@@ -568,12 +588,18 @@ export class ObjectifsUploadDialogComponent implements OnInit {
   @Input() visible = false;
   @Output() visibleChange = new EventEmitter<boolean>();
   @Output() close = new EventEmitter<void>();
+  @ViewChild(UploadComponent) uploadComponent!: UploadComponent;
 
   readonly isPlatformAdmin = this.roleService.isPlatformAdmin();
   readonly loadingCounts = signal(false);
   readonly distributors = signal<Distributor[]>([]);
   readonly selectedCanal = signal<'VD' | 'VH' | null>(null);
   readonly errorMessage = signal<string | null>(null);
+  readonly isImportDisabled = computed(() => {
+    if (!this.selectedCanal()) return true;
+    if (!this.uploadComponent || !this.uploadComponent.selectedFile()) return true;
+    return false;
+  });
 
   prevendeurVDValue = 0;
   prevendeurVHValue = 0;
@@ -586,6 +612,19 @@ export class ObjectifsUploadDialogComponent implements OnInit {
       this.loadDistributors();
     } else {
       this.loadPrevendeurCounts();
+    }
+  }
+
+  ngAfterViewInit() {
+    if (this.uploadComponent) {
+      this.uploadComponent.autoUpload = false;
+    }
+  }
+
+  onDropZoneClick() {
+    if (!this.selectedCanal()) {
+      this.notify.warn('Veuillez sélectionner le type de vente d\'abord');
+      return;
     }
   }
 
@@ -659,11 +698,8 @@ export class ObjectifsUploadDialogComponent implements OnInit {
   }
 
   onImport() {
-    if (!this.selectedCanal()) {
-      this.errorMessage.set('Veuillez sélectionner le type de vente d\'abord');
-      return;
+    if (this.uploadComponent && this.selectedCanal()) {
+      this.uploadComponent.uploadObjectives(this.selectedCanal()!);
     }
-    this.errorMessage.set(null);
-    // Proceed with upload
   }
 }
