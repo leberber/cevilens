@@ -534,7 +534,7 @@ async def upload_ventes(
 
         BATCH = 500
         inserted = 0
-        clients_to_sync = {}  # code_client -> nom_client
+        clients_to_sync = {}   # code_client -> nom_client
         for batch_start in range(0, total, BATCH):
             batch_df = df.iloc[batch_start:batch_start + BATCH]
             batch_ventes = []

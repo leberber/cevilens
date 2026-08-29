@@ -99,21 +99,7 @@ def get_rapport_facturation(
     if clients:
         rows = [r for r in rows if r.nom_client in clients]
 
-    # Build code_produit -> display name map (nom_produit if set, else description_produit)
-    codes = {r.code_produit for r in rows if r.code_produit}
-    produits = session.exec(select(Produit).where(Produit.code_produit.in_(codes))).all()
-    code_to_label = {p.code_produit: (p.nom_produit or p.description_produit) for p in produits}
-    code_to_produit = {p.code_produit: p for p in produits}
-
-    # Exclude products explicitly marked non-facturable
-    rows = [
-        r for r in rows
-        if not (r.code_produit and r.code_produit in code_to_produit and not code_to_produit[r.code_produit].facturable)
-    ]
-
     def display_label(r: Vente) -> str:
-        if r.code_produit and r.code_produit in code_to_label and code_to_label[r.code_produit]:
-            return code_to_label[r.code_produit]
         return r.description_produit or ''
 
     # Distinct products (columns), sorted
@@ -125,11 +111,7 @@ def get_rapport_facturation(
         label = display_label(r)
         if label not in label_meta:
             famille = (r.famille or '').lower()
-            if r.code_produit and r.code_produit in code_to_produit:
-                p = code_to_produit[r.code_produit]
-                label_meta[label] = {"uom_vente": p.uom_vente, "colisage": p.colisage, "famille": famille}
-            else:
-                label_meta[label] = {"uom_vente": None, "colisage": None, "famille": famille}
+            label_meta[label] = {"uom_vente": r.uom_vente, "colisage": None, "famille": famille}
     products_meta = {p: label_meta.get(p, {"uom_vente": None, "colisage": None, "famille": None}) for p in products}
 
     # Distinct clients (rows), sorted
@@ -210,17 +192,6 @@ def export_clients_zip(
     if clients:
         rows = [r for r in rows if r.nom_client in clients]
 
-    # Build code_produit → Produit map
-    codes = {r.code_produit for r in rows if r.code_produit}
-    produits_db = session.exec(select(Produit).where(Produit.code_produit.in_(codes))).all()
-    code_to_produit = {p.code_produit: p for p in produits_db}
-
-    # Exclude products explicitly marked non-facturable
-    rows = [
-        r for r in rows
-        if not (r.code_produit and r.code_produit in code_to_produit and not code_to_produit[r.code_produit].facturable)
-    ]
-
     use_unites = display_mode == "unites"
 
     # All distinct product keys for the period, sorted
@@ -229,13 +200,24 @@ def export_clients_zip(
         for r in rows if r.code_produit or r.description_produit
     })
 
+    # Build per-product price and colisage from ventes data
+    code_prix: dict = {}
+    code_colisage: dict = {}
+    for r in rows:
+        key = r.code_produit or r.description_produit or ""
+        if key and key not in code_prix and r.prix_unitaire:
+            code_prix[key] = r.prix_unitaire
+        if key and key not in code_colisage and r.prix_unitaire and r.prix_unitaire_uom_pr:
+            uom = (r.uom_vente or '').strip().lower()
+            if uom not in ('tonne', 'ton', 't'):
+                ratio = round(r.prix_unitaire_uom_pr / r.prix_unitaire, 4)
+                code_colisage[key] = ratio
+
     def get_prix(key: str) -> Optional[float]:
-        p = code_to_produit.get(key)
-        return p.prix_dd if p else None
+        return code_prix.get(key)
 
     def get_colisage(key: str) -> Optional[float]:
-        p = code_to_produit.get(key)
-        return p.colisage if p else None
+        return code_colisage.get(key)
 
     # Aggregate: client → product_key → qty
     client_qty: dict = defaultdict(lambda: defaultdict(float))

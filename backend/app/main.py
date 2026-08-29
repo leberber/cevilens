@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.core.logging_config import setup_logging
 from app.database import create_db_and_tables, engine
 from app.api.api_v1.api import api_router
-from app.models import objectif  # noqa — ensures tables are registered
+from app.models import objectif, produit  # noqa — ensures tables are registered
 
 setup_logging()
 logger = logging.getLogger("app")

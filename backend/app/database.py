@@ -51,8 +51,6 @@ def create_db_and_tables() -> None:
             "WHERE canal IS NULL AND code_fdv IS NOT NULL"
         ))
 
-        # Produit model removed — skip schema migrations for produits table
-
         conn.commit()
 
 

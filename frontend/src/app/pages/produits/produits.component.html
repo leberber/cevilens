@@ -1,0 +1,666 @@
+<app-page-layout
+  icon="pi-box"
+  title="Catalogue produits"
+  [subtitle]="totalCount() + ' produits au catalogue'"
+  [actions]="actionsTpl"
+  [toolbar]="toolbarTpl">
+
+  <!-- Table -->
+  <div class="table-wrapper-inner">
+    @if (filtered().length === 0 && !loading()) {
+      <div class="table-empty">Aucun produit trouvé</div>
+    } @else {
+      <table class="table">
+        <thead>
+          <tr>
+            @if (isColVisible('code_produit')) {
+              <th class="th-sort prod-sl0" (click)="sort('code_produit')">
+                Code <i [class]="sortIcon('code_produit')"></i>
+              </th>
+            }
+            @if (isColVisible('description_produit')) {
+              <th class="th-sort prod-sl1" (click)="sort('description_produit')">
+                Désignation <i [class]="sortIcon('description_produit')"></i>
+              </th>
+            }
+            @if (isColVisible('nom_produit')) {
+              <th class="th-sort" (click)="sort('nom_produit')">
+                Désignation courte <i [class]="sortIcon('nom_produit')"></i>
+              </th>
+            }
+            @if (isColVisible('code_dd')) {
+              <th class="th-sort" (click)="sort('code_dd')">
+                Code Objectif <i [class]="sortIcon('code_dd')"></i>
+              </th>
+            }
+            @if (isColVisible('famille')) {
+              <th class="th-sort" (click)="sort('famille')">
+                <div class="th-content">
+                  <span>Famille <i [class]="sortIcon('famille')"></i></span>
+                  <button class="col-filter-btn" [class.col-filter-btn--active]="getColFilter('famille')"
+                    (click)="openColFilter('famille', $event)" pTooltip="Filtrer" tooltipPosition="top">
+                    <i class="pi" [class.pi-filter]="!getColFilter('famille')" [class.pi-filter-fill]="!!getColFilter('famille')"></i>
+                  </button>
+                </div>
+              </th>
+            }
+            @if (isColVisible('sous_famille')) {
+              <th class="th-sort" (click)="sort('sous_famille')">
+                <div class="th-content">
+                  <span>Sous-famille <i [class]="sortIcon('sous_famille')"></i></span>
+                  <button class="col-filter-btn" [class.col-filter-btn--active]="getColFilter('sous_famille')"
+                    (click)="openColFilter('sous_famille', $event)" pTooltip="Filtrer" tooltipPosition="top">
+                    <i class="pi" [class.pi-filter]="!getColFilter('sous_famille')" [class.pi-filter-fill]="!!getColFilter('sous_famille')"></i>
+                  </button>
+                </div>
+              </th>
+            }
+            @if (isColVisible('uom_vente')) {
+              <th class="th-sort" (click)="sort('uom_vente')">
+                <div class="th-content">
+                  <span>UOM Vente <i [class]="sortIcon('uom_vente')"></i></span>
+                  <button class="col-filter-btn" [class.col-filter-btn--active]="getColFilter('uom_vente')"
+                    (click)="openColFilter('uom_vente', $event)" pTooltip="Filtrer" tooltipPosition="top">
+                    <i class="pi" [class.pi-filter]="!getColFilter('uom_vente')" [class.pi-filter-fill]="!!getColFilter('uom_vente')"></i>
+                  </button>
+                </div>
+              </th>
+            }
+            @if (isColVisible('uom_principale')) {
+              <th class="th-sort" (click)="sort('uom_principale')">
+                <div class="th-content">
+                  <span>UOM P. <i [class]="sortIcon('uom_principale')"></i></span>
+                  <button class="col-filter-btn" [class.col-filter-btn--active]="getColFilter('uom_principale')"
+                    (click)="openColFilter('uom_principale', $event)" pTooltip="Filtrer" tooltipPosition="top">
+                    <i class="pi" [class.pi-filter]="!getColFilter('uom_principale')" [class.pi-filter-fill]="!!getColFilter('uom_principale')"></i>
+                  </button>
+                </div>
+              </th>
+            }
+            @if (isColVisible('colisage')) {
+              <th class="th-sort col-center" (click)="sort('colisage')">
+                Colisage <i [class]="sortIcon('colisage')"></i>
+              </th>
+            }
+            @if (isColVisible('colisage_palette')) {
+              <th class="th-sort col-center" (click)="sort('colisage_palette')">
+                Col./palette <i [class]="sortIcon('colisage_palette')"></i>
+              </th>
+            }
+            @if (isColVisible('unite')) {
+              <th class="th-sort col-center" (click)="sort('unite')">
+                <div class="th-content">
+                  <span>Unité <i [class]="sortIcon('unite')"></i></span>
+                  <button class="col-filter-btn" [class.col-filter-btn--active]="getColFilter('unite')"
+                    (click)="openColFilter('unite', $event)" pTooltip="Filtrer" tooltipPosition="top">
+                    <i class="pi" [class.pi-filter]="!getColFilter('unite')" [class.pi-filter-fill]="!!getColFilter('unite')"></i>
+                  </button>
+                </div>
+              </th>
+            }
+            @if (isColVisible('volume')) {
+              <th class="th-sort col-center" (click)="sort('volume')">
+                Volume <i [class]="sortIcon('volume')"></i>
+              </th>
+            }
+            @if (isColVisible('poids_unite_vente')) {
+              <th class="th-sort col-center" (click)="sort('poids_unite_vente')">
+                Poids UV (T) <i [class]="sortIcon('poids_unite_vente')"></i>
+              </th>
+            }
+            @if (isColVisible('prix_dd')) {
+              <th class="th-sort col-center" (click)="sort('prix_dd')">
+                Prix DD <i [class]="sortIcon('prix_dd')"></i>
+              </th>
+            }
+            @if (isColVisible('prix_promotion')) {
+              <th class="th-sort col-center" (click)="sort('prix_promotion')">
+                Prix Promo <i [class]="sortIcon('prix_promotion')"></i>
+              </th>
+            }
+            @if (isColVisible('prix_club')) {
+              <th class="th-sort col-center" (click)="sort('prix_club')">
+                Prix Club <i [class]="sortIcon('prix_club')"></i>
+              </th>
+            }
+            @if (isColVisible('facturable')) {
+              <th class="th-sort col-center" (click)="sort('facturable')">
+                <div class="th-content">
+                  <span>Facturable <i [class]="sortIcon('facturable')"></i></span>
+                  <button class="col-filter-btn" [class.col-filter-btn--active]="getColFilter('facturable')"
+                    (click)="openColFilter('facturable', $event)" pTooltip="Filtrer" tooltipPosition="top">
+                    <i class="pi" [class.pi-filter]="!getColFilter('facturable')" [class.pi-filter-fill]="!!getColFilter('facturable')"></i>
+                  </button>
+                </div>
+              </th>
+            }
+            @if (isColVisible('imported')) {
+              <th class="th-sort col-center" (click)="sort('imported')">
+                <div class="th-content">
+                  <span>Importé <i [class]="sortIcon('imported')"></i></span>
+                  <button class="col-filter-btn" [class.col-filter-btn--active]="getColFilter('imported')"
+                    (click)="openColFilter('imported', $event)" pTooltip="Filtrer" tooltipPosition="top">
+                    <i class="pi" [class.pi-filter]="!getColFilter('imported')" [class.pi-filter-fill]="!!getColFilter('imported')"></i>
+                  </button>
+                </div>
+              </th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @if (loading()) {
+            @for (_ of [1,2,3,4,5,6,7,8]; track $index) {
+              <tr>
+                <td [attr.colspan]="allColumns.length" style="padding:0.6rem 1rem">
+                  <div style="height:1.1rem;border-radius:6px;background:var(--surface-200);animation:pulse 1.2s infinite alternate"></div>
+                </td>
+              </tr>
+            }
+          } @else {
+            @for (p of filtered(); track p.code_produit; let i = $index) {
+              <tr class="table-row-animate" [style.--row-delay]="i < 30 ? i * 15 + 'ms' : '0ms'">
+
+                @if (isColVisible('code_produit')) {
+                  <td class="prod-sl0"><code class="code-chip">{{ p.code_produit }}</code></td>
+                }
+
+                @if (isColVisible('description_produit')) {
+                  <td class="td-designation prod-sl1">
+                    <span class="item-name item-name--truncate" [pTooltip]="p.description_produit ?? ''" tooltipPosition="top">{{ p.description_produit ?? '—' }}</span>
+                  </td>
+                }
+
+                @if (isColVisible('nom_produit')) {
+                  <td class="cell-editable"
+                    (click)="startEdit(p, 'nom_produit', $event)"
+                    [class.cell-editing]="isEditing(p.code_produit, 'nom_produit')">
+                    @if (isEditing(p.code_produit, 'nom_produit')) {
+                      <input type="text" class="cell-input" autofocus
+                        [value]="editingValue() ?? ''"
+                        (blur)="editingValue.set($any($event.target).value || null); saveEdit(p)"
+                        (keydown.enter)="editingValue.set($any($event.target).value || null); saveEdit(p)"
+                        (keydown.escape)="cancelEdit()" />
+                    } @else {
+                      <div class="cell-display">
+                        @if (savingCell()?.code === p.code_produit && savingCell()?.field === 'nom_produit') {
+                          <i class="pi pi-spin pi-spinner cell-spinner"></i>
+                        } @else {
+                          <span [class.text-muted]="!p.nom_produit">{{ p.nom_produit ?? '—' }}</span>
+                        }
+                        <i class="pi pi-pencil cell-pencil"></i>
+                      </div>
+                    }
+                  </td>
+                }
+
+                @if (isColVisible('code_dd')) {
+                  <td class="cell-editable"
+                    (click)="startEdit(p, 'code_dd', $event)"
+                    [class.cell-editing]="isEditing(p.code_produit, 'code_dd')">
+                    @if (isEditing(p.code_produit, 'code_dd')) {
+                      <input type="text" class="cell-input" autofocus
+                        [value]="editingValue() ?? ''"
+                        (blur)="editingValue.set($any($event.target).value || null); saveEdit(p)"
+                        (keydown.enter)="editingValue.set($any($event.target).value || null); saveEdit(p)"
+                        (keydown.escape)="cancelEdit()" />
+                    } @else {
+                      <div class="cell-display">
+                        @if (savingCell()?.code === p.code_produit && savingCell()?.field === 'code_dd') {
+                          <i class="pi pi-spin pi-spinner cell-spinner"></i>
+                        } @else {
+                          <span [class.text-muted]="!p.code_dd"><code>{{ p.code_dd ?? '—' }}</code></span>
+                        }
+                        <i class="pi pi-pencil cell-pencil"></i>
+                      </div>
+                    }
+                  </td>
+                }
+
+                @if (isColVisible('famille')) {
+                  <td class="cell-editable" (click)="openFamillePopover(p, $event)">
+                    <div class="cell-display">
+                      @if (savingCell()?.code === p.code_produit && savingCell()?.field === 'famille') {
+                        <i class="pi pi-spin pi-spinner cell-spinner"></i>
+                      } @else if (p.famille) {
+                        <span class="famille-pill-badge" [style.background]="familleColor.getStyle(p.famille).background" [style.color]="familleColor.getStyle(p.famille).color">
+                          {{ p.famille }}
+                        </span>
+                      } @else {
+                        <span class="text-muted">—</span>
+                      }
+                      <i class="pi pi-pencil cell-pencil"></i>
+                    </div>
+                  </td>
+                }
+
+                @if (isColVisible('sous_famille')) {
+                  <td class="text-muted cell-editable"
+                    (click)="startEdit(p, 'sous_famille', $event)"
+                    [class.cell-editing]="isEditing(p.code_produit, 'sous_famille')">
+                    @if (isEditing(p.code_produit, 'sous_famille')) {
+                      <input type="text" class="cell-input" autofocus style="width:120px;text-align:left"
+                        [value]="editingValue() ?? ''"
+                        (blur)="editingValue.set($any($event.target).value || null); saveEdit(p)"
+                        (keydown.enter)="editingValue.set($any($event.target).value || null); saveEdit(p)"
+                        (keydown.escape)="cancelEdit()" />
+                    } @else {
+                      <div class="cell-display">
+                        @if (savingCell()?.code === p.code_produit && savingCell()?.field === 'sous_famille') {
+                          <i class="pi pi-spin pi-spinner cell-spinner"></i>
+                        } @else {
+                          <span [class.text-muted]="!p.sous_famille">{{ p.sous_famille ?? '—' }}</span>
+                        }
+                        <i class="pi pi-pencil cell-pencil"></i>
+                      </div>
+                    }
+                  </td>
+                }
+
+                @if (isColVisible('uom_vente')) {
+                  <td class="text-muted cell-editable"
+                    (click)="startEdit(p, 'uom_vente', $event)"
+                    [class.cell-editing]="isEditing(p.code_produit, 'uom_vente')">
+                    @if (isEditing(p.code_produit, 'uom_vente')) {
+                      <input type="text" class="cell-input" autofocus style="width:80px;text-align:left"
+                        [value]="editingValue() ?? ''"
+                        (blur)="editingValue.set($any($event.target).value || null); saveEdit(p)"
+                        (keydown.enter)="editingValue.set($any($event.target).value || null); saveEdit(p)"
+                        (keydown.escape)="cancelEdit()" />
+                    } @else {
+                      <div class="cell-display">
+                        @if (savingCell()?.code === p.code_produit && savingCell()?.field === 'uom_vente') {
+                          <i class="pi pi-spin pi-spinner cell-spinner"></i>
+                        } @else {
+                          <span [class.text-muted]="!p.uom_vente">{{ p.uom_vente ?? '—' }}</span>
+                        }
+                        <i class="pi pi-pencil cell-pencil"></i>
+                      </div>
+                    }
+                  </td>
+                }
+
+                @if (isColVisible('uom_principale')) {
+                  <td class="text-muted cell-editable"
+                    (click)="startEdit(p, 'uom_principale', $event)"
+                    [class.cell-editing]="isEditing(p.code_produit, 'uom_principale')">
+                    @if (isEditing(p.code_produit, 'uom_principale')) {
+                      <input type="text" class="cell-input" autofocus style="width:80px;text-align:left"
+                        [value]="editingValue() ?? ''"
+                        (blur)="editingValue.set($any($event.target).value || null); saveEdit(p)"
+                        (keydown.enter)="editingValue.set($any($event.target).value || null); saveEdit(p)"
+                        (keydown.escape)="cancelEdit()" />
+                    } @else {
+                      <div class="cell-display">
+                        @if (savingCell()?.code === p.code_produit && savingCell()?.field === 'uom_principale') {
+                          <i class="pi pi-spin pi-spinner cell-spinner"></i>
+                        } @else {
+                          <span [class.text-muted]="!p.uom_principale">{{ p.uom_principale ?? '—' }}</span>
+                        }
+                        <i class="pi pi-pencil cell-pencil"></i>
+                      </div>
+                    }
+                  </td>
+                }
+
+                @if (isColVisible('colisage')) {
+                  <td class="col-center cell-editable"
+                    (click)="startEdit(p, 'colisage', $event)"
+                    [class.cell-editing]="isEditing(p.code_produit, 'colisage')">
+                    @if (isEditing(p.code_produit, 'colisage')) {
+                      <input type="number" class="cell-input" autofocus min="0" step="1"
+                        [value]="editingValue()"
+                        (blur)="editingValue.set(+$any($event.target).value || null); saveEdit(p)"
+                        (keydown.enter)="editingValue.set(+$any($event.target).value || null); saveEdit(p)"
+                        (keydown.escape)="cancelEdit()" />
+                    } @else {
+                      <div class="cell-display cell-display--center">
+                        @if (savingCell()?.code === p.code_produit && savingCell()?.field === 'colisage') {
+                          <i class="pi pi-spin pi-spinner cell-spinner"></i>
+                        } @else {
+                          <span [class.colisage-value]="p.colisage != null" [class.text-muted]="p.colisage == null">
+                            {{ p.colisage != null ? p.colisage : '—' }}
+                          </span>
+                        }
+                        <i class="pi pi-pencil cell-pencil"></i>
+                      </div>
+                    }
+                  </td>
+                }
+
+                @if (isColVisible('colisage_palette')) {
+                  <td class="col-center cell-editable"
+                    (click)="startEdit(p, 'colisage_palette', $event)"
+                    [class.cell-editing]="isEditing(p.code_produit, 'colisage_palette')">
+                    @if (isEditing(p.code_produit, 'colisage_palette')) {
+                      <input type="number" class="cell-input" autofocus min="0" step="1"
+                        [value]="editingValue()"
+                        (blur)="editingValue.set(+$any($event.target).value || null); saveEdit(p)"
+                        (keydown.enter)="editingValue.set(+$any($event.target).value || null); saveEdit(p)"
+                        (keydown.escape)="cancelEdit()" />
+                    } @else {
+                      <div class="cell-display cell-display--center">
+                        @if (savingCell()?.code === p.code_produit && savingCell()?.field === 'colisage_palette') {
+                          <i class="pi pi-spin pi-spinner cell-spinner"></i>
+                        } @else {
+                          <span [class.colisage-value]="p.colisage_palette != null" [class.text-muted]="p.colisage_palette == null">
+                            {{ p.colisage_palette != null ? p.colisage_palette : '—' }}
+                          </span>
+                        }
+                        <i class="pi pi-pencil cell-pencil"></i>
+                      </div>
+                    }
+                  </td>
+                }
+
+                @if (isColVisible('unite')) {
+                  <td class="col-center cell-editable"
+                    (click)="startEdit(p, 'unite', $event)"
+                    [class.cell-editing]="isEditing(p.code_produit, 'unite')">
+                    @if (isEditing(p.code_produit, 'unite')) {
+                      <select class="cell-select" autofocus
+                        [value]="editingValue() ?? ''"
+                        (change)="editingValue.set($any($event.target).value || null); saveEdit(p)"
+                        (keydown.escape)="cancelEdit()">
+                        <option value="">—</option>
+                        <option value="KG">KG</option>
+                        <option value="L">L</option>
+                      </select>
+                    } @else {
+                      <div class="cell-display cell-display--center">
+                        @if (savingCell()?.code === p.code_produit && savingCell()?.field === 'unite') {
+                          <i class="pi pi-spin pi-spinner cell-spinner"></i>
+                        } @else {
+                          <span [class.text-muted]="!p.unite">{{ p.unite ?? '—' }}</span>
+                        }
+                        <i class="pi pi-pencil cell-pencil"></i>
+                      </div>
+                    }
+                  </td>
+                }
+
+                @if (isColVisible('volume')) {
+                  <td class="col-center cell-editable"
+                    (click)="startEdit(p, 'volume', $event)"
+                    [class.cell-editing]="isEditing(p.code_produit, 'volume')">
+                    @if (isEditing(p.code_produit, 'volume')) {
+                      <input type="number" class="cell-input" autofocus min="0" step="0.01"
+                        [value]="editingValue()"
+                        (blur)="editingValue.set(+$any($event.target).value || null); saveEdit(p)"
+                        (keydown.enter)="editingValue.set(+$any($event.target).value || null); saveEdit(p)"
+                        (keydown.escape)="cancelEdit()" />
+                    } @else {
+                      <div class="cell-display cell-display--center">
+                        @if (savingCell()?.code === p.code_produit && savingCell()?.field === 'volume') {
+                          <i class="pi pi-spin pi-spinner cell-spinner"></i>
+                        } @else {
+                          <span [class.text-muted]="p.volume == null">{{ p.volume != null ? p.volume : '—' }}</span>
+                        }
+                        <i class="pi pi-pencil cell-pencil"></i>
+                      </div>
+                    }
+                  </td>
+                }
+
+                @if (isColVisible('poids_unite_vente')) {
+                  <td class="col-center cell-editable"
+                    (click)="startEdit(p, 'poids_unite_vente', $event)"
+                    [class.cell-editing]="isEditing(p.code_produit, 'poids_unite_vente')">
+                    @if (isEditing(p.code_produit, 'poids_unite_vente')) {
+                      <input type="number" class="cell-input" autofocus min="0" step="0.0001"
+                        [value]="editingValue()"
+                        (blur)="editingValue.set(+$any($event.target).value || null); saveEdit(p)"
+                        (keydown.enter)="editingValue.set(+$any($event.target).value || null); saveEdit(p)"
+                        (keydown.escape)="cancelEdit()" />
+                    } @else {
+                      <div class="cell-display cell-display--center">
+                        @if (savingCell()?.code === p.code_produit && savingCell()?.field === 'poids_unite_vente') {
+                          <i class="pi pi-spin pi-spinner cell-spinner"></i>
+                        } @else {
+                          <span [class.text-muted]="p.poids_unite_vente == null">{{ formatPoids(p.poids_unite_vente) }}</span>
+                        }
+                        <i class="pi pi-pencil cell-pencil"></i>
+                      </div>
+                    }
+                  </td>
+                }
+
+                @if (isColVisible('prix_dd')) {
+                  <td class="col-center cell-editable"
+                    (click)="startEdit(p, 'prix_dd', $event)"
+                    [class.cell-editing]="isEditing(p.code_produit, 'prix_dd')">
+                    @if (isEditing(p.code_produit, 'prix_dd')) {
+                      <input type="number" class="cell-input" autofocus min="0" step="0.01"
+                        [value]="editingValue()"
+                        (blur)="editingValue.set(+$any($event.target).value || null); saveEdit(p)"
+                        (keydown.enter)="editingValue.set(+$any($event.target).value || null); saveEdit(p)"
+                        (keydown.escape)="cancelEdit()" />
+                    } @else {
+                      <div class="cell-display cell-display--center">
+                        @if (savingCell()?.code === p.code_produit && savingCell()?.field === 'prix_dd') {
+                          <i class="pi pi-spin pi-spinner cell-spinner"></i>
+                        } @else {
+                          <span [class.text-muted]="p.prix_dd == null">{{ p.prix_dd != null ? p.prix_dd : '—' }}</span>
+                        }
+                        <i class="pi pi-pencil cell-pencil"></i>
+                      </div>
+                    }
+                  </td>
+                }
+
+                @if (isColVisible('prix_promotion')) {
+                  <td class="col-center cell-editable"
+                    (click)="startEdit(p, 'prix_promotion', $event)"
+                    [class.cell-editing]="isEditing(p.code_produit, 'prix_promotion')">
+                    @if (isEditing(p.code_produit, 'prix_promotion')) {
+                      <input type="number" class="cell-input" autofocus min="0" step="0.01"
+                        [value]="editingValue()"
+                        (blur)="editingValue.set(+$any($event.target).value || null); saveEdit(p)"
+                        (keydown.enter)="editingValue.set(+$any($event.target).value || null); saveEdit(p)"
+                        (keydown.escape)="cancelEdit()" />
+                    } @else {
+                      <div class="cell-display cell-display--center">
+                        @if (savingCell()?.code === p.code_produit && savingCell()?.field === 'prix_promotion') {
+                          <i class="pi pi-spin pi-spinner cell-spinner"></i>
+                        } @else {
+                          <span [class.text-muted]="p.prix_promotion == null">{{ p.prix_promotion != null ? p.prix_promotion : '—' }}</span>
+                        }
+                        <i class="pi pi-pencil cell-pencil"></i>
+                      </div>
+                    }
+                  </td>
+                }
+
+                @if (isColVisible('prix_club')) {
+                  <td class="col-center cell-editable"
+                    (click)="startEdit(p, 'prix_club', $event)"
+                    [class.cell-editing]="isEditing(p.code_produit, 'prix_club')">
+                    @if (isEditing(p.code_produit, 'prix_club')) {
+                      <input type="number" class="cell-input" autofocus min="0" step="0.01"
+                        [value]="editingValue()"
+                        (blur)="editingValue.set(+$any($event.target).value || null); saveEdit(p)"
+                        (keydown.enter)="editingValue.set(+$any($event.target).value || null); saveEdit(p)"
+                        (keydown.escape)="cancelEdit()" />
+                    } @else {
+                      <div class="cell-display cell-display--center">
+                        @if (savingCell()?.code === p.code_produit && savingCell()?.field === 'prix_club') {
+                          <i class="pi pi-spin pi-spinner cell-spinner"></i>
+                        } @else {
+                          <span [class.text-muted]="p.prix_club == null">{{ p.prix_club != null ? p.prix_club : '—' }}</span>
+                        }
+                        <i class="pi pi-pencil cell-pencil"></i>
+                      </div>
+                    }
+                  </td>
+                }
+
+                @if (isColVisible('facturable')) {
+                  <td class="col-center">
+                    <button class="facturable-toggle"
+                      [class.facturable-toggle--on]="p.facturable"
+                      [class.facturable-toggle--off]="!p.facturable"
+                      (click)="toggleFacturable(p)"
+                      [title]="p.facturable ? 'Oui — cliquer pour exclure' : 'Non — cliquer pour inclure'">
+                      {{ p.facturable ? 'Oui' : 'Non' }}
+                    </button>
+                  </td>
+                }
+
+                @if (isColVisible('imported')) {
+                  <td class="col-center">
+                    @if (p.imported) {
+                      <span class="imported-badge">Importé</span>
+                    } @else {
+                      <span class="text-muted">—</span>
+                    }
+                  </td>
+                }
+
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+
+</app-page-layout>
+
+<ng-template #actionsTpl>
+  <button class="btn-secondary" (click)="sync()" [disabled]="syncing()">
+    <i class="pi" [class.pi-sync]="!syncing()" [class.pi-spin]="syncing()" [class.pi-spinner]="syncing()"></i>
+    Synchroniser
+  </button>
+</ng-template>
+
+<ng-template #toolbarTpl>
+  <div class="prod-toolbar-inner">
+    <div class="prod-toolbar-inner__left">
+      <div class="table-search prod-search">
+        <div class="search-icon"><i class="pi pi-search"></i></div>
+        <input placeholder="Rechercher code, désignation…"
+          [ngModel]="searchText()" (ngModelChange)="searchText.set($event)" />
+      </div>
+      <div class="famille-pills">
+        @for (f of familles(); track f) {
+          <button class="famille-pill" [class.famille-pill--active]="familleFilter() === f"
+            (click)="familleFilter.set(f)"
+            [style.--pill-bg]="familleColor.getStyle(f).background"
+            [style.--pill-color]="familleColor.getStyle(f).color">
+            <span class="famille-pill__dot"></span>
+            <span>{{ f }}</span>
+          </button>
+        }
+      </div>
+    </div>
+    <div class="table-actions">
+      <button class="table-action-btn" pTooltip="Colonnes visibles" (click)="colMenu.toggle($event)">
+        <i class="pi pi-sliders-h"></i>
+      </button>
+      <p-popover #colMenu>
+        <div class="table-options-menu">
+          <div class="table-options-section">
+            <span class="table-options-label">Colonnes visibles</span>
+            <div class="table-options-columns">
+              @for (col of allColumns; track col.field) {
+                <label class="column-toggle">
+                  <input type="checkbox" [checked]="col.visible" (change)="toggleColumn(col.field)" />
+                  <span>{{ col.header }}</span>
+                </label>
+              }
+            </div>
+          </div>
+        </div>
+      </p-popover>
+      <button class="table-action-btn" pTooltip="Rafraîchir" (click)="load()">
+        <i class="pi pi-refresh" [class.pi-spin]="loading()"></i>
+      </button>
+    </div>
+  </div>
+</ng-template>
+
+<!-- Column filter popover -->
+<p-popover #colFilterPop>
+  <div class="col-filter-popup">
+    <input type="text" class="col-filter-search"
+      placeholder="Rechercher…"
+      [ngModel]="colFilterTerm()" (ngModelChange)="colFilterTerm.set($event)" />
+    <div class="col-filter-list">
+      <div class="col-filter-option"
+        [class.col-filter-option--active]="!getColFilter(colFilterField() ?? '')"
+        (click)="applyColFilter(null)">
+        <i class="pi pi-list"></i> Tous
+      </div>
+      @for (opt of colFilterOptions(); track opt) {
+        <div class="col-filter-option"
+          [class.col-filter-option--active]="getColFilter(colFilterField() ?? '') === opt"
+          (click)="applyColFilter(opt)">
+          {{ opt }}
+        </div>
+      }
+      @if (colFilterOptions().length === 0) {
+        <div class="col-filter-empty">Aucun résultat</div>
+      }
+    </div>
+  </div>
+</p-popover>
+
+<!-- Famille picker popover -->
+<p-popover #familleOv styleClass="famille-popover">
+  <div class="famille-popup">
+    <input #newFamilleInput type="text" class="famille-popup__new-input"
+      placeholder="Nouvelle famille…"
+      (keydown.enter)="saveFamille(newFamilleInput.value.trim().toUpperCase() || null); newFamilleInput.value = ''"
+      (keydown.escape)="familleOv.hide()" />
+    <div class="famille-popup__divider"></div>
+    <div class="famille-popup__option famille-popup__option--empty" (click)="saveFamille(null)">—</div>
+    @for (f of familles(); track f) {
+      <div class="famille-popup__option"
+        [class.famille-popup__option--active]="familleEditProd()?.famille === f"
+        [style.background]="familleColor.getStyle(f).background"
+        [style.color]="familleColor.getStyle(f).color"
+        (click)="saveFamille(f)">
+        {{ f }}
+      </div>
+    }
+  </div>
+</p-popover>
+
+@if (showSyncConfirm) {
+  <div class="sync-backdrop" (click)="showSyncConfirm = false">
+    <div class="sync-dialog" (click)="$event.stopPropagation()">
+      <h3 class="sync-dialog__title"><i class="pi pi-sync"></i> Synchroniser les produits</h3>
+
+      @if (syncPreviewLoading) {
+        <p class="sync-dialog__body"><i class="pi pi-spin pi-spinner"></i> Recherche des produits manquants…</p>
+      } @else if (syncPreviewItems.length === 0) {
+        <p class="sync-dialog__body">
+          <i class="pi pi-check-circle" style="color:var(--color-success,#22c55e)"></i>
+          Aucun produit manquant — le catalogue est déjà à jour.
+        </p>
+      } @else {
+        <p class="sync-dialog__body">
+          <strong>{{ syncPreviewItems.length }}</strong> produit(s) seront ajoutés au catalogue (identifiés par leur code) :
+        </p>
+        <ul class="sync-preview-list">
+          @for (p of syncPreviewItems; track p.code_produit) {
+            <li>
+              <code class="sync-preview-code">{{ p.code_produit }}</code>
+              <span class="sync-preview-name">{{ p.description_produit ?? '—' }}</span>
+              @if (p.famille) {
+                <span class="sync-preview-famille">{{ p.famille }}</span>
+              }
+            </li>
+          }
+        </ul>
+      }
+
+      <div class="sync-dialog__actions">
+        <button class="sync-btn-cancel" (click)="showSyncConfirm = false">Annuler</button>
+        <button class="sync-btn-confirm" (click)="confirmSync()"
+          [disabled]="syncPreviewLoading || syncPreviewItems.length === 0">
+          <i class="pi pi-check"></i> Confirmer
+        </button>
+      </div>
+    </div>
+  </div>
+}
