@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, Input, Output, EventEmitter, ViewCh
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { firstValueFrom } from 'rxjs';
 import { Dialog } from 'primeng/dialog';
 import { Select } from 'primeng/select';
 import { HttpClient } from '@angular/common/http';
@@ -144,6 +145,15 @@ import { UploadComponent } from '../../upload/upload.component';
               <div class="confirm-calc-note">
                 <i class="pi pi-info-circle"></i>
                 Objectif par prévendeur&nbsp;=&nbsp;Total&nbsp;÷&nbsp;{{ confirmState().routeCount }}&nbsp;prévendeurs
+              </div>
+            }
+            @if (confirmState().existingCount > 0) {
+              <div class="confirm-replace-warning">
+                <i class="pi pi-exclamation-triangle"></i>
+                <span>
+                  <strong>{{ confirmState().existingCount }} objectif(s) {{ confirmState().canal }} existants</strong>
+                  pour cette période seront supprimés et remplacés.
+                </span>
               </div>
             }
           </div>
@@ -673,6 +683,25 @@ import { UploadComponent } from '../../upload/upload.component';
       }
     }
 
+    .confirm-replace-warning {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      padding: 0.75rem 1rem;
+      border-radius: 0.625rem;
+      background: color-mix(in srgb, var(--color-warning, #f59e0b) 10%, var(--surface-ground));
+      border: 1px solid color-mix(in srgb, var(--color-warning, #f59e0b) 40%, transparent);
+      font-size: 0.82rem;
+      color: var(--text-color);
+      width: 100%;
+
+      i {
+        color: var(--color-warning, #f59e0b);
+        flex-shrink: 0;
+        margin-top: 0.1rem;
+      }
+    }
+
     .confirm-value--toggle {
       display: flex;
       align-items: center;
@@ -825,9 +854,10 @@ export class ObjectifsUploadDialogComponent implements OnInit {
     rowCount: number | null;
     canal: 'VD' | 'VH' | null;
     routeCount: number;
+    existingCount: number;
     headers: string[];
     products: Record<string, unknown>[];
-  }>({ visible: false, distributor: '', mois: null, annee: null, rowCount: null, canal: null, routeCount: 0, headers: [], products: [] });
+  }>({ visible: false, distributor: '', mois: null, annee: null, rowCount: null, canal: null, routeCount: 0, existingCount: 0, headers: [], products: [] });
 
   readonly productsExpanded = signal(false);
 
@@ -920,7 +950,7 @@ export class ObjectifsUploadDialogComponent implements OnInit {
 
   private resetDialog() {
     this.uploadComponent?.reset();
-    this.confirmState.set({ visible: false, distributor: '', mois: null, annee: null, rowCount: null, canal: null, routeCount: 0, headers: [], products: [] });
+    this.confirmState.set({ visible: false, distributor: '', mois: null, annee: null, rowCount: null, canal: null, routeCount: 0, existingCount: 0, headers: [], products: [] });
     this.productsExpanded.set(false);
     this.selectedCanal.set(null);
   }
@@ -930,18 +960,35 @@ export class ObjectifsUploadDialogComponent implements OnInit {
 
     this.isConfirming.set(true);
     const preview = await this.uploadComponent.previewObjectifsFile(this.selectedCanal()!);
-    this.isConfirming.set(false);
 
     if (!preview) {
+      this.isConfirming.set(false);
       this.notify.error('Impossible de lire le fichier');
       return;
     }
+
+    const canal = this.selectedCanal()!;
+    const distId = this.selectedDistributor;
+
+    // Check how many existing objectives will be replaced
+    let existingCount = 0;
+    try {
+      let url = `/api/v1/objectifs?mois=${preview.mois}&annee=${preview.annee}`;
+      if (distId) url += `&distributor_id=${distId}`;
+      const existing = await firstValueFrom(this.http.get<Record<string, unknown>[]>(url));
+      existingCount = existing.filter(r =>
+        canal === 'VD'
+          ? r['objectif_tonne_vd'] != null || r['objectif_packs_vd'] != null
+          : r['objectif_tonne_vh'] != null || r['objectif_packs_vh'] != null
+      ).length;
+    } catch { /* ignore — proceed without warning */ }
+
+    this.isConfirming.set(false);
 
     const distributor = this.isPlatformAdmin && this.selectedDistributor
       ? this.distributors().find(d => d.id === this.selectedDistributor)?.nom || 'Inconnu'
       : this.distributorName() || 'Distributeur';
 
-    const canal = this.selectedCanal()!;
     const routeCount = canal === 'VD' ? this.prevendeurVDValue : this.prevendeurVHValue;
     this.productsExpanded.set(false);
     this.confirmState.set({
@@ -952,6 +999,7 @@ export class ObjectifsUploadDialogComponent implements OnInit {
       rowCount: preview.rowCount,
       canal,
       routeCount,
+      existingCount,
       headers: preview.headers,
       products: preview.products,
     });

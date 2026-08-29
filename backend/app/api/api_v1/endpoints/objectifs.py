@@ -573,10 +573,10 @@ async def upload_objectifs(
                     ))
                 saved_count += 1
 
-            # Step 3 — delete rows where both canals are now fully empty
+            # Step 3 — delete rows where both canals are now fully NULL
             for obj in existing:
-                has_vd = any([obj.objectif_tonne_vd, obj.objectif_packs_vd])
-                has_vh = any([obj.objectif_tonne_vh, obj.objectif_packs_vh])
+                has_vd = obj.objectif_tonne_vd is not None or obj.objectif_packs_vd is not None
+                has_vh = obj.objectif_tonne_vh is not None or obj.objectif_packs_vh is not None
                 if not has_vd and not has_vh:
                     session.delete(obj)
 
