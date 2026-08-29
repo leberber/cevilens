@@ -8,12 +8,12 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 
 logger = logging.getLogger("app.upload")
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, delete as sa_delete, case as sa_case, cast, String
+from sqlalchemy import func, delete as sa_delete, cast, String
 from sqlmodel import Session, select
 
 from app.api.deps import get_current_user, get_current_distributor
 from app.database import get_session
-from app.models.user import User, UserRole
+from app.models.user import User, UserRole, Canal
 from app.models.distributor import Distributor
 from app.models.vente import Vente, VentePage, VenteRead, VenteClientName
 from app.utils.parse import parse_file
@@ -608,6 +608,10 @@ async def upload_ventes(
                 code = fdv['code']
                 # Check if phone (code) is already in use
                 if not session.exec(select(User).where(User.phone == code)).first():
+                    # Extract canal from code (e.g., '1501-VD204' -> 'VD')
+                    canal_str = _extract_canal(code)
+                    canal = Canal(canal_str) if canal_str else None
+
                     user = User(
                         phone=code,
                         full_name=fdv['nom'],
@@ -616,6 +620,7 @@ async def upload_ventes(
                         employe_code=code,
                         nom_distributeur=fdv['nom_distributeur'],
                         distributor_id=distributor_id,
+                        canal=canal,
                     )
                     session.add(user)
                     created_count += 1

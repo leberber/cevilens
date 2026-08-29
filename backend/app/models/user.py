@@ -11,6 +11,11 @@ class UserRole(str, Enum):
     PREVENDEUR = "prevendeur"
 
 
+class Canal(str, Enum):
+    VD = "VD"
+    VH = "VH"
+
+
 class User(SQLModel, table=True):
     __tablename__ = "users"
 
@@ -23,6 +28,7 @@ class User(SQLModel, table=True):
     role: UserRole = Field(default=UserRole.SUPERVISEUR)
     is_active: bool = Field(default=True)
     nom_distributeur: Optional[str] = Field(default=None, max_length=100)
+    canal: Optional[Canal] = Field(default=None)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -34,6 +40,7 @@ class UserCreate(SQLModel):
     distributor_id: Optional[int] = None
     employe_code: Optional[str] = None
     nom_distributeur: Optional[str] = None
+    canal: Optional[Canal] = None
 
 
 class UserUpdate(SQLModel):
@@ -45,6 +52,7 @@ class UserUpdate(SQLModel):
     distributor_id: Optional[int] = None
     employe_code: Optional[str] = None
     nom_distributeur: Optional[str] = None
+    canal: Optional[Canal] = None
 
 
 class UserRead(SQLModel):
@@ -58,4 +66,5 @@ class UserRead(SQLModel):
     distributor_id: Optional[int] = None
     employe_code: Optional[str] = None
     nom_distributeur: Optional[str] = None
+    canal: Optional[Canal] = None
     created_at: datetime

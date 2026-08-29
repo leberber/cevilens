@@ -1,12 +1,11 @@
-import { Component, Input, Output, EventEmitter, inject, signal, computed, OnInit, ViewChild, DestroyRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, inject, signal, computed, OnInit, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Dialog } from 'primeng/dialog';
 import { Select } from 'primeng/select';
+import { TooltipModule } from 'primeng/tooltip';
 import { HttpClient } from '@angular/common/http';
-import { VentesService } from '../../../core/services/ventes.service';
-import { AuthService } from '../../../core/services/auth.service';
 import { DistributorContextService } from '../../../core/services/distributor-context.service';
 import { RoleService } from '../../../core/services/role.service';
 import { NotificationService } from '../../../core/services/notification.service';
@@ -16,7 +15,7 @@ import { UploadComponent } from '../../upload/upload.component';
 @Component({
   selector: 'app-objectifs-upload-dialog',
   standalone: true,
-  imports: [CommonModule, FormsModule, Dialog, Select, UploadComponent],
+  imports: [CommonModule, FormsModule, Dialog, Select, TooltipModule, UploadComponent],
   template: `
     <p-dialog
       [visible]="visible"
@@ -458,9 +457,7 @@ import { UploadComponent } from '../../upload/upload.component';
   `],
 })
 export class ObjectifsUploadDialogComponent implements OnInit {
-  private readonly ventesService = inject(VentesService);
   private readonly http = inject(HttpClient);
-  private readonly auth = inject(AuthService);
   private readonly distContext = inject(DistributorContextService);
   private readonly roleService = inject(RoleService);
   private readonly notify = inject(NotificationService);
@@ -469,7 +466,6 @@ export class ObjectifsUploadDialogComponent implements OnInit {
   @Input() visible = false;
   @Output() visibleChange = new EventEmitter<boolean>();
   @Output() close = new EventEmitter<void>();
-  @ViewChild('uploadComponent') uploadComponent!: UploadComponent;
 
   readonly isPlatformAdmin = this.roleService.isPlatformAdmin();
   readonly loadingCounts = signal(false);
@@ -514,63 +510,36 @@ export class ObjectifsUploadDialogComponent implements OnInit {
   private loadPrevendeurCounts() {
     this.loadingCounts.set(true);
 
-    // Get distributor ID for query
-    const distributorId = this.selectedDistributor || this.distContext.distributor()?.id;
-    if (!distributorId) {
-      this.loadingCounts.set(false);
-      return;
-    }
-
-    // Query latest month vente data and count prevendeurs
-    this.ventesService.getPeriodes()
+    // Query users table for prevendeurs by canal
+    this.http.get<Record<string, unknown>[]>(`/api/v1/users?role=prevendeur`)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: (periodes) => {
-          if (!periodes.length) {
-            this.loadingCounts.set(false);
-            return;
-          }
-
-          // Get latest periode
-          const latestPeriode = periodes[0];
-
-          // Query vente data for this period
-          this.http.get<Record<string, unknown>[]>(`/api/v1/ventes/list?date_from=${latestPeriode}&date_to=${latestPeriode}`)
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe({
-              next: (ventes) => {
-                this.countPrevendeurs(ventes, distributorId);
-                this.loadingCounts.set(false);
-              },
-              error: () => {
-                this.loadingCounts.set(false);
-                this.notify.error('Erreur lors de la détection des prévendeurs');
-              }
-            });
+        next: (users) => {
+          this.countPrevendeursFromUsers(users);
+          this.loadingCounts.set(false);
         },
         error: () => {
           this.loadingCounts.set(false);
+          this.notify.error('Erreur lors de la détection des prévendeurs');
         }
       });
   }
 
-  private countPrevendeurs(ventes: Record<string, unknown>[], distributorId: number) {
-    const vdSet = new Set<string>();
-    const vhSet = new Set<string>();
+  private countPrevendeursFromUsers(users: Record<string, unknown>[]) {
+    let vdCount = 0;
+    let vhCount = 0;
 
-    for (const vente of ventes) {
-      if (vente['distributor_id'] !== distributorId && vente['distributor_id'] !== null) continue;
-      if (!vente['nom_fdv']) continue;
-
-      if (vente['canal'] === 'VD') {
-        vdSet.add(vente['nom_fdv'] as string);
-      } else if (vente['canal'] === 'VH') {
-        vhSet.add(vente['nom_fdv'] as string);
+    for (const user of users) {
+      const canal = user['canal'];
+      if (canal === 'VD') {
+        vdCount++;
+      } else if (canal === 'VH') {
+        vhCount++;
       }
     }
 
-    this.prevendeurVDValue = vdSet.size;
-    this.prevendeurVHValue = vhSet.size;
+    this.prevendeurVDValue = vdCount;
+    this.prevendeurVHValue = vhCount;
   }
 
   onVisibleChange(value: boolean) {

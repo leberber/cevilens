@@ -1,6 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule, DecimalPipe } from '@angular/common';
-import { Router } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 
 interface UploadResult { success: boolean; message: string; }
@@ -14,8 +13,7 @@ interface FileInfo { total_rows: number; date_min: string; date_max: string; }
   templateUrl: './upload.component.html',
 })
 export class UploadComponent {
-  private auth   = inject(AuthService);
-  private router = inject(Router);
+  private auth = inject(AuthService);
 
   dragOver        = signal(false);
   loading         = signal(false);
