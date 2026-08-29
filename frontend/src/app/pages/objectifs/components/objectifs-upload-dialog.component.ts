@@ -1,4 +1,4 @@
-import { Component, Input, Output, EventEmitter, ViewChild, inject, signal, computed, OnInit, AfterViewInit, DestroyRef } from '@angular/core';
+import { Component, Input, Output, EventEmitter, ViewChild, inject, signal, computed, OnInit, DestroyRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -20,79 +20,141 @@ import { UploadComponent } from '../../upload/upload.component';
     <p-dialog
       [visible]="visible"
       [modal]="true"
-      [header]="'Ajouter les objectifs'"
+      [header]="confirmState().visible ? 'Confirmation — Ajouter les objectifs' : 'Ajouter les objectifs'"
       [style]="{ width: '1000px' }"
       [styleClass]="'objectifs-dialog'"
       (visibleChange)="onVisibleChange($event)">
 
       <div class="objectifs-dialog-content">
 
-        <!-- Header with Config Info -->
+        <!-- Header -->
+        @if (!confirmState().visible) {
         <div class="dialog-header">
-          <div class="header-left">
-            <div class="header-meta">
-              @if (isPlatformAdmin) {
-                <div class="distributor-select-wrapper">
-                  <i class="pi pi-building"></i>
-                  <p-select
-                    [options]="distributors()"
-                    [(ngModel)]="selectedDistributor"
-                    optionLabel="nom"
-                    optionValue="id"
-                    (onChange)="selectedDistributor !== null && onDistributorChange(selectedDistributor)"
-                    placeholder="Sélectionner..."
-                    [showClear]="false"
-                    [filter]="true"
-                    class="glass-select"
-                    panelStyleClass="glass-panel">
-                  </p-select>
-                </div>
-              } @else {
-                <span class="meta-item">
-                  <i class="pi pi-building"></i>
-                  {{ distributorName() || 'Chargement...' }}
+          <div class="header-meta">
+            @if (isPlatformAdmin) {
+              <div class="distributor-select-wrapper">
+                <i class="pi pi-building"></i>
+                <p-select
+                  [options]="distributors()"
+                  [(ngModel)]="selectedDistributor"
+                  optionLabel="nom"
+                  optionValue="id"
+                  (onChange)="selectedDistributor !== null && onDistributorChange(selectedDistributor)"
+                  placeholder="Sélectionner..."
+                  [showClear]="false"
+                  [filter]="true"
+                  class="glass-select"
+                  panelStyleClass="glass-panel">
+                </p-select>
+              </div>
+            } @else {
+              <span class="meta-item">
+                <i class="pi pi-building"></i>
+                {{ distributorName() || 'Chargement...' }}
+              </span>
+            }
+            @if (!loadingCounts() && !confirmState().visible) {
+              <div class="prevendeur-select-wrapper">
+                <i class="pi pi-users"></i>
+                <span class="canal-type-label">Sélectionner type de vente</span>
+                <button class="canal-btn" [class.active]="selectedCanal() === 'VD'" (click)="selectedCanal.set('VD')" type="button">
+                  @if (selectedCanal() === 'VD') { <i class="pi pi-check"></i> }
+                  VD: <strong>{{ prevendeurVDValue }}</strong>
+                </button>
+                <span class="prevendeur-separator">|</span>
+                <button class="canal-btn" [class.active]="selectedCanal() === 'VH'" (click)="selectedCanal.set('VH')" type="button">
+                  @if (selectedCanal() === 'VH') { <i class="pi pi-check"></i> }
+                  VH: <strong>{{ prevendeurVHValue }}</strong>
+                </button>
+              </div>
+            }
+          </div>
+        </div>
+        }
+
+        <!-- Upload view (always mounted so @ViewChild stays valid) -->
+        <div class="upload-zone-wrapper" [hidden]="confirmState().visible">
+          <app-upload #uploadComponent [autoUpload]="false" [selectedCanal]="selectedCanal()"></app-upload>
+        </div>
+
+        <!-- Confirmation view -->
+        @if (confirmState().visible) {
+          <div class="confirmation-body">
+            <div class="confirm-icon">
+              <i class="pi pi-file-check"></i>
+            </div>
+            <div class="confirm-summary">
+              <div class="confirm-row">
+                <span class="confirm-label"><i class="pi pi-building"></i> Distributeur</span>
+                <span class="confirm-value">{{ confirmState().distributor }}</span>
+              </div>
+              <div class="confirm-row">
+                <span class="confirm-label"><i class="pi pi-tag"></i> Canal</span>
+                <span class="confirm-value">
+                  <span class="badge badge--info">{{ confirmState().canal }}</span>
                 </span>
-              }
-              @if (!loadingCounts()) {
-                <div class="prevendeur-select-wrapper">
-                  <i class="pi pi-users"></i>
-                  <span class="canal-type-label">Sélectionner type de vente</span>
-                  <button class="canal-btn" [class.active]="selectedCanal() === 'VD'" (click)="selectedCanal.set('VD')" type="button">
-                    @if (selectedCanal() === 'VD') { <i class="pi pi-check"></i> }
-                    VD: <strong>{{ prevendeurVDValue }}</strong>
-                  </button>
-                  <span class="prevendeur-separator">|</span>
-                  <button class="canal-btn" [class.active]="selectedCanal() === 'VH'" (click)="selectedCanal.set('VH')" type="button">
-                    @if (selectedCanal() === 'VH') { <i class="pi pi-check"></i> }
-                    VH: <strong>{{ prevendeurVHValue }}</strong>
-                  </button>
+              </div>
+              <div class="confirm-row">
+                <span class="confirm-label"><i class="pi pi-calendar"></i> Période</span>
+                <span class="confirm-value">
+                  @if (confirmState().mois && confirmState().annee) {
+                    {{ confirmState().mois | number: '2.0-0' }}/{{ confirmState().annee }}
+                  } @else { N/A }
+                </span>
+              </div>
+              <div class="confirm-row confirm-row--clickable" (click)="productsExpanded.set(!productsExpanded())">
+                <span class="confirm-label"><i class="pi pi-box"></i> Produits</span>
+                <span class="confirm-value confirm-value--toggle">
+                  @if (confirmState().rowCount) {
+                    <span>{{ confirmState().rowCount | number }}</span>
+                  } @else { <span>N/A</span> }
+                  <i class="pi" [class.pi-chevron-down]="!productsExpanded()" [class.pi-chevron-up]="productsExpanded()"></i>
+                </span>
+              </div>
+              @if (productsExpanded()) {
+                <div class="confirm-products-table-wrap">
+                  <table class="confirm-products-table">
+                    <thead>
+                      <tr>
+                        @for (h of confirmState().headers; track h) {
+                          @if (h) { <th>{{ h }}</th> }
+                        }
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (p of confirmState().products; track $index) {
+                        <tr>
+                          @for (h of confirmState().headers; track h) {
+                            @if (h) { <td>{{ p[h] ?? '—' }}</td> }
+                          }
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
                 </div>
               }
             </div>
-          </div>
-        </div>
-
-        <!-- Main Upload Area -->
-        <div class="upload-zone-wrapper">
-          <app-upload #uploadComponent [selectedCanal]="selectedCanal()"></app-upload>
-        </div>
-
-        <!-- Error Message -->
-        @if (errorMessage()) {
-          <div class="error-message">
-            <i class="pi pi-exclamation-circle"></i>
-            {{ errorMessage() }}
           </div>
         }
 
         <!-- Footer -->
         <div class="dialog-footer">
-          <button class="btn-secondary" type="button" (click)="onDialogClose()" [disabled]="loadingCounts()">
-            Annuler
-          </button>
-          <button class="btn-primary" type="button" (click)="onImport()" [disabled]="isImportDisabled()">
-            <i class="pi pi-upload"></i> Importer
-          </button>
+          @if (confirmState().visible) {
+            <button class="btn-secondary" type="button" (click)="onCancelConfirm()">
+              <i class="pi pi-arrow-left"></i> Retour
+            </button>
+            <button class="btn-primary" type="button" (click)="onConfirmImport()">
+              <i class="pi pi-check"></i> Confirmer l'import
+            </button>
+          } @else {
+            <button class="btn-secondary" type="button" (click)="onDialogClose()" [disabled]="loadingCounts()">
+              Annuler
+            </button>
+            <button class="btn-primary" type="button" (click)="onImport()" [disabled]="isImportDisabled() || isConfirming()">
+              @if (isConfirming()) { <i class="pi pi-spin pi-spinner"></i> } @else { <i class="pi pi-upload"></i> }
+              Importer
+            </button>
+          }
         </div>
 
       </div>
@@ -113,13 +175,8 @@ import { UploadComponent } from '../../upload/upload.component';
     }
 
     .dialog-header {
+      padding: 1rem 2rem;
       border-bottom: 1px solid var(--surface-border);
-    }
-
-    .header-left {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
     }
 
     .header-meta {
@@ -281,6 +338,10 @@ import { UploadComponent } from '../../upload/upload.component';
       justify-content: center;
     }
 
+    .upload-zone-wrapper[hidden] {
+      display: none !important;
+    }
+
     .dialog-footer {
       padding: 2rem;
       border-top: 1px solid var(--surface-border);
@@ -288,38 +349,6 @@ import { UploadComponent } from '../../upload/upload.component';
       display: flex;
       justify-content: flex-end;
       gap: 0.75rem;
-    }
-
-    .btn-primary {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.625rem 1.5rem;
-      border: none;
-      background: var(--primary-color);
-      color: white;
-      border-radius: var(--radius-md);
-      font-weight: 600;
-      font-size: 0.95rem;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      box-shadow: 0 2px 8px rgba(var(--primary-rgb), 0.2);
-    }
-
-    .btn-primary:hover {
-      background: linear-gradient(135deg, var(--primary-color), rgba(var(--primary-rgb), 0.8));
-      box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
-      transform: translateY(-2px);
-    }
-
-    .btn-primary:active {
-      transform: translateY(0);
-    }
-
-    .btn-primary:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      box-shadow: none;
     }
 
     .canal-btn {
@@ -576,9 +605,195 @@ import { UploadComponent } from '../../upload/upload.component';
       }
     }
 
+    .confirmation-body {
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+    }
+
+    .confirm-icon {
+      width: 64px;
+      height: 64px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, var(--primary-color), color-mix(in srgb, var(--primary-color) 70%, #6366f1));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 16px color-mix(in srgb, var(--primary-color) 30%, transparent);
+
+      i {
+        font-size: 1.75rem;
+        color: white;
+      }
+    }
+
+    .confirm-summary {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid var(--surface-border);
+      border-radius: 0.875rem;
+      overflow: hidden;
+    }
+
+    .confirm-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.875rem 1.25rem;
+      background: var(--surface-card);
+      border-bottom: 1px solid var(--surface-border);
+
+      &:last-child {
+        border-bottom: none;
+      }
+    }
+
+    .confirm-label {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--text-color-secondary);
+      font-weight: 500;
+
+      i {
+        color: var(--primary-color);
+        font-size: 0.875rem;
+      }
+    }
+
+    .confirm-value {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-color);
+    }
+
+    .confirm-value--toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+
+      i {
+        font-size: 0.75rem;
+        color: var(--text-color-secondary);
+        transition: transform 0.2s ease;
+      }
+    }
+
+    .confirm-row--clickable {
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.15s ease;
+
+      &:hover {
+        background: color-mix(in srgb, var(--primary-color) 5%, var(--surface-card));
+      }
+    }
+
+    .confirm-products-table-wrap {
+      max-height: 220px;
+      overflow: auto;
+      background: var(--surface-ground);
+      border-bottom: 1px solid var(--surface-border);
+    }
+
+    .confirm-products-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+
+      th {
+        position: sticky;
+        top: 0;
+        background: var(--surface-200);
+        color: var(--text-color-secondary);
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        padding: 0.45rem 0.85rem;
+        text-align: left;
+        white-space: nowrap;
+        border-bottom: 1px solid var(--surface-border);
+      }
+
+      td {
+        padding: 0.35rem 0.85rem;
+        color: var(--text-color);
+        border-bottom: 1px solid var(--surface-100);
+        white-space: nowrap;
+      }
+
+      tbody tr:last-child td {
+        border-bottom: none;
+      }
+
+      tbody tr:hover td {
+        background: color-mix(in srgb, var(--primary-color) 4%, var(--surface-ground));
+      }
+    }
+
+    .btn-secondary {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--surface-300);
+      color: var(--text-color);
+      border: none;
+      border-radius: var(--radius-md);
+      padding: 0.625rem 1.5rem;
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+
+      &:hover:not(:disabled) {
+        background: var(--surface-400);
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    }
+
+    .btn-primary {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.625rem 1.5rem;
+      border: none;
+      background: var(--primary-color);
+      color: white;
+      border-radius: var(--radius-md);
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(var(--primary-rgb), 0.2);
+
+      &:hover:not(:disabled) {
+        background: linear-gradient(135deg, var(--primary-color), rgba(var(--primary-rgb), 0.8));
+        box-shadow: 0 4px 12px rgba(var(--primary-rgb), 0.3);
+        transform: translateY(-2px);
+      }
+
+      &:active:not(:disabled) {
+        transform: translateY(0);
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        box-shadow: none;
+      }
+    }
+
   `],
 })
-export class ObjectifsUploadDialogComponent implements OnInit, AfterViewInit {
+export class ObjectifsUploadDialogComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly distContext = inject(DistributorContextService);
   private readonly roleService = inject(RoleService);
@@ -601,6 +816,21 @@ export class ObjectifsUploadDialogComponent implements OnInit, AfterViewInit {
     return false;
   });
 
+  readonly confirmState = signal<{
+    visible: boolean;
+    distributor: string;
+    mois: number | null;
+    annee: number | null;
+    rowCount: number | null;
+    canal: 'VD' | 'VH' | null;
+    headers: string[];
+    products: Record<string, unknown>[];
+  }>({ visible: false, distributor: '', mois: null, annee: null, rowCount: null, canal: null, headers: [], products: [] });
+
+  readonly productsExpanded = signal(false);
+
+  readonly isConfirming = signal(false);
+
   prevendeurVDValue = 0;
   prevendeurVHValue = 0;
   selectedDistributor: number | null = null;
@@ -612,12 +842,6 @@ export class ObjectifsUploadDialogComponent implements OnInit, AfterViewInit {
       this.loadDistributors();
     } else {
       this.loadPrevendeurCounts();
-    }
-  }
-
-  ngAfterViewInit() {
-    if (this.uploadComponent) {
-      this.uploadComponent.autoUpload = false;
     }
   }
 
@@ -646,8 +870,8 @@ export class ObjectifsUploadDialogComponent implements OnInit, AfterViewInit {
   private loadPrevendeurCounts() {
     this.loadingCounts.set(true);
 
-    // Query users table for prevendeurs by canal
-    this.http.get<Record<string, unknown>[]>(`/api/v1/users?role=prevendeur`)
+    const distParam = this.selectedDistributor ? `&distributor_id=${this.selectedDistributor}` : '';
+    this.http.get<Record<string, unknown>[]>(`/api/v1/users?role=prevendeur${distParam}`)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (users) => {
@@ -690,9 +914,45 @@ export class ObjectifsUploadDialogComponent implements OnInit, AfterViewInit {
     this.close.emit();
   }
 
-  onImport() {
-    if (this.uploadComponent && this.selectedCanal()) {
-      this.uploadComponent.uploadObjectives(this.selectedCanal()!);
+  async onImport() {
+    if (!this.uploadComponent || !this.selectedCanal()) return;
+
+    this.isConfirming.set(true);
+    const preview = await this.uploadComponent.previewObjectifsFile(this.selectedCanal()!);
+    this.isConfirming.set(false);
+
+    if (!preview) {
+      this.notify.error('Impossible de lire le fichier');
+      return;
     }
+
+    const distributor = this.isPlatformAdmin && this.selectedDistributor
+      ? this.distributors().find(d => d.id === this.selectedDistributor)?.nom || 'Inconnu'
+      : this.distributorName() || 'Distributeur';
+
+    this.productsExpanded.set(false);
+    this.confirmState.set({
+      visible: true,
+      distributor,
+      mois: preview.mois,
+      annee: preview.annee,
+      rowCount: preview.rowCount,
+      canal: this.selectedCanal(),
+      headers: preview.headers,
+      products: preview.products,
+    });
+  }
+
+  onConfirmImport() {
+    const state = this.confirmState();
+    if (this.uploadComponent && state.canal) {
+      const routeCount = state.canal === 'VD' ? this.prevendeurVDValue : this.prevendeurVHValue;
+      this.confirmState.update(s => ({ ...s, visible: false }));
+      this.uploadComponent.uploadObjectives(state.canal as 'VD' | 'VH', this.selectedDistributor || undefined, routeCount || 1);
+    }
+  }
+
+  onCancelConfirm() {
+    this.confirmState.update(s => ({ ...s, visible: false }));
   }
 }

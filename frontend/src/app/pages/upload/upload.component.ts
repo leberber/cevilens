@@ -16,10 +16,10 @@ export class UploadComponent {
   private auth = inject(AuthService);
 
   @Input() selectedCanal: 'VD' | 'VH' | null = null;
+  @Input() autoUpload: boolean = true;
 
   uploadType: 'ventes' | 'objectifs' = 'ventes';
   uploadCanal: 'VD' | 'VH' | null = null;
-  autoUpload: boolean = true;
   selectedFile = signal<File | null>(null);
 
   dragOver        = signal(false);
@@ -74,13 +74,16 @@ export class UploadComponent {
     this.progressMessage.set('');
   }
 
-  private async streamUpload(file: File, mode?: string) {
+  private async streamUpload(file: File, mode?: string, distributorId?: number, routeCount?: number) {
     const formData = new FormData();
     formData.append('file', file);
 
     let url: string;
     if (this.uploadType === 'objectifs') {
-      url = `/api/v1/objectifs/upload?canal=${this.uploadCanal}`;
+      url = `/api/v1/objectifs/upload?canal=${this.uploadCanal}&route_count=${routeCount ?? 1}`;
+      if (distributorId) {
+        url += `&distributor_id=${distributorId}`;
+      }
     } else {
       url = mode ? `/api/v1/ventes/upload?mode=${mode}` : '/api/v1/ventes/upload';
     }
@@ -137,14 +140,54 @@ export class UploadComponent {
     }
   }
 
-  uploadObjectives(canal: 'VD' | 'VH') {
+  async previewObjectifsFile(canal: 'VD' | 'VH'): Promise<{ mois: number; annee: number; rowCount: number; headers: string[]; products: Record<string, unknown>[] } | null> {
+    const file = this.selectedFile() || this.pendingFile;
+    if (!file) return null;
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`/api/v1/objectifs/preview?canal=${canal}`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${this.auth.token}` },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        console.error('Preview error:', error);
+        return null;
+      }
+
+      const preview = await response.json();
+
+      if (preview.error) {
+        console.error('Preview error:', preview.error);
+        return null;
+      }
+
+      return {
+        mois: preview.mois,
+        annee: preview.annee,
+        rowCount: preview.rowCount,
+        headers: preview.headers || [],
+        products: preview.products || [],
+      };
+    } catch (error) {
+      console.error('Error previewing file:', error);
+      return null;
+    }
+  }
+
+  uploadObjectives(canal: 'VD' | 'VH', distributorId?: number, routeCount?: number) {
     const file = this.selectedFile() || this.pendingFile;
     if (file) {
       this.uploadType = 'objectifs';
       this.uploadCanal = canal;
       this.pendingFile = file;
       this.resetUploadState();
-      this.streamUpload(file);
+      this.streamUpload(file, undefined, distributorId, routeCount);
     }
   }
 

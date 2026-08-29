@@ -14,22 +14,20 @@ router = APIRouter()
 @router.get("", response_model=List[UserRead])
 def list_users(
     role: Optional[UserRole] = Query(default=None),
+    distributor_id: Optional[int] = Query(default=None),
     session: Session = Depends(get_session),
     current_user: User = Depends(get_current_user),
 ) -> Any:
     q = select(User)
 
-    # Filter by distributor for non-platform-admin users
     if current_user.role != UserRole.PLATFORM_ADMIN:
-        print(f"DEBUG: User {current_user.full_name} (role={current_user.role}) has distributor_id={current_user.distributor_id}")
-        # Show only users in the same distributor (exclude platform-level users with NULL distributor_id)
         q = q.where(User.distributor_id == current_user.distributor_id)
+    elif distributor_id:
+        q = q.where(User.distributor_id == distributor_id)
 
     if role:
         q = q.where(User.role == role)
-    result = session.exec(q.order_by(User.full_name)).all()
-    print(f"DEBUG: Query returned {len(result)} users")
-    return result
+    return session.exec(q.order_by(User.full_name)).all()
 
 
 @router.get("/admin/all", response_model=List[UserRead])
