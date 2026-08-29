@@ -20,13 +20,14 @@ import { EmptyStateComponent } from '../../shared/components/empty-state/empty-s
 import { StatusBadgeComponent } from '../../shared/components/status-badge/status-badge.component';
 import { SortHeaderComponent } from '../../shared/components/sort-header/sort-header.component';
 import { SearchInputComponent } from '../../shared/components/search-input/search-input.component';
+import { SkeletonLoaderComponent } from '../../shared/components/skeleton-loader/skeleton-loader.component';
 import { User } from '../../core/models/user.model';
 import { ROLE_LABELS, ROLE_BADGES } from '../../core/constants/roles';
 
 @Component({
   selector: 'app-utilisateurs',
   standalone: true,
-  imports: [CommonModule, FormsModule, Toast, PageLayoutComponent, ConfirmDialogComponent, EmptyStateComponent, StatusBadgeComponent, SortHeaderComponent, SearchInputComponent],
+  imports: [CommonModule, FormsModule, Toast, PageLayoutComponent, ConfirmDialogComponent, EmptyStateComponent, StatusBadgeComponent, SortHeaderComponent, SearchInputComponent, SkeletonLoaderComponent],
   templateUrl: './utilisateurs.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -66,6 +67,18 @@ export class UtilisateursComponent implements OnInit {
 
   readonly roleLabel = ROLE_LABELS;
   readonly roleBadge = ROLE_BADGES;
+
+  initials(name: string): string {
+    return name.split(' ').slice(0, 2).map(p => p[0] ?? '').join('').toUpperCase();
+  }
+
+  avatarClass(role: string): string {
+    if (role === 'platform_admin' || role === 'admin') return 'table-user-avatar--admin';
+    if (role === 'distributor_admin')                  return 'table-user-avatar--dist';
+    if (role === 'superviseur')                        return 'table-user-avatar--sup';
+    if (role === 'prevendeur' || role === 'prevender') return 'table-user-avatar--prev';
+    return '';
+  }
 
   sortBy(col: string) {
     const s = toggleSort(this.sortCol(), this.sortDir(), col);

@@ -241,8 +241,44 @@
 
 // ── Table item with sub-text ───────────────────────────────────────────────────
 .table-item-info { display: flex; flex-direction: column; gap: 0.1rem; }
-.table-item-name { font-weight: var(--font-weight-semibold); color: var(--text-color); }
+.table-item-name { font-weight: var(--font-weight-semibold); color: var(--text-color); font-size: var(--font-size-sm); }
 .table-item-desc { font-size: var(--font-size-sm); color: var(--text-color-secondary); }
+
+// ── Role cell ─────────────────────────────────────────────────────────────────
+.role-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  svg { flex-shrink: 0; }
+}
+
+// ── User cell with avatar ──────────────────────────────────────────────────────
+.table-user-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.table-user-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(var(--primary-rgb), 0.1);
+  color: var(--primary-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+  text-transform: uppercase;
+
+  &--admin { background: rgba(var(--color-error-rgb), 0.1);   color: var(--color-error-dark); }
+  &--dist  { background: rgba(var(--color-warning-rgb), 0.12); color: var(--color-warning-dark); }
+  &--sup   { background: rgba(var(--color-info-rgb), 0.1);    color: var(--color-info-dark); }
+  &--prev  { background: rgba(var(--color-success-rgb), 0.1); color: var(--color-success-dark); }
+}
 
 .hist-store-pill {
   display: inline-block;

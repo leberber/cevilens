@@ -148,6 +148,7 @@ import { CommonModule } from '@angular/common';
       display: flex;
       align-items: center;
       gap: 0.5rem;
+      padding: 0.4rem 0.75rem;
     }
     .search-icon {
       color: var(--text-color-subdued);
@@ -157,7 +158,8 @@ import { CommonModule } from '@angular/common';
       border: none;
       background: transparent;
       outline: none;
-      font-size: 0.9rem;
+      font-size: 1rem;
+      min-width: 200px;
     }
   `],
 })

@@ -27,11 +27,7 @@
 
   <div class="table-wrapper">
       @if (loading()) {
-        @for (_ of [1,2,3,4,5]; track $index) {
-          <div style="padding:0.65rem 1rem;border-bottom:1px solid var(--border-color-light)">
-            <div style="height:1rem;border-radius:6px;background:var(--surface-200);animation:skeleton 1.2s infinite alternate"></div>
-          </div>
-        }
+        <app-skeleton-loader [rows]="5" [columns]="6" />
       } @else if (sorted().length === 0) {
         <app-empty-state
           icon="pi-users"
@@ -60,7 +56,10 @@
             @for (u of sorted(); track u.id; let i = $index) {
               <tr class="table-row-animate" [style.--row-delay]="i * 20 + 'ms'">
                 <td>
-                  <div class="table-item-info">
+                  <div class="table-user-cell">
+                    <div class="table-user-avatar" [class]="'table-user-avatar ' + avatarClass(u.role)">
+                      {{ initials(u.full_name) }}
+                    </div>
                     <span class="table-item-name">
                       {{ u.full_name }}
                       @if (isSelf(u)) { <span class="text-muted" style="font-weight:400"> (vous)</span> }
@@ -71,7 +70,17 @@
                 <td>
                   <code class="font-mono text-muted">{{ formatPhone(u.phone) }}</code>
                 </td>
-                <td><span [class]="roleBadge[u.role]" [ngClass]="{'text-muted': u.role === 'prevendeur' || u.role === 'prevender'}" [style.font-size.%]="(u.role === 'prevendeur' || u.role === 'prevender') ? 90 : 100">{{ roleLabel[u.role] }}</span></td>
+                <td>
+                  <span [class]="'role-cell ' + roleBadge[u.role]">
+                    @if (u.role === 'platform_admin' || u.role === 'distributor_admin' || u.role === 'admin') {
+                      <i class="pi pi-key"></i>
+                    }
+                    @if (u.role === 'prevendeur' || u.role === 'prevender') {
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
+                    }
+                    {{ roleLabel[u.role] }}
+                  </span>
+                </td>
                 <td><span class="text-muted">{{ getDistributorName(u.distributor_id) }}</span></td>
                 <td>
                   <app-status-badge [isActive]="u.is_active"></app-status-badge>

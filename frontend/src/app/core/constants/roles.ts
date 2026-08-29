@@ -1,20 +1,20 @@
 import { UserRole } from '../models/user.model';
 
 export const ROLE_LABELS: Record<UserRole | string, string> = {
-  platform_admin: '🔑 Platform Admin',
-  distributor_admin: '🔑 Admin',
-  superviseur: '👮 Superviseur',
-  prevendeur: '🚚 Prévendeur',
-  prevender: '🚚 Prévendeur', // legacy
-  admin: 'Admin', // legacy
+  platform_admin:    'Platform Admin',
+  distributor_admin: 'Admin',
+  superviseur:       '👮 Superviseur',
+  prevendeur:        'Prévendeur',
+  prevender:         'Prévendeur', // legacy
+  admin:             'Admin',        // legacy
 };
 
 export const ROLE_BADGES: Record<UserRole | string, string> = {
   platform_admin: 'badge badge--danger',
   distributor_admin: 'badge badge--warning',
   superviseur: 'badge badge--info',
-  prevendeur: '',
-  prevender: '', // legacy
+  prevendeur: 'badge badge--neutral',
+  prevender:  'badge badge--neutral', // legacy
   admin: 'badge badge--danger', // legacy
 };
 

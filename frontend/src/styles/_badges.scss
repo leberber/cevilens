@@ -17,4 +17,5 @@
   &--warning { background: rgba(var(--color-warning-rgb), 0.12); color: var(--color-warning-dark); }
   &--danger  { background: rgba(var(--color-error-rgb),   0.12); color: var(--color-error-dark); }
   &--info    { background: rgba(var(--color-info-rgb),    0.12); color: var(--color-info-dark); }
+  &--neutral { background: rgba(0, 0, 0, 0.06);                  color: var(--text-color-secondary); }
 }
