@@ -19,18 +19,12 @@
   </ng-template>
 
   <app-objectifs-table
-    [rows]="rows()"
-    [grouped]="grouped()"
+    [rows]="sortedRows()"
     [loading]="loading()"
     [canal]="canal()"
     [sortCol]="sortCol()"
     [sortDir]="sortDir()"
-    [collapsedFamilies]="collapsedFamilies()"
-    [isFlatSort]="isFlatSort()"
-    [sortedRows]="sortedRows()"
-    [routeCount]="routeCount()"
-    (sortChange)="setSort($event)"
-    (familyToggle)="toggleFamily($event)">
+    (sortChange)="setSort($event)">
   </app-objectifs-table>
 
 </app-page-layout>

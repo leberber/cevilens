@@ -15,6 +15,7 @@ class Objectif(SQLModel, table=True):
     annee: int  # 2025 …
     code_distributeur: Optional[str] = Field(default=None, max_length=30)
     nom_distributeur: Optional[str] = Field(default=None, max_length=100)
+    nom_produit: Optional[str] = Field(default=None, max_length=200)
 
     objectif_tonne_vd: Optional[float] = Field(default=None)
     objectif_tonne_vd_tournee: Optional[float] = Field(default=None)

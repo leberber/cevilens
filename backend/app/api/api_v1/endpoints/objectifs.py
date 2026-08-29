@@ -186,6 +186,7 @@ def list_objectifs(
     return [
         {
             "code_produit": obj.code_produit,
+            "nom_produit": obj.nom_produit,
             "nom_distributeur": obj.nom_distributeur,
             "objectif_tonne_vd": obj.objectif_tonne_vd,
             "objectif_tonne_vd_tournee": obj.objectif_tonne_vd_tournee,
@@ -411,6 +412,7 @@ async def upload_objectifs(
             mois_idx  = next((i for i, h in enumerate(header_lower) if 'mois'  in h), None)
             tonne_idx = next((i for i, h in enumerate(header_lower) if 'tonne' in h), None)
             pack_idx  = next((i for i, h in enumerate(header_lower) if 'pack'  in h), None)
+            nom_idx   = next((i for i, h in enumerate(header_lower) if 'produit' in h and 'code' not in h), None)
 
             missing = []
             if code_idx  is None: missing.append("Code")
@@ -457,13 +459,14 @@ async def upload_objectifs(
 
                 tonne_raw = float(row[tonne_idx]) if tonne_idx < len(row) and row[tonne_idx] is not None else None
                 packs_raw = float(row[pack_idx]) if pack_idx < len(row) and row[pack_idx] is not None else None
+                nom_produit = str(row[nom_idx]).strip() if nom_idx is not None and nom_idx < len(row) and row[nom_idx] is not None else None
 
                 # Per-route calculations
                 tonne_tournee = tonne_raw / route_count if tonne_raw is not None else None
                 packs_tournee = packs_raw / route_count if packs_raw is not None else None
 
                 # Transform based on canal
-                item = {"code_produit": code}
+                item = {"code_produit": code, "nom_produit": nom_produit}
                 if canal == "VD":
                     item["objectif_tonne_vd"] = tonne_raw
                     item["objectif_tonne_vd_tournee"] = tonne_tournee
@@ -532,6 +535,8 @@ async def upload_objectifs(
                 if obj:
                     obj.code_distributeur = target_distributor.code
                     obj.nom_distributeur  = target_distributor.nom
+                    if item.get("nom_produit"):
+                        obj.nom_produit = item["nom_produit"]
                     if canal == "VD":
                         obj.objectif_tonne_vd          = item.get("objectif_tonne_vd")
                         obj.objectif_tonne_vd_tournee  = item.get("objectif_tonne_vd_tournee")
@@ -552,6 +557,7 @@ async def upload_objectifs(
                         distributor_id=target_distributor.id,
                         code_distributeur=target_distributor.code,
                         nom_distributeur=target_distributor.nom,
+                        nom_produit=item.get("nom_produit"),
                         objectif_tonne_vd=item.get("objectif_tonne_vd"),
                         objectif_tonne_vd_tournee=item.get("objectif_tonne_vd_tournee"),
                         objectif_packs_vd=item.get("objectif_packs_vd"),
