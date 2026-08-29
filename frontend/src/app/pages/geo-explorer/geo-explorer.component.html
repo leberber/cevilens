@@ -1,0 +1,156 @@
+<!-- ── Header ── -->
+<div class="geo-header">
+  <div class="geo-header__brand">
+    <div class="geo-header__icon"><i class="pi pi-map"></i></div>
+    <span class="geo-header__title">Explorer géo</span>
+
+    @if (selectedProduit()) {
+      <span class="geo-tag">
+        <i class="pi pi-box"></i>
+        {{ selectedProduit()!.nom }}
+        <button (click)="clearProduit()" aria-label="Effacer le produit">×</button>
+      </span>
+    }
+    @if (commune()) {
+      <span class="geo-tag geo-tag--commune">
+        <i class="pi pi-map-marker"></i>
+        {{ commune()!.name }}
+        <button (click)="clearCommune()" aria-label="Effacer la commune">×</button>
+      </span>
+    }
+  </div>
+
+  <div class="geo-header__controls">
+    <div class="seg-control seg-control--glass">
+      @for (u of unites; track u.value) {
+        <button class="seg-btn" [class.seg-btn--active]="unite() === u.value" (click)="setUnite(u.value)">{{ u.label }}</button>
+      }
+    </div>
+    <div class="seg-control seg-control--glass">
+      @for (c of canals; track c.value) {
+        <button class="seg-btn" [class.seg-btn--active]="canal() === c.value" (click)="setCanal(c.value)">{{ c.label }}</button>
+      }
+    </div>
+    <select class="geo-select" (change)="setPeriode($any($event.target).value)">
+      @for (p of periodes(); track p) {
+        <option [value]="p" [selected]="periode() === p">{{ formatPeriode(p) }}</option>
+      }
+    </select>
+
+    <button class="geo-panel-toggle" (click)="togglePanel()"
+            [title]="panelOpen() ? 'Masquer le panneau' : 'Afficher le panneau'">
+      <i [class]="panelOpen() ? 'pi pi-chevron-right' : 'pi pi-list'"></i>
+    </button>
+  </div>
+</div>
+
+<!-- ── Body ── -->
+<div class="geo-body">
+
+  <!-- Map -->
+  <div class="geo-map">
+    <app-commune-map
+      [data]="mapData()"
+      [selectedCode]="commune()?.code ?? null"
+      (communeSelect)="setCommune($event)" />
+  </div>
+
+  <!-- Side panel -->
+  @if (panelOpen()) {
+    <aside class="geo-sidebar">
+
+      <!-- Search -->
+      <div class="geo-sidebar__search">
+        <div class="table-search">
+          <div class="search-icon"><i class="pi pi-search"></i></div>
+          <input
+            type="search"
+            placeholder="Rechercher un produit…"
+            [value]="search()"
+            (input)="onSearch($any($event.target).value)"
+          />
+        </div>
+      </div>
+
+      <!-- Product list -->
+      <div class="geo-sidebar__list">
+        @if (loading()) {
+          @for (sk of [1,2,3,4,5,6,7,8]; track sk) {
+            <div class="geo-produit-item geo-produit-item--sk">
+              <div class="geo-produit-item__sk-name"></div>
+              <div class="geo-produit-item__sk-bar"></div>
+            </div>
+          }
+        } @else if (filteredProduits().length === 0) {
+          <div class="geo-sidebar__empty">
+            <i class="pi pi-box"></i>
+            <span>Aucun produit trouvé</span>
+          </div>
+        } @else {
+          @for (p of filteredProduits(); track p.code) {
+            <button
+              class="geo-produit-item"
+              [class.geo-produit-item--active]="selectedProduit()?.code === p.code"
+              (click)="selectProduit(p)">
+              <div class="geo-produit-item__row">
+                <span class="geo-produit-item__name">{{ p.nom }}</span>
+                <span class="geo-produit-item__val">
+                  {{ p.total | number:'1.0-0' }}
+                </span>
+              </div>
+              <div class="geo-produit-item__track">
+                <div class="geo-produit-item__bar" [style.width]="barWidth(p.total)"></div>
+              </div>
+            </button>
+          }
+        }
+      </div>
+
+      <!-- KPIs -->
+      <div class="geo-sidebar__kpis">
+        <div class="geo-kpi">
+          <div class="geo-kpi__icon geo-kpi__icon--blue"><i class="pi pi-box"></i></div>
+          <div class="geo-kpi__body">
+            <div class="geo-kpi__label">
+              @if (selectedProduit()) { Ventes produit } @else { Total ventes }
+              ({{ uniteLabel() }})
+            </div>
+            @if (loading()) {
+              <div class="geo-kpi__sk"></div>
+            } @else {
+              <div class="geo-kpi__val">{{ data()?.kpis?.total_ventes | number:'1.0-0' }}</div>
+            }
+          </div>
+        </div>
+
+        <div class="geo-kpi">
+          <div class="geo-kpi__icon geo-kpi__icon--green"><i class="pi pi-map-marker"></i></div>
+          <div class="geo-kpi__body">
+            <div class="geo-kpi__label">Communes actives</div>
+            @if (loading()) {
+              <div class="geo-kpi__sk"></div>
+            } @else {
+              <div class="geo-kpi__val">{{ activeCommuneCount() }}</div>
+            }
+          </div>
+        </div>
+
+        @if (commune()) {
+          <div class="geo-kpi">
+            <div class="geo-kpi__icon geo-kpi__icon--amber"><i class="pi pi-flag"></i></div>
+            <div class="geo-kpi__body">
+              <div class="geo-kpi__label">{{ commune()!.name }}</div>
+              @if (communeTotal()) {
+                <div class="geo-kpi__val">{{ communeTotal()!.total | number:'1.0-0' }}</div>
+              } @else {
+                <div class="geo-kpi__val">—</div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
+    </aside>
+  }
+
+</div>

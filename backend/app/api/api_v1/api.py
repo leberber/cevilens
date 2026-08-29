@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from app.api.api_v1.endpoints import auth, users, ventes, rapports, prevendeur, admin, objectifs, distributors
+from app.api.api_v1.endpoints import auth, users, ventes, rapports, prevendeur, admin, objectifs, distributors, geo
 from app.api.deps import get_current_user
 
 api_router = APIRouter()
@@ -15,3 +15,4 @@ api_router.include_router(prevendeur.router,   prefix="/prevendeur",   tags=["Pr
 api_router.include_router(distributors.router, prefix="/distributors", tags=["Distributors"], dependencies=[Depends(get_current_user)])
 api_router.include_router(admin.router,        prefix="/admin",        tags=["Admin"])
 api_router.include_router(objectifs.router,    prefix="/objectifs",    tags=["Objectifs"],    dependencies=[Depends(get_current_user)])
+api_router.include_router(geo.router,          prefix="/geo",          tags=["Geo"],          dependencies=[Depends(get_current_user)])

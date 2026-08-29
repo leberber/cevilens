@@ -21,76 +21,6 @@ from app.models.objectif import Objectif
 router = APIRouter()
 
 
-# ── WKT → GeoJSON helpers ─────────────────────────────────────────────────────
-
-def _find_paren(s: str, start: int) -> int:
-    depth = 0
-    for i in range(start, len(s)):
-        if s[i] == '(':
-            depth += 1
-        elif s[i] == ')':
-            depth -= 1
-            if depth == 0:
-                return i
-    return -1
-
-
-def _parse_ring(s: str) -> list:
-    s = s.strip().strip('()')
-    result = []
-    for pair in s.split(','):
-        parts = pair.strip().split()
-        if len(parts) >= 2:
-            result.append([float(parts[0]), float(parts[1])])
-    return result
-
-
-def _parse_polygon(s: str) -> list:
-    s = s.strip().strip('()')
-    rings, i = [], 0
-    while i < len(s):
-        if s[i] == '(':
-            end = _find_paren(s, i)
-            if end == -1:
-                break
-            rings.append(_parse_ring(s[i:end + 1]))
-            i = end + 1
-        else:
-            i += 1
-    return rings
-
-
-def _wkt_to_coords(wkt: str) -> list:
-    s = wkt.strip()
-    is_multi = s.upper().startswith('MULTIPOLYGON')
-    if is_multi:
-        s = s[len('MULTIPOLYGON'):].strip()
-    elif s.upper().startswith('POLYGON'):
-        s = s[len('POLYGON'):].strip()
-    else:
-        return []
-
-    s = s.strip().strip('()')
-    polygons, i = [], 0
-    while i < len(s):
-        if s[i] == '(':
-            end = _find_paren(s, i)
-            if end == -1:
-                break
-            polygons.append(_parse_polygon(s[i:end + 1]))
-            i = end + 1
-        else:
-            i += 1
-
-    if not is_multi and len(polygons) == 1:
-        # POLYGON → wrap as MultiPolygon
-        return polygons
-    return polygons
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-
-
 @router.get("/periodes", response_model=List[str])
 def prevendeur_periodes(
     current_user: User = Depends(get_current_user),
@@ -786,6 +716,7 @@ def prevendeur_admin_analytics(
     fdv: Optional[str] = Query(None),
     canal: Optional[str] = Query(None),
     commune: Optional[str] = Query(None),
+    produit: Optional[str] = Query(None),
     unite: str = Query('tonnes'),
     current_user: User = Depends(get_current_user),
     current_distributor = Depends(get_current_distributor),
@@ -804,7 +735,7 @@ def prevendeur_admin_analytics(
     else:  # packs (default)
         _norm = Vente.qte_livree  # Simplified: use raw quantity
 
-    def apply_filters(q, include_famille=True, include_commune=True):
+    def apply_filters(q, include_famille=True, include_commune=True, include_produit=True):
         q = q.where(Vente.annee_mois == annee_mois, Vente.statut_commande == 'Facturé')
         if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
             q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
@@ -816,6 +747,8 @@ def prevendeur_admin_analytics(
             q = q.where(Vente.canal == canal)
         if include_commune and commune:
             q = q.where(Vente.commune == commune)
+        if include_produit and produit:
+            q = q.where(Vente.code_produit == produit)
         return q
 
     # KPIs
@@ -901,7 +834,7 @@ def prevendeur_admin_analytics(
         )).all()
     ]
 
-    # Top 10 produits (with famille filter)
+    # Top 10 produits — never filtered by produit so list always shows all options
     by_produit = [
         {"nom": r[0] or "?", "code": r[1], "total": round(r[2] or 0)}
         for r in session.exec(apply_filters(
@@ -909,7 +842,8 @@ def prevendeur_admin_analytics(
             .where(Vente.description_produit.isnot(None))
             .group_by(Vente.description_produit, Vente.code_produit)
             .order_by(func.sum(_norm).desc())
-            .limit(10)
+            .limit(10),
+            include_produit=False,
         )).all()
     ]
 
@@ -944,6 +878,9 @@ def prevendeur_admin_analytics(
     if canal:
         loc_conditions.append("v.canal = :loc_canal")
         loc_params["loc_canal"] = canal
+    if produit:
+        loc_conditions.append("v.code_produit = :loc_produit")
+        loc_params["loc_produit"] = produit
 
     # Simplified SQL without produits table (model removed)
     # Use qte_livree directly without weight/colisage normalization
@@ -952,7 +889,9 @@ def prevendeur_admin_analytics(
         SELECT lc.commune_code, lc.commune_name,
                COALESCE(SUM(v.qte_livree), 0) AS total
         FROM ventes v
-        JOIN location_communes lc ON LOWER(v.commune) = LOWER(lc.commune_name)
+        JOIN location_communes lc
+          ON LOWER(v.commune) = LOWER(lc.commune_name)
+         AND LOWER(v.wilaya)  = LOWER(lc.wilaya_name)
         WHERE {where_clause}
         GROUP BY lc.commune_code, lc.commune_name
         ORDER BY total DESC
@@ -982,29 +921,6 @@ def prevendeur_admin_analytics(
         "by_location": by_location,
         "periodes": all_periods_list,
     }
-
-
-@router.get("/admin/communes-geojson")
-def admin_communes_geojson(
-    codes: Optional[str] = Query(None),
-    current_user: User = Depends(get_current_user),
-    session: Session = Depends(get_session),
-) -> Any:
-    import json as _json
-    sql = "SELECT commune_code, commune_name, ST_AsGeoJSON(geom) FROM location_communes WHERE geom IS NOT NULL"
-    params: dict = {}
-    if codes:
-        code_list = [int(c) for c in codes.split(",") if c.strip().isdigit()]
-        if code_list:
-            sql += " AND commune_code = ANY(:codes)"
-            params["codes"] = code_list
-    sql += " ORDER BY commune_code"
-    rows = session.execute(text(sql), params).all()
-    features = [
-        {"type": "Feature", "properties": {"code": code, "name": name}, "geometry": _json.loads(geom_json)}
-        for code, name, geom_json in rows if geom_json
-    ]
-    return {"type": "FeatureCollection", "features": features}
 
 
 @router.get("/objectifs")

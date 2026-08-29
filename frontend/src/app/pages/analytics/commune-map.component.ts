@@ -6,6 +6,7 @@ import * as L from 'leaflet';
 import { HttpClient } from '@angular/common/http';
 import { CommuneMapStyleService } from './services/commune-map-style.service';
 import { CommuneMapTooltipService } from './services/commune-map-tooltip.service';
+import { environment } from '../../../environments/environment';
 
 export interface CommuneDatum { code: number; total: number; }
 
@@ -171,6 +172,7 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
   private top1Code: number | undefined;
   private showTop1: (() => void) | null = null;
   private boundsFitted = false;
+  private lastCodeSet = '';
 
   setMapMode(m: MapMode): void { this.mapMode.set(m); }
 
@@ -195,20 +197,22 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
   }
 
   constructor() {
-    // Fetch GeoJSON when data (commune codes) changes
+    // Fetch GeoJSON only when the set of commune codes changes.
+    // When only totals change (e.g. product filter), the code set stays the
+    // same so we skip the fetch and let the second effect re-animate fills.
     effect(() => {
       const data = this.data();
       if (!this.mapReady() || !data.length) return;
-      const codes = data.map(d => d.code).join(',');
+      const codeSet = [...data.map(d => d.code)].sort((a, b) => a - b).join(',');
+      if (codeSet === this.lastCodeSet) return;
+      this.lastCodeSet = codeSet;
       this.geoLoading.set(true);
       this.geoError.set(false);
       this.geoData.set(null);
       this.boundsFitted = false;
-      this.http.get<GeoFeatureCollection>(`/api/v1/prevendeur/admin/communes-geojson?codes=${codes}`).subscribe({
+      this.http.get<GeoFeatureCollection>(`/api/v1/geo/communes-geojson?codes=${codeSet}`).subscribe({
         next: geo => { this.geoData.set(geo); this.geoLoading.set(false); },
-        error: err => {
-          this.geoLoading.set(false); this.geoError.set(true);
-        },
+        error: () => { this.geoLoading.set(false); this.geoError.set(true); },
       });
     }, { allowSignalWrites: true });
 
@@ -250,8 +254,11 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
       center: [36.6949, 3.9753], zoom: 9,
       zoomControl: false, attributionControl: false, zoomSnap: 0.5,
     });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', {
-      attribution: '© OpenStreetMap © CARTO', maxZoom: 19,
+    L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/light-v11/tiles/{z}/{x}/{y}?access_token=${environment.mapboxToken}`, {
+      attribution: '&copy; <a href="https://www.mapbox.com/">Mapbox</a>',
+      tileSize: 512,
+      zoomOffset: -1,
+      maxZoom: 22,
     }).addTo(this.map);
     this.mapReady.set(true);
   }
@@ -259,6 +266,7 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     this.cleanupTimers.forEach(clearTimeout);
     this.tooltipService.clearTimers();
+    this.lastCodeSet = '';
     this.map?.remove(); this.map = null;
   }
 
@@ -308,7 +316,7 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
       const row  = code != null ? dataMap.get(code) : undefined;
       const path = (layer as any)._path as SVGPathElement | undefined;
       if (!path) return;
-      const fill = row && row.total > 0 ? this.styleService.fillColor(row.total, maxTotal) : '#eff6ff';
+      const fill = row && row.total > 0 ? this.styleService.fillColor(row.total, maxTotal) : '#e2e8f0';
       const rank = code != null ? (rankMap.get(code) ?? 9999) : 9999;
       rank <= 6 ? top.push({ path, fill, rank }) : rest.push({ path, fill, rank });
     });
