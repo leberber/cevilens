@@ -42,8 +42,11 @@ export class ProductTreeComponent {
   readonly tree      = input<FamilleNode[]>([]);
   readonly selection = input<TreeSelection>(null);
   readonly loading   = input(false);
+  readonly title     = input('');
 
   readonly selectionChange = output<TreeSelection>();
+
+  readonly collapsed = signal(false);
 
   private readonly openFamilles = signal<Set<string>>(new Set());
   private readonly openSfs      = signal<Set<string>>(new Set());
@@ -133,6 +136,10 @@ export class ProductTreeComponent {
     this.selectionChange.emit(this.isProdActive(p) ? null : next);
   }
 
+  toggleCollapsed(): void {
+    this.collapsed.update(v => !v);
+  }
+
   // ── Progress bar helpers ────────────────────────────────────────────────────
 
   pct(total: number, objectif: number | null): number | null {
@@ -146,18 +153,16 @@ export class ProductTreeComponent {
   }
 
   pctClass(p: number): string {
-    if (p >= 100) return 'prod-tree__pct--success';
-    if (p >= 75)  return 'prod-tree__pct--primary';
-    if (p >= 50)  return 'prod-tree__pct--warning';
+    if (p >= 90) return 'prod-tree__pct--success';
+    if (p >= 60) return 'prod-tree__pct--warning';
     return 'prod-tree__pct--danger';
   }
 
   barFillClass(total: number, objectif: number | null): string {
     const p = this.pct(total, objectif);
     if (p === null) return '';
-    if (p >= 100) return 'prod-tree__fill--success';
-    if (p >= 75)  return 'prod-tree__fill--primary';
-    if (p >= 50)  return 'prod-tree__fill--warning';
-    return 'prod-tree__fill--danger';
+    if (p >= 90) return 'prod-tree__bar-fill--success';
+    if (p >= 60) return 'prod-tree__bar-fill--warning';
+    return 'prod-tree__bar-fill--danger';
   }
 }

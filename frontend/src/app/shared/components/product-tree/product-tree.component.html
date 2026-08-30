@@ -1,9 +1,20 @@
 <div class="prod-tree">
 
+  @if (title()) {
+    <button class="prod-tree__header" (click)="toggleCollapsed()" [attr.aria-expanded]="!collapsed()">
+      <span class="prod-tree__header-title">{{ title() }}</span>
+      <i class="pi pi-chevron-down prod-tree__header-chevron"
+         [class.prod-tree__header-chevron--collapsed]="collapsed()"></i>
+    </button>
+  }
+
+  @if (!collapsed()) {
+
   @if (loading()) {
     @for (sk of [1,2,3,4]; track sk) {
       <div class="prod-tree__sk-node">
         <div class="prod-tree__sk-name"></div>
+        <div class="prod-tree__sk-frac"></div>
         <div class="prod-tree__sk-bar"></div>
       </div>
     }
@@ -29,7 +40,10 @@
         <button class="prod-tree__label" (click)="selectFamille(f)">
           <span class="prod-tree__name">{{ f.nom }}</span>
           <span class="prod-tree__meta">
-            <span class="prod-tree__total">{{ f.total | number:'1.0-0' }}</span>
+            <span class="prod-tree__frac">
+              {{ f.total | number:'1.1-1' }}
+              @if (f.objectif) { / {{ f.objectif | number:'1.1-1' }} obj. }
+            </span>
             @if (pct(f.total, f.objectif); as p) {
               <span class="prod-tree__pct" [class]="pctClass(p)">{{ p }}%</span>
             }
@@ -60,7 +74,10 @@
             <button class="prod-tree__label" (click)="selectSf(f, sf)">
               <span class="prod-tree__name">{{ sf.nom }}</span>
               <span class="prod-tree__meta">
-                <span class="prod-tree__total">{{ sf.total | number:'1.0-0' }}</span>
+                <span class="prod-tree__frac">
+                  {{ sf.total | number:'1.1-1' }}
+                  @if (sf.objectif) { / {{ sf.objectif | number:'1.1-1' }} obj. }
+                </span>
                 @if (pct(sf.total, sf.objectif); as p) {
                   <span class="prod-tree__pct" [class]="pctClass(p)">{{ p }}%</span>
                 }
@@ -86,7 +103,10 @@
                 <button class="prod-tree__label" (click)="selectProd(f, sf, p)">
                   <span class="prod-tree__name prod-tree__name--prod">{{ p.nom }}</span>
                   <span class="prod-tree__meta">
-                    <span class="prod-tree__total">{{ p.total | number:'1.0-0' }}</span>
+                    <span class="prod-tree__frac">
+                      {{ p.total | number:'1.1-1' }}
+                      @if (p.objectif) { / {{ p.objectif | number:'1.1-1' }} obj. }
+                    </span>
                     @if (pct(p.total, p.objectif); as pv) {
                       <span class="prod-tree__pct" [class]="pctClass(pv)">{{ pv }}%</span>
                     }
@@ -108,5 +128,7 @@
       }
     }
   }
+
+  } <!-- end @if (!collapsed()) -->
 
 </div>

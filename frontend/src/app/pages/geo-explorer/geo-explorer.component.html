@@ -8,6 +8,7 @@
     @if (panelOpen()) {
       <div class="geo-sidebar__tree">
         <app-product-tree
+          title="Catalogue produits"
           [tree]="treeData()"
           [selection]="selection()"
           [loading]="loading()"
