@@ -11,6 +11,7 @@ import {
   type TreeSelection,
 } from '../../shared/components/product-tree/product-tree.component';
 import { type DateRange } from '../../shared/components/date-range-picker/date-range-picker.component';
+import { CommuneDrawerComponent } from './commune-drawer/commune-drawer.component';
 
 interface LocationDatum {
   code: number;
@@ -25,7 +26,7 @@ type Unite = 'packs' | 'tonnes';
 @Component({
   selector: 'app-geo-explorer',
   standalone: true,
-  imports: [DecimalPipe, CommuneMapComponent, ProductTreeComponent],
+  imports: [DecimalPipe, CommuneMapComponent, ProductTreeComponent, CommuneDrawerComponent],
   templateUrl: './geo-explorer.component.html',
   styleUrl: './geo-explorer.component.scss',
 })
@@ -35,19 +36,17 @@ export class GeoExplorerComponent implements OnInit {
   private readonly roleService = inject(RoleService);
   private readonly dateHelper  = inject(DateHelper);
 
-  readonly loading       = signal(false);
-  readonly drawerLoading = signal(false);
-  readonly treeData      = signal<FamilleNode[]>([]);
-  readonly drawerTree    = signal<FamilleNode[]>([]);
-  readonly mapLocations  = signal<LocationDatum[]>([]);
+  readonly loading      = signal(false);
+  readonly treeData     = signal<FamilleNode[]>([]);
+  readonly mapLocations = signal<LocationDatum[]>([]);
 
   private readonly userDateSet = signal(false);
 
-  readonly canal    = signal<Canal>('ALL');
-  readonly unite    = signal<Unite>('tonnes');
-  readonly dateFrom = signal('');
-  readonly dateTo   = signal('');
-  readonly periodes = signal<string[]>([]);
+  readonly canal     = signal<Canal>('ALL');
+  readonly unite     = signal<Unite>('tonnes');
+  readonly dateFrom  = signal('');
+  readonly dateTo    = signal('');
+  readonly periodes  = signal<string[]>([]);
   readonly selection = signal<TreeSelection>(null);
   readonly commune      = signal<{ code: number; name: string } | null>(null);
   readonly sidebarWidth = signal(350);
@@ -79,12 +78,6 @@ export class GeoExplorerComponent implements OnInit {
     this.mapLocations().reduce((sum, r) => sum + r.total, 0)
   );
 
-  readonly communeTotal = computed(() => {
-    const c = this.commune();
-    if (!c) return null;
-    return this.mapLocations().find(r => r.code === c.code) ?? null;
-  });
-
   readonly uniteLabel = computed(() => this.unite() === 'tonnes' ? 'tonnes' : 'packs');
 
   readonly selectionLabel = computed(() => {
@@ -97,11 +90,9 @@ export class GeoExplorerComponent implements OnInit {
 
   constructor() {
     effect(() => {
-      this.distContext.selectedDistributorId(); // track distributor changes
-      // Everything else must be untracked so that date/canal/unite signal reads
-      // inside load()/baseParams() don't make this effect re-run on every filter change.
+      this.distContext.selectedDistributorId();
       untracked(() => {
-        this.userDateSet.set(false); // reset manual flag on distributor switch
+        this.userDateSet.set(false);
         if (this.dateFrom()) {
           this.load();
           this.loadPeriodes();
@@ -111,13 +102,11 @@ export class GeoExplorerComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    // Set current month so the map loads immediately; the effect below will also call
-    // load() + loadPeriodes() once it fires, populating the real list of available months
     const now = new Date();
     const currentPeriod = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     this.dateFrom.set(this.dateHelper.getFirstDayOfMonth(currentPeriod));
     this.dateTo.set(this.dateHelper.getLastDayOfMonth(currentPeriod));
-    this.periodes.set([currentPeriod]); // seed so the chip renders immediately
+    this.periodes.set([currentPeriod]);
 
     if (this.roleService.isPlatformAdmin() && !this.distContext.selectedDistributorId()) return;
     this.load();
@@ -127,8 +116,9 @@ export class GeoExplorerComponent implements OnInit {
     const canal = c as Canal;
     if (this.canal() === canal) return;
     this.canal.set(canal);
-    this.commune.set(null);
-    this.selection.set(null);
+    if (!this.commune()) {
+      this.selection.set(null);
+    }
     this.load();
   }
 
@@ -143,8 +133,9 @@ export class GeoExplorerComponent implements OnInit {
     this.userDateSet.set(true);
     this.dateFrom.set(range.from);
     this.dateTo.set(range.to);
-    this.commune.set(null);
-    this.selection.set(null);
+    if (!this.commune()) {
+      this.selection.set(null);
+    }
     this.load();
   }
 
@@ -160,12 +151,10 @@ export class GeoExplorerComponent implements OnInit {
 
   setCommune(evt: { code: number; name: string } | null): void {
     this.commune.set(evt);
-    if (evt) this.loadDrawerTree();
   }
 
   clearCommune(): void {
     this.commune.set(null);
-    this.drawerTree.set([]);
   }
 
   startResize(event: MouseEvent): void {
@@ -182,7 +171,6 @@ export class GeoExplorerComponent implements OnInit {
     const onUp = () => {
       document.body.style.cursor     = '';
       document.body.style.userSelect = '';
-      // Snap: if just above collapse threshold, expand to minimum
       if (this.sidebarWidth() > 0 && this.sidebarWidth() < this.MIN_WIDTH) {
         this.sidebarWidth.set(this.MIN_WIDTH);
       }
@@ -202,8 +190,6 @@ export class GeoExplorerComponent implements OnInit {
       next: periodes => {
         this.periodes.set(periodes);
         if (!periodes.length) return;
-        // Auto-redirect to latest available period only when the user hasn't
-        // manually selected a custom date range.
         const latestFrom = this.dateHelper.getFirstDayOfMonth(periodes[0]);
         if (latestFrom !== this.dateFrom() && !this.userDateSet()) {
           this.dateFrom.set(latestFrom);
@@ -214,7 +200,6 @@ export class GeoExplorerComponent implements OnInit {
     });
   }
 
-  /** Full reload: tree + map (on date/canal/unite change). */
   private load(): void {
     const params = this.baseParams();
     this.loading.set(true);
@@ -229,22 +214,9 @@ export class GeoExplorerComponent implements OnInit {
       });
   }
 
-  /** Load commune-specific product tree into the drawer. */
-  private loadDrawerTree(): void {
-    const c = this.commune();
-    if (!c) return;
-    this.drawerLoading.set(true);
-    const params = this.baseParams().set('commune', c.name);
-    this.http.get<FamilleNode[]>('/api/v1/geo/product-tree', { params }).subscribe({
-      next:  tree => { this.drawerTree.set(tree);  this.drawerLoading.set(false); },
-      error: ()   => this.drawerLoading.set(false),
-    });
-  }
-
-  /** Reload map only — when tree selection changes. */
   private loadMap(): void {
     let params = this.baseParams();
-    const sel = this.selection();
+    const sel  = this.selection();
 
     if (sel?.type === 'famille') {
       params = params.set('famille', sel.nom);

@@ -15,7 +15,7 @@ export type D3Rect = d3.Selection<SVGRectElement, unknown, null, undefined>;
 export function fmtShort(v: number): string {
   return v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M`
        : v >= 1_000     ? `${(v / 1_000).toFixed(0)}k`
-       : `${v}`;
+       : v % 1 === 0 ? `${v}` : `${parseFloat(v.toFixed(2))}`;
 }
 
 @Directive()

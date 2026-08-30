@@ -46,28 +46,6 @@
 
   <!-- Map -->
   <div class="geo-map">
-    <!-- Commune drawer (slides in from left edge of map) -->
-    <div class="geo-drawer" [class.geo-drawer--open]="!!commune()">
-      <div class="geo-drawer__header">
-        <div class="geo-drawer__title">
-          <i class="pi pi-map-marker"></i>
-          <span>{{ commune()?.name ?? '' }}</span>
-          @if (communeTotal()) {
-            <span class="geo-drawer__total">{{ communeTotal()!.total | number:'1.0-0' }} {{ uniteLabel() }}</span>
-          }
-        </div>
-        <button class="geo-drawer__close" (click)="clearCommune()" aria-label="Fermer">
-          <i class="pi pi-times"></i>
-        </button>
-      </div>
-      <div class="geo-drawer__body">
-        <app-product-tree
-          [tree]="drawerTree()"
-          [selection]="null"
-          [loading]="drawerLoading()" />
-      </div>
-    </div>
-
     <app-commune-map
       [data]="mapData()"
       [selectedCode]="commune()?.code ?? null"
@@ -94,5 +72,20 @@
       </div>
     }
   </div>
+
+  <!-- Full-page commune analytics overlay -->
+  <app-commune-drawer
+    [commune]="commune()"
+    [dateFrom]="dateFrom()"
+    [dateTo]="dateTo()"
+    [canal]="canal()"
+    [unite]="unite()"
+    [periodes]="periodes()"
+    [canalOptions]="canals"
+    [uniteOptions]="unites"
+    (canalChange)="setCanal($event)"
+    (uniteChange)="setUnite($event)"
+    (rangeChange)="onRangeChange($event)"
+    (closed)="clearCommune()" />
 
 </div>
