@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import date
 from typing import Any, Optional
 import json as _json
 
@@ -7,10 +8,9 @@ from sqlalchemy import text
 from sqlmodel import Session
 
 from app.api.deps import get_current_user, get_current_distributor
-from app.core.product_codes import remap_by_vente_code
 from app.core.tonnage import PRODUITS_JOIN, qty_expr
 from app.database import get_session
-from app.models.user import User, UserRole
+from app.models.user import User
 
 router = APIRouter()
 
@@ -155,9 +155,8 @@ def get_product_tree(
     Returns a famille → sous_famille → produit hierarchy with sales totals
     and objectives. Totals are in the requested unit (tonnes or packs).
     """
-    from datetime import date as _date
     try:
-        d     = _date.fromisoformat(date_from)
+        d     = date.fromisoformat(date_from)
         annee = d.year
         mois  = d.month
     except (ValueError, TypeError):
@@ -218,13 +217,37 @@ def get_product_tree(
         obj_conds.append("o.distributor_id = :dist_id")
         obj_params["dist_id"] = current_distributor.id
 
-    obj_rows = session.execute(text(
-        f"SELECT o.code_produit, {obj_expr} AS obj FROM objectifs o WHERE {' AND '.join(obj_conds)}"
-    ), obj_params).all()
-    # Remap objective codes (may be code_dd) → vente codes so the hier lookup matches
-    obj_by_code: dict = remap_by_vente_code(
-        {r[0]: float(r[1] or 0) for r in obj_rows if r[0]}, session
-    )
+    # Single query: resolve code_dd aliases via LATERAL join (one produit per objectif row,
+    # preferring exact code_produit match). Builds both obj_by_code and obj_by_famille
+    # without extra round-trips. Famille objectives include products with zero sales —
+    # the monthly target is always the full amount from the objectifs table.
+    obj_obj_where = " AND ".join(obj_conds)
+    combined_obj_rows = session.execute(text(f"""
+        SELECT
+            COALESCE(p.code_produit, o.code_produit) AS vente_code,
+            TRIM(p.famille)                           AS famille,
+            SUM({obj_expr})                           AS obj
+        FROM objectifs o
+        LEFT JOIN LATERAL (
+            SELECT code_produit, famille
+            FROM produits
+            WHERE code_produit = o.code_produit
+               OR (code_dd IS NOT NULL AND code_dd = o.code_produit)
+            ORDER BY (code_produit = o.code_produit) DESC
+            LIMIT 1
+        ) p ON TRUE
+        WHERE {obj_obj_where}
+        GROUP BY COALESCE(p.code_produit, o.code_produit), TRIM(p.famille)
+    """), obj_params).all()
+
+    obj_by_code: dict = {}
+    obj_by_famille: dict = defaultdict(float)
+    for vente_code, famille, obj_val in combined_obj_rows:
+        v = float(obj_val or 0)
+        if vente_code:
+            obj_by_code[vente_code] = obj_by_code.get(vente_code, 0) + v
+        if famille:
+            obj_by_famille[famille] += v
 
     # Build hierarchy: famille → sf → (code, nom) → {total, obj}
     hier: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {"total": 0.0, "obj": 0.0})))
@@ -238,7 +261,7 @@ def get_product_tree(
     result = []
     for famille, sf_map in hier.items():
         sfs_out = []
-        f_total = f_obj = 0.0
+        f_total = 0.0
 
         for sf, prod_map in sf_map.items():
             prods_out = []
@@ -259,8 +282,9 @@ def get_product_tree(
                 "produits": prods_out,
             })
             f_total += sf_total
-            f_obj   += sf_obj
 
+        # Use the directly-queried famille objective (fixed monthly target from objectifs table)
+        f_obj = obj_by_famille.get(famille, 0)
         result.append({
             "nom": famille, "total": round(f_total, 3),
             "objectif": round(f_obj, 3) if f_obj else None,
