@@ -1,5 +1,5 @@
 import {
-  Component, input, output, effect, ElementRef, ViewChild, signal,
+  Component, input, output, effect, ElementRef, ViewChild, signal, computed,
   AfterViewInit, OnDestroy, inject, HostListener,
 } from '@angular/core';
 import * as L from 'leaflet';
@@ -55,11 +55,20 @@ interface GeoFeatureCollection {
       }
     </button>
 
-    <div class="map-legend">
-      <span class="map-legend__label">0</span>
-      <div class="map-legend__bar" [class.map-legend__bar--bubble]="mapMode() === 'bubbles'"></div>
-      <span class="map-legend__label">{{ maxStr() }}</span>
-    </div>
+    @if (activeCommuneCount() > 0) {
+      <div class="map-legend">
+        <div class="map-legend__scale">
+          <span class="map-legend__val">0</span>
+          <div class="map-legend__bar" [class.map-legend__bar--bubble]="mapMode() === 'bubbles'"></div>
+          <span class="map-legend__val">{{ maxStr() }}</span>
+        </div>
+        <div class="map-legend__info">
+          <span><strong>{{ activeCommuneCount() }}</strong> communes</span>
+          <span class="map-legend__sep">·</span>
+          <span>Total <strong>{{ totalStr() }}</strong></span>
+        </div>
+      </div>
+    }
 
     @if (geoLoading()) {
       <div class="map-sk">Chargement de la carte…</div>
@@ -71,8 +80,8 @@ interface GeoFeatureCollection {
     :host { display:block; width:100%; height:100%; position:relative; overflow:hidden; }
 
     .map-card {
-      position:absolute; bottom:18px; left:14px; z-index:500;
-      width:200px;
+      position:absolute; top:0; left:0; z-index:500;
+      width:210px;
       background:rgba(255,255,255,.94);
       border:1px solid rgba(226,232,240,.9);
       border-radius:14px; padding:12px 14px;
@@ -103,22 +112,39 @@ interface GeoFeatureCollection {
     }
 
     .map-legend {
-      position:absolute; top:10px; right:10px; z-index:500;
-      display:flex; align-items:center; gap:6px; pointer-events:none;
-      background:rgba(255,255,255,.85); border:1px solid #e2e8f0;
-      border-radius:8px; padding:5px 9px; font-size:10px; color:#64748b;
+      position:absolute; bottom:18px; right:10px; z-index:500;
+      display:flex; flex-direction:column; gap:5px; pointer-events:none;
+      background:rgba(255,255,255,.92); border:1px solid #e2e8f0;
+      border-radius:10px; padding:8px 12px; min-width:170px;
+      box-shadow:0 2px 8px rgba(0,0,0,.07);
+
+      &__scale {
+        display:flex; align-items:center; gap:7px;
+      }
 
       &__bar {
-        width:72px; height:6px; border-radius:3px;
-        background:linear-gradient(90deg,#dbeafe,#2563eb);
+        flex:1; height:6px; border-radius:3px;
+        background:linear-gradient(90deg,#dbeafe,#1d4ed8);
 
         &--bubble {
           background:linear-gradient(90deg,
-            rgba(37,99,235,.15) 0%,
-            rgba(37,99,235,.7) 100%);
+            rgba(37,99,235,.12) 0%,
+            rgba(37,99,235,.72) 100%);
         }
       }
-      &__label { white-space:nowrap; }
+
+      &__val {
+        white-space:nowrap; font-size:9px; font-weight:600;
+        color:#475569; font-variant-numeric:tabular-nums;
+      }
+
+      &__info {
+        display:flex; align-items:center; gap:5px;
+        font-size:9px; color:#94a3b8;
+        strong { color:#475569; font-weight:700; }
+      }
+
+      &__sep { opacity:0.4; }
     }
 
     .map-fs-btn {
@@ -135,7 +161,6 @@ interface GeoFeatureCollection {
     }
 
     :host:fullscreen { border-radius:0; }
-    :host:fullscreen .map-card { bottom:24px; left:20px; }
 
     .map-sk {
       position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -158,6 +183,12 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
   readonly mapMode      = signal<MapMode>('choropleth');
   readonly isFullscreen = signal(false);
 
+  readonly activeCommuneCount = computed(() => this.data().filter(d => d.total > 0).length);
+  readonly totalStr = computed(() => {
+    const total = this.data().reduce((s, d) => s + d.total, 0);
+    return total ? this.styleService.fmtVal(total) : '—';
+  });
+
   private readonly http           = inject(HttpClient);
   private readonly el             = inject(ElementRef<HTMLElement>);
   private readonly styleService   = inject(CommuneMapStyleService);
@@ -170,7 +201,6 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
   private cleanupTimers: ReturnType<typeof setTimeout>[] = [];
 
   private top1Code: number | undefined;
-  private showTop1: (() => void) | null = null;
   private boundsFitted = false;
   private lastCodeSet = '';
 
@@ -265,12 +295,19 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.cleanupTimers.forEach(clearTimeout);
-    this.tooltipService.clearTimers();
-    this.lastCodeSet = '';
     this.map?.remove(); this.map = null;
   }
 
   // ── Helpers ───────────────────────────────────────────────────────────────
+
+  private showTooltip(e: L.LeafletMouseEvent, html: string): void {
+    this.tooltipService.positionCard(this.cardEl, e.containerPoint.x, e.containerPoint.y, this.el.nativeElement.offsetWidth);
+    this.tooltipService.showCard(this.cardEl, html);
+  }
+
+  private moveTooltip(e: L.LeafletMouseEvent): void {
+    this.tooltipService.positionCard(this.cardEl, e.containerPoint.x, e.containerPoint.y, this.el.nativeElement.offsetWidth);
+  }
 
   private layerCode(layer: L.Layer): number | undefined {
     const v = (layer as any).feature?.properties?.['code'] ?? (layer as any).communeCode;
@@ -357,9 +394,9 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
     if (this.geoLayer) { this.geoLayer.remove(); this.geoLayer = null; }
 
     if (this.mapMode() === 'bubbles') {
-      this.renderBubbles(geo, dataMap, maxTotal, totalAll, rankMap, sorted);
+      this.renderBubbles(geo, dataMap, maxTotal, totalAll, rankMap);
     } else {
-      this.renderChoropleth(geo, dataMap, maxTotal, totalAll, rankMap, sorted);
+      this.renderChoropleth(geo, dataMap, maxTotal, totalAll, rankMap);
     }
 
     if (!this.boundsFitted) {
@@ -368,12 +405,6 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
       this.map.setView(bounds.getCenter(), zoom, { animate: false });
       this.boundsFitted = true;
     }
-
-    // Show top-1 card
-    const top1Layer = this.findLayerByCode(this.top1Code!);
-    const top1Name  = top1Layer ? this.layerName(top1Layer) : undefined;
-    this.showTop1 = () => this.tooltipService.setCard(this.cardEl, this.tooltipService.buildCard(top1Name, sorted[0], totalAll, 1));
-    this.showTop1();
   }
 
   // ── Choropleth mode ───────────────────────────────────────────────────────
@@ -384,7 +415,6 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
     maxTotal: number,
     totalAll: number,
     rankMap: Map<number, number>,
-    sorted: CommuneDatum[],
   ): void {
     this.geoLayer = L.geoJSON(geo as any, {
       style: (feature?: any) => {
@@ -411,11 +441,12 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
           };
         };
 
-        layer.on('mouseover', () => {
+        layer.on('mouseover', (e: L.LeafletMouseEvent) => {
           (layer as L.Path).setStyle({ weight: 2, color: '#1d4ed8' });
-          this.tooltipService.setCard(this.cardEl, this.tooltipService.buildCard(name, dataMap.get(code!), totalAll, rankMap.get(code!)));
+          this.showTooltip(e, this.tooltipService.buildCard(name, dataMap.get(code!), totalAll, rankMap.get(code!)));
         });
-        layer.on('mouseout', () => { (layer as L.Path).setStyle(baseStyle()); this.showTop1?.(); });
+        layer.on('mousemove', (e: L.LeafletMouseEvent) => { this.moveTooltip(e); });
+        layer.on('mouseout', () => { (layer as L.Path).setStyle(baseStyle()); this.tooltipService.hideCard(this.cardEl); });
         layer.on('click', () => {
           if (code == null) return;
           this.communeSelect.emit(this.selectedCode() === code ? null : { code, name: name ?? '' });
@@ -448,7 +479,6 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
     maxTotal: number,
     totalAll: number,
     rankMap: Map<number, number>,
-    sorted: CommuneDatum[],
   ): void {
     const MAX_R = 38, MIN_R = 4;
     const group = L.featureGroup();
@@ -477,14 +507,15 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
       (marker as any).communeCode = code;
       (marker as any).communeName = name;
 
-      marker.on('mouseover', () => {
+      marker.on('mouseover', (e: L.LeafletMouseEvent) => {
         marker.setStyle({ color: '#1d4ed8', weight: 2 });
-        this.tooltipService.setCard(this.cardEl, this.tooltipService.buildCard(name, row, totalAll, rank));
+        this.showTooltip(e, this.tooltipService.buildCard(name, row, totalAll, rank));
       });
+      marker.on('mousemove', (e: L.LeafletMouseEvent) => { this.moveTooltip(e); });
       marker.on('mouseout', () => {
         const isSel = code === this.selectedCode();
         marker.setStyle({ color: isSel ? '#7c3aed' : '#fff', weight: isSel ? 2.5 : 1 });
-        this.showTop1?.();
+        this.tooltipService.hideCard(this.cardEl);
       });
       marker.on('click', () => {
         this.communeSelect.emit(this.selectedCode() === code ? null : { code, name: name ?? '' });
@@ -493,9 +524,6 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
       group.addLayer(marker);
     }
 
-    // Sort so bigger bubbles render on bottom (added first = lower z-order)
-    // Leaflet SVG stacks in DOM order, so we want large → small insertion
-    // group already built; re-sort by descending radius not needed in Leaflet SVG
     this.geoLayer = group;
     group.addTo(this.map!);
 

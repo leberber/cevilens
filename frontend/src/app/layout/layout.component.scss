@@ -121,6 +121,23 @@
   @media (max-width: 768px) { display: none; }
 }
 
+.dist-initials {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--primary-color);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: default;
+  flex-shrink: 0;
+  margin: 0 auto;
+}
+
 .sidebar-logout {
   background: none;
   border: none;
@@ -438,6 +455,13 @@
   transition: opacity 0.15s ease;
 }
 
+.sidebar-logo-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
 .sidebar-distributor-filter-centered {
   display: flex;
   align-items: center;
@@ -505,10 +529,17 @@
 }
 
 .admin-shell--collapsed {
-  .sidebar-logo-full { height: 28px; }
-  .sidebar-distributor-filter-centered { display: none; }
+  .admin-sidebar__logo { justify-content: center; }
+  .sidebar-distributor-filter-centered { margin: 0; padding: 0; height: auto; }
+  .sidebar-distributor-filter-centered { justify-content: center; }
   .admin-sidebar__footer-text { display: none; }
-  .admin-sidebar__footer { justify-content: center; }
+  .admin-sidebar__footer {
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: var(--space-1);
+    padding: var(--space-2) 0;
+  }
   .nav-label { display: none; }
   .nav-section { padding: 0 var(--space-2) var(--space-1); }
 

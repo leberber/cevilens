@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, inject, HostListener, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, HostListener, ChangeDetectionStrategy, effect, untracked } from '@angular/core';
 import { DashboardHeaderComponent } from './header/dashboard-header.component';
 import { DashboardOverviewComponent } from './overview/dashboard-overview.component';
 import { DashboardProductTreeComponent } from './product-tree/dashboard-product-tree.component';
@@ -9,6 +9,7 @@ import { DashboardAnimationService } from './services/dashboard-animation.servic
 import { DashboardFdvRankingService } from './services/dashboard-fdv-ranking.service';
 import { PrevendeurService, DrilldownData, DrilldownFamille } from '../../core/services/prevendeur.service';
 import { RoleService } from '../../core/services/role.service';
+import { DistributorContextService } from '../../core/services/distributor-context.service';
 
 
 @Component({
@@ -30,10 +31,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly roleService   = inject(RoleService);
   private readonly animationSvc  = inject(DashboardAnimationService);
   private readonly fdvRankingSvc = inject(DashboardFdvRankingService);
+  private readonly distContext   = inject(DistributorContextService);
 
   readonly state = inject(DashboardStateService);
 
   private animCancelFn: (() => void) | null = null;
+
+  constructor() {
+    effect(() => {
+      this.distContext.selectedDistributorId();
+      if (untracked(() => !!this.state.data())) this.load();
+    });
+  }
 
   ngOnInit() {
     this.loadInitial();
@@ -49,9 +58,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   private loadInitial() {
-    this.state.loading.set(true);
     const isPlatformAdmin = this.roleService.isPlatformAdmin();
     this.state.isPlatformAdmin.set(isPlatformAdmin);
+    if (isPlatformAdmin && !this.distContext.selectedDistributorId()) return;
+    this.state.loading.set(true);
 
     const now = new Date();
     const guess = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;

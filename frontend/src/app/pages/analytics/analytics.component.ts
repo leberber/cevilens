@@ -1,6 +1,8 @@
-import { Component, inject, signal, computed, OnInit, OnDestroy } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, OnDestroy, effect, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { DistributorContextService } from '../../core/services/distributor-context.service';
+import { RoleService } from '../../core/services/role.service';
 import { FormatService } from '../../core/services/format.service';
 import { LoadingManager } from '../../core/services/loading-manager.service';
 import { PeriodService } from '../../core/services/period.service';
@@ -40,6 +42,15 @@ export class AnalyticsComponent implements OnInit, OnDestroy {
   private readonly format        = inject(FormatService);
   private readonly loadingManager = inject(LoadingManager);
   private readonly period        = inject(PeriodService);
+  private readonly distContext   = inject(DistributorContextService);
+  private readonly roleService   = inject(RoleService);
+
+  constructor() {
+    effect(() => {
+      this.distContext.selectedDistributorId();
+      if (untracked(() => this.periode())) this.load();
+    });
+  }
 
   readonly data        = signal<AnalyticsData | null>(null);
   readonly loading     = signal(true);
@@ -92,6 +103,7 @@ export class AnalyticsComponent implements OnInit, OnDestroy {
     const now = new Date();
     const guess = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     this.periode.set(guess);
+    if (this.roleService.isPlatformAdmin() && !this.distContext.selectedDistributorId()) return;
     this.load();
   }
 

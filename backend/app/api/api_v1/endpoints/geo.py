@@ -7,6 +7,8 @@ from sqlalchemy import text
 from sqlmodel import Session
 
 from app.api.deps import get_current_user, get_current_distributor
+from app.core.product_codes import remap_by_vente_code
+from app.core.tonnage import PRODUITS_JOIN, qty_expr
 from app.database import get_session
 from app.models.user import User, UserRole
 
@@ -51,16 +53,16 @@ def get_by_location(
     fdv: Optional[str] = Query(None),
     famille: Optional[str] = Query(None),
     sous_famille: Optional[str] = Query(None),
+    unite: str = Query("tonnes"),
     current_user: User = Depends(get_current_user),
     current_distributor=Depends(get_current_distributor),
     session: Session = Depends(get_session),
 ) -> Any:
     """
     Returns ALL communes for every wilaya that has sales in the given period,
-    including communes with zero sales (total=0). This lets the map always
-    show full wilaya coverage regardless of product/filter selection.
+    including communes with zero sales (total=0). Totals are in the requested
+    unit (tonnes or packs).
     """
-    # Base conditions — used to find active wilayas (no produit filter)
     base_conditions = [
         "v.annee_mois = :annee_mois",
         "v.statut_commande = 'Facturé'",
@@ -68,7 +70,7 @@ def get_by_location(
     ]
     params: dict = {"annee_mois": annee_mois}
 
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         base_conditions.append(
             "(v.distributor_id = :distributor_id OR v.distributor_id IS NULL)"
         )
@@ -88,12 +90,14 @@ def get_by_location(
 
     base_where = " AND ".join(base_conditions)
 
-    # Sales conditions — same as base + commune required + optional produit
     sales_conditions = list(base_conditions) + ["v.commune IS NOT NULL"]
     if produit:
         sales_conditions.append("v.code_produit = :produit")
         params["produit"] = produit
     sales_where = " AND ".join(sales_conditions)
+
+    _qty   = qty_expr(unite)
+    _pjoin = PRODUITS_JOIN if unite == "tonnes" else ""
 
     sql = f"""
         WITH active_wilayas AS (
@@ -103,8 +107,9 @@ def get_by_location(
         ),
         sales AS (
             SELECT lc.commune_code,
-                   COALESCE(SUM(v.qte_livree), 0) AS total
+                   COALESCE(SUM({_qty}), 0) AS total
             FROM ventes v
+            {_pjoin}
             JOIN location_communes lc
               ON LOWER(v.commune) = LOWER(lc.commune_name)
              AND LOWER(v.wilaya)  = LOWER(lc.wilaya_name)
@@ -127,7 +132,7 @@ def get_by_location(
             "code": row[0],
             "name": row[1],
             "wilaya": row[2],
-            "total": round(row[3] or 0),
+            "total": round(float(row[3] or 0), 3),
         }
         for row in rows
     ]
@@ -139,13 +144,14 @@ def get_product_tree(
     canal: Optional[str] = Query(None),
     commune: Optional[str] = Query(None),
     fdv: Optional[str] = Query(None),
+    unite: str = Query("tonnes"),
     current_user: User = Depends(get_current_user),
     current_distributor=Depends(get_current_distributor),
     session: Session = Depends(get_session),
 ) -> Any:
     """
     Returns a famille → sous_famille → produit hierarchy with sales totals
-    and objectives. Optionally filtered by commune (for map-click drill-down).
+    and objectives. Totals are in the requested unit (tonnes or packs).
     """
     try:
         annee = int(annee_mois[:4])
@@ -160,7 +166,7 @@ def get_product_tree(
     ]
     params: dict = {"annee_mois": annee_mois}
 
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         conds.append("(v.distributor_id = :dist_id OR v.distributor_id IS NULL)")
         params["dist_id"] = current_distributor.id
     if canal:
@@ -173,7 +179,9 @@ def get_product_tree(
         conds.append("LOWER(v.commune) = LOWER(:commune)")
         params["commune"] = commune
 
-    where = " AND ".join(conds)
+    where  = " AND ".join(conds)
+    _qty   = qty_expr(unite)
+    _pjoin = PRODUITS_JOIN if unite == "tonnes" else ""
 
     rows = session.execute(text(f"""
         SELECT
@@ -181,8 +189,9 @@ def get_product_tree(
             TRIM(COALESCE(v.sous_famille, 'Autres'))  AS sous_famille,
             v.code_produit,
             v.description_produit,
-            SUM(v.qte_livree)                          AS total
+            SUM({_qty})                               AS total
         FROM ventes v
+        {_pjoin}
         WHERE {where}
         GROUP BY
             TRIM(v.famille),
@@ -191,7 +200,7 @@ def get_product_tree(
             v.description_produit
     """), params).all()
 
-    # Objectives — rolled up per product then aggregated to sf/famille
+    # Objectives are always in tonnes (objectif_tonne_vd/vh columns)
     if canal == "VD":
         obj_expr = "COALESCE(o.objectif_tonne_vd, 0)"
     elif canal == "VH":
@@ -201,14 +210,17 @@ def get_product_tree(
 
     obj_conds = ["o.annee = :annee", "o.mois = :mois"]
     obj_params: dict = {"annee": annee, "mois": mois}
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         obj_conds.append("o.distributor_id = :dist_id")
         obj_params["dist_id"] = current_distributor.id
 
     obj_rows = session.execute(text(
         f"SELECT o.code_produit, {obj_expr} AS obj FROM objectifs o WHERE {' AND '.join(obj_conds)}"
     ), obj_params).all()
-    obj_by_code: dict = {r[0]: float(r[1] or 0) for r in obj_rows if r[0]}
+    # Remap objective codes (may be code_dd) → vente codes so the hier lookup matches
+    obj_by_code: dict = remap_by_vente_code(
+        {r[0]: float(r[1] or 0) for r in obj_rows if r[0]}, session
+    )
 
     # Build hierarchy: famille → sf → (code, nom) → {total, obj}
     hier: dict = defaultdict(lambda: defaultdict(lambda: defaultdict(lambda: {"total": 0.0, "obj": 0.0})))
@@ -231,23 +243,23 @@ def get_product_tree(
             for (code, nom), data in sorted(prod_map.items(), key=lambda x: -x[1]["total"]):
                 prods_out.append({
                     "nom": nom, "code": code,
-                    "total": round(data["total"]),
-                    "objectif": round(data["obj"]) if data["obj"] else None,
+                    "total": round(data["total"], 3),
+                    "objectif": round(data["obj"], 3) if data["obj"] else None,
                 })
                 sf_total += data["total"]
                 sf_obj   += data["obj"]
 
             sfs_out.append({
-                "nom": sf, "total": round(sf_total),
-                "objectif": round(sf_obj) if sf_obj else None,
+                "nom": sf, "total": round(sf_total, 3),
+                "objectif": round(sf_obj, 3) if sf_obj else None,
                 "produits": prods_out,
             })
             f_total += sf_total
             f_obj   += sf_obj
 
         result.append({
-            "nom": famille, "total": round(f_total),
-            "objectif": round(f_obj) if f_obj else None,
+            "nom": famille, "total": round(f_total, 3),
+            "objectif": round(f_obj, 3) if f_obj else None,
             "sous_familles": sorted(sfs_out, key=lambda x: -x["total"]),
         })
 

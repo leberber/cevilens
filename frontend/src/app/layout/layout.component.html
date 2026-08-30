@@ -9,12 +9,22 @@
 
     <!-- Brand / Logo -->
     <div class="admin-sidebar__logo">
-      <img src="cevilogo.webp" alt="Cevital" class="sidebar-logo-full" />
+      @if (collapsed()) {
+        <img src="ceviicon.png" alt="Cevital" class="sidebar-logo-icon" />
+      } @else {
+        <img src="cevilogo.webp" alt="Cevital" class="sidebar-logo-full" />
+      }
     </div>
 
     <!-- Global Distributor Filter (centered under logo) -->
     <div class="sidebar-distributor-filter-centered">
-      <app-distributor-switcher (distributorChange)="onDistributorChange($event)" />
+      @if (collapsed()) {
+        <div class="dist-initials" [title]="distributorName()">
+          {{ distributorInitials() }}
+        </div>
+      } @else {
+        <app-distributor-switcher (distributorChange)="onDistributorChange($event)" />
+      }
     </div>
 
     <!-- Divider -->

@@ -1,21 +1,13 @@
 import { Injectable, ElementRef } from '@angular/core';
-
-export interface CommuneDatum { code: number; total: number; }
+import type { CommuneDatum } from '../commune-map.component';
 
 @Injectable({ providedIn: 'root' })
 export class CommuneMapTooltipService {
-  private cleanupTimers: ReturnType<typeof setTimeout>[] = [];
 
-  /**
-   * Format number for tooltip display
-   */
   private fmtVal(v: number): string {
     return v >= 1000 ? `${(v / 1000).toFixed(1)}k` : `${Math.round(v)}`;
   }
 
-  /**
-   * Build HTML tooltip card for a commune with rank and stats
-   */
   buildCard(
     name: string | undefined,
     row: CommuneDatum | undefined,
@@ -47,26 +39,31 @@ export class CommuneMapTooltipService {
       </div>`;
   }
 
-  /**
-   * Display tooltip card with fade-in animation
-   */
-  setCard(cardEl: ElementRef<HTMLDivElement> | null, html: string): void {
+  positionCard(cardEl: ElementRef<HTMLDivElement> | null, x: number, y: number, containerW: number): void {
     const el = cardEl?.nativeElement;
     if (!el) return;
-    el.classList.add('fading');
-    const t = setTimeout(() => {
-      el.innerHTML = html;
-      el.classList.remove('fading');
-      el.classList.add('visible');
-    }, 180);
-    this.cleanupTimers.push(t);
+    const w = 210;
+    const flipX = x + w / 2 > containerW - 10;
+    el.style.left = `${x}px`;
+    el.style.top  = `${y}px`;
+    el.style.transform = flipX
+      ? 'translate(calc(-100% - 12px), calc(-100% - 12px))'
+      : 'translate(12px, calc(-100% - 12px))';
   }
 
-  /**
-   * Clear all pending timer operations
-   */
-  clearTimers(): void {
-    this.cleanupTimers.forEach(clearTimeout);
-    this.cleanupTimers = [];
+  showCard(cardEl: ElementRef<HTMLDivElement> | null, html: string): void {
+    const el = cardEl?.nativeElement;
+    if (!el) return;
+    el.innerHTML = html;
+    el.classList.add('visible');
+    el.classList.remove('fading');
   }
+
+  hideCard(cardEl: ElementRef<HTMLDivElement> | null): void {
+    const el = cardEl?.nativeElement;
+    if (!el) return;
+    el.classList.remove('visible');
+    el.classList.add('fading');
+  }
+
 }

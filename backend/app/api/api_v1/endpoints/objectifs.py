@@ -29,7 +29,7 @@ def next_missing_month(
 ) -> Any:
     # Single query: get the latest (annee, mois) in one pass
     q = select(Objectif.annee, Objectif.mois).where(Objectif.mois.isnot(None), Objectif.annee.isnot(None))
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         q = q.where(Objectif.distributor_id == current_distributor.id)
     q = q.order_by(Objectif.annee.desc(), Objectif.mois.desc()).limit(1)
     row = session.exec(q).first()
@@ -58,7 +58,7 @@ def routes_count(
             Vente.canal.in_(["VD", "VH"]),
             Vente.code_fdv.isnot(None),
         )
-        if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        if current_distributor:
             q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
         rows = session.exec(q.group_by(Vente.canal)).all()
         return {canal: int(cnt) for canal, cnt in rows}
@@ -70,7 +70,7 @@ def routes_count(
     fallback_mois = None
     if vd == 0 and vh == 0:
         q_latest = select(Vente.annee_mois).where(Vente.canal.isnot(None), Vente.code_fdv.isnot(None))
-        if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        if current_distributor:
             q_latest = q_latest.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
         latest = session.exec(q_latest.order_by(Vente.annee_mois.desc()).limit(1)).first()
         if latest and latest != annee_mois:
@@ -168,7 +168,7 @@ def list_objectifs(
         (Objectif.objectif_packs_vh.isnot(None)),
     ).order_by(Objectif.code_produit)
 
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         q = q.where(Objectif.distributor_id == current_distributor.id)
     elif distributor_id:
         q = q.where(Objectif.distributor_id == distributor_id)

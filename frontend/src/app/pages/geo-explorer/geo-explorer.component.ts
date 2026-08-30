@@ -1,6 +1,8 @@
-import { Component, inject, signal, computed, OnInit } from '@angular/core';
+import { Component, inject, signal, computed, OnInit, effect, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { DistributorContextService } from '../../core/services/distributor-context.service';
+import { RoleService } from '../../core/services/role.service';
 import { PeriodService } from '../../core/services/period.service';
 import { LoadingManager } from '../../core/services/loading-manager.service';
 import { CommuneMapComponent, type CommuneDatum } from '../analytics/commune-map.component';
@@ -41,6 +43,8 @@ export class GeoExplorerComponent implements OnInit {
   private readonly http           = inject(HttpClient);
   private readonly loadingManager = inject(LoadingManager);
   private readonly periodService  = inject(PeriodService);
+  private readonly distContext    = inject(DistributorContextService);
+  private readonly roleService    = inject(RoleService);
 
   readonly loading      = signal(true);
   readonly treeLoading  = signal(false);
@@ -95,9 +99,17 @@ export class GeoExplorerComponent implements OnInit {
     return { icon: 'pi-box', text: s.nom };
   });
 
+  constructor() {
+    effect(() => {
+      this.distContext.selectedDistributorId(); // track distributor changes
+      if (untracked(() => this.periode())) this.load();
+    });
+  }
+
   ngOnInit(): void {
     const now = new Date();
     this.periode.set(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`);
+    if (this.roleService.isPlatformAdmin() && !this.distContext.selectedDistributorId()) return;
     this.load();
   }
 

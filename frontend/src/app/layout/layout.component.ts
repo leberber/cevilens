@@ -36,7 +36,11 @@ export class LayoutComponent {
     });
   }
 
-  readonly distributorName = computed(() => this.distributorContext.formattedName());
+  readonly distributorName     = computed(() => this.distributorContext.formattedName());
+  readonly distributorInitials = computed(() => {
+    const name = this.distributorContext.distributor()?.nom ?? '';
+    return name.split(/\s+/).slice(0, 2).map(w => w[0]?.toUpperCase() ?? '').join('') || '—';
+  });
 
   get user() { return this.auth.currentUser(); }
   get isPlatformAdmin() { return this.roleService.isPlatformAdmin(); }

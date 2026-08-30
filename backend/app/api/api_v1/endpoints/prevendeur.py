@@ -13,6 +13,8 @@ from sqlalchemy import func, case as sa_case, text
 from sqlmodel import Session, select
 
 from app.api.deps import get_current_user, get_current_distributor
+from app.core.product_codes import remap_by_vente_code
+from app.core.tonnage import PRODUITS_JOIN, qty_expr
 from app.database import get_session
 from app.models.user import User, UserRole
 from app.models.vente import Vente
@@ -151,7 +153,7 @@ def prevendeur_admin_stats(
     session: Session = Depends(get_session),
 ) -> Any:
     q = select(User).where(User.role == UserRole.PREVENDEUR).where(User.is_active == True)
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         q = q.where(User.distributor_id == current_distributor.id)
     prevendeurs = session.exec(q.order_by(User.full_name)).all()
 
@@ -251,7 +253,7 @@ def export_clients_excel(
     session: Session = Depends(get_session),
 ):
     q = select(User).where(User.role == UserRole.PREVENDEUR).where(User.is_active == True)
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         q = q.where(User.distributor_id == current_distributor.id)
     prevendeurs = session.exec(q.order_by(User.full_name)).all()
 
@@ -352,21 +354,19 @@ def prevendeur_admin_drilldown(
     session: Session = Depends(get_session),
 ) -> Any:
     q_periods = select(Vente.annee_mois).distinct().order_by(Vente.annee_mois.desc())
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         q_periods = q_periods.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     all_periods = session.exec(q_periods).all()
     all_periods_list = list(all_periods)
 
     # Prevendeurs list with their totals for the current period (always unfiltered)
     q_pv = select(User).where(User.role == UserRole.PREVENDEUR).where(User.is_active == True)
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         q_pv = q_pv.where(User.distributor_id == current_distributor.id)
     prevendeurs_db = session.exec(q_pv.order_by(User.full_name)).all()
     fdv_name_map = {p.employe_code: p.full_name for p in prevendeurs_db if p.employe_code}
 
-    # Normalize qte_livree — simplified without Produit model
-    # Previously: divide by colisage for UN rows; now just use qte_livree as-is
-    _norm = Vente.qte_livree
+    _norm = Vente.qte_facturee
 
     fdv_totals_q = (
         select(Vente.code_fdv, func.sum(_norm))
@@ -375,7 +375,7 @@ def prevendeur_admin_drilldown(
         .where(Vente.code_fdv.isnot(None))
         .group_by(Vente.code_fdv)
     )
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         fdv_totals_q = fdv_totals_q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     if canal:
         fdv_totals_q = fdv_totals_q.where(Vente.canal == canal)
@@ -407,7 +407,7 @@ def prevendeur_admin_drilldown(
         ).where(
             Vente.annee_mois == periode, Vente.statut_commande == 'Facturé'
         )
-        if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        if current_distributor:
             q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
         if code_fdv:
             q = q.where(Vente.code_fdv == code_fdv)
@@ -427,7 +427,7 @@ def prevendeur_admin_drilldown(
             .where(Vente.annee_mois.in_(trend_periods))
             .where(Vente.statut_commande == 'Facturé')
         )
-        if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        if current_distributor:
             q6 = q6.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
         if code_fdv:
             q6 = q6.where(Vente.code_fdv == code_fdv)
@@ -517,6 +517,11 @@ def prevendeur_admin_drilldown(
         obj_by_prod_total = {r.code_produit: (r.objectif_packs_vd or 0) + (r.objectif_packs_vh or 0) for r in obj_prod_rows}
         obj_tonne_by_prod = {r.code_produit: (r.objectif_tonne_vd or 0) + (r.objectif_tonne_vh or 0) for r in obj_prod_rows}
 
+    # Remap objective codes (may be code_dd) → vente codes so sales lookups match
+    obj_by_prod       = remap_by_vente_code(obj_by_prod, session)
+    obj_by_prod_total = remap_by_vente_code(obj_by_prod_total, session)
+    obj_tonne_by_prod = remap_by_vente_code(obj_tonne_by_prod, session)
+
     # When a single FDV is selected, display per-route targets instead of global totals
     if code_fdv:
         obj_by_prod_total = obj_by_prod
@@ -533,7 +538,7 @@ def prevendeur_admin_drilldown(
         select(Vente.code_fdv, Vente.code_produit, func.sum(_norm))
         .where(Vente.annee_mois == annee_mois, Vente.statut_commande == 'Facturé', Vente.code_fdv.isnot(None), Vente.code_produit.isnot(None))
     )
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         _fdv_prod_q = _fdv_prod_q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     if canal:
         _fdv_prod_q = _fdv_prod_q.where(Vente.canal == canal)
@@ -570,14 +575,14 @@ def prevendeur_admin_drilldown(
         key=lambda x: x["nom"],
     )
 
-    # CA (chiffre d'affaires) per famille — SUM(qte_livree * prix_unitaire)
+    # CA (chiffre d'affaires) per famille — SUM(qte_facturee * prix_unitaire)
     _ca_q = (
-        select(Vente.famille, func.sum(Vente.qte_livree * Vente.prix_unitaire))
+        select(Vente.famille, func.sum(Vente.qte_facturee * Vente.prix_unitaire))
         .where(Vente.annee_mois == annee_mois, Vente.statut_commande == 'Facturé')
         .where(Vente.prix_unitaire.isnot(None))
         .group_by(Vente.famille)
     )
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         _ca_q = _ca_q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
     if code_fdv:
         _ca_q = _ca_q.where(Vente.code_fdv == code_fdv)
@@ -587,12 +592,12 @@ def prevendeur_admin_drilldown(
 
     if prev_periode:
         _ca_prev_q = (
-            select(Vente.famille, func.sum(Vente.qte_livree * Vente.prix_unitaire))
+            select(Vente.famille, func.sum(Vente.qte_facturee * Vente.prix_unitaire))
             .where(Vente.annee_mois == prev_periode, Vente.statut_commande == 'Facturé')
             .where(Vente.prix_unitaire.isnot(None))
             .group_by(Vente.famille)
         )
-        if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+        if current_distributor:
             _ca_prev_q = _ca_prev_q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
         if code_fdv:
             _ca_prev_q = _ca_prev_q.where(Vente.code_fdv == code_fdv)
@@ -722,54 +727,13 @@ def prevendeur_admin_analytics(
     current_distributor = Depends(get_current_distributor),
     session: Session = Depends(get_session),
 ) -> Any:
+    # Periods list (no qty conversion needed)
     q_periods = select(Vente.annee_mois).distinct().order_by(Vente.annee_mois.desc())
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
+    if current_distributor:
         q_periods = q_periods.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
-    all_periods = session.exec(q_periods).all()
-    all_periods_list = list(all_periods)
+    all_periods_list = list(session.exec(q_periods).all())
 
-    # Simplified normalization without Produit model
-    # Cannot calculate tonnes without poids_unite_vente or normalize by colisage
-    if unite == 'tonnes':
-        _norm = Vente.qte_livree  # Simplified: no weight data available
-    else:  # packs (default)
-        _norm = Vente.qte_livree  # Simplified: use raw quantity
-
-    def apply_filters(q, include_famille=True, include_commune=True, include_produit=True):
-        q = q.where(Vente.annee_mois == annee_mois, Vente.statut_commande == 'Facturé')
-        if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-            q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
-        if include_famille and famille:
-            q = q.where(Vente.famille.ilike(famille))
-        if fdv:
-            q = q.where(Vente.code_fdv == fdv)
-        if canal:
-            q = q.where(Vente.canal == canal)
-        if include_commune and commune:
-            q = q.where(Vente.commune == commune)
-        if include_produit and produit:
-            q = q.where(Vente.code_produit == produit)
-        return q
-
-    # KPIs
-    kpi_row = session.exec(apply_filters(
-        select(func.coalesce(func.sum(_norm), 0))
-    )).one()
-    total_ventes = round(kpi_row or 0)
-
-    nb_fdvs = len(session.exec(apply_filters(
-        select(Vente.code_fdv).distinct().where(Vente.code_fdv.isnot(None))
-    )).all())
-
-    top_famille_row = session.exec(apply_filters(
-        select(Vente.famille, func.coalesce(func.sum(_norm), 0))
-        .where(Vente.famille.isnot(None))
-        .group_by(Vente.famille)
-        .order_by(func.sum(_norm).desc())
-        .limit(1),
-        include_famille=False,
-    )).first()
-
+    # FDV name map (no qty conversion needed)
     fdv_name_map = {
         p.employe_code: p.full_name
         for p in session.exec(
@@ -778,15 +742,73 @@ def prevendeur_admin_analytics(
         if p.employe_code
     }
 
-    top_fdv_row = session.exec(apply_filters(
-        select(Vente.code_fdv, func.coalesce(func.sum(_norm), 0))
-        .where(Vente.code_fdv.isnot(None))
-        .group_by(Vente.code_fdv)
-        .order_by(func.sum(_norm).desc())
-        .limit(1)
-    )).first()
+    # ── Build common raw-SQL WHERE conditions ──────────────────────────────────
+    base_conds = ["v.annee_mois = :annee_mois", "v.statut_commande = 'Facturé'"]
+    base_params: dict = {"annee_mois": annee_mois}
 
-    # Monthly trend (last 6 periods)
+    if current_distributor:
+        base_conds.append("(v.distributor_id = :dist_id OR v.distributor_id IS NULL)")
+        base_params["dist_id"] = current_distributor.id
+    if fdv:
+        base_conds.append("v.code_fdv = :fdv")
+        base_params["fdv"] = fdv
+    if canal:
+        base_conds.append("v.canal = :canal")
+        base_params["canal"] = canal
+    # Optional filter strings (appended per-query as needed)
+    if famille:
+        base_params["famille"] = famille
+    if commune:
+        base_params["commune"] = commune
+    if produit:
+        base_params["produit"] = produit
+
+    _famille_cond = "LOWER(v.famille) = LOWER(:famille)" if famille else ""
+    _commune_cond = "LOWER(v.commune) = LOWER(:commune)"  if commune  else ""
+    _produit_cond = "v.code_produit = :produit"           if produit  else ""
+
+    _qty   = qty_expr(unite)
+    _pjoin = PRODUITS_JOIN if unite == "tonnes" else ""
+
+    def _from(extra_join: str = "") -> str:
+        parts = ["FROM ventes v"]
+        if _pjoin:
+            parts.append(_pjoin)
+        if extra_join:
+            parts.append(extra_join)
+        return "\n        ".join(parts)
+
+    def _where(*extra: str) -> str:
+        return " AND ".join(base_conds + [c for c in extra if c])
+
+    # ── KPIs ───────────────────────────────────────────────────────────────────
+    total_ventes = round(session.execute(text(f"""
+        SELECT COALESCE(SUM({_qty}), 0)
+        {_from()}
+        WHERE {_where(_famille_cond, _commune_cond, _produit_cond)}
+    """), base_params).scalar() or 0)
+
+    nb_fdvs = session.execute(text(f"""
+        SELECT COUNT(DISTINCT v.code_fdv)
+        FROM ventes v
+        WHERE {_where(_famille_cond, _commune_cond, _produit_cond)} AND v.code_fdv IS NOT NULL
+    """), base_params).scalar() or 0
+
+    tf_row = session.execute(text(f"""
+        SELECT v.famille, COALESCE(SUM({_qty}), 0) AS t
+        {_from()}
+        WHERE {_where(_commune_cond, _produit_cond)} AND v.famille IS NOT NULL
+        GROUP BY v.famille ORDER BY t DESC LIMIT 1
+    """), base_params).first()
+
+    tfdv_row = session.execute(text(f"""
+        SELECT v.code_fdv, COALESCE(SUM({_qty}), 0) AS t
+        {_from()}
+        WHERE {_where(_famille_cond, _commune_cond, _produit_cond)} AND v.code_fdv IS NOT NULL
+        GROUP BY v.code_fdv ORDER BY t DESC LIMIT 1
+    """), base_params).first()
+
+    # ── Monthly trend (last 6 periods) ─────────────────────────────────────────
     try:
         cur_idx = all_periods_list.index(annee_mois)
     except ValueError:
@@ -795,124 +817,91 @@ def prevendeur_admin_analytics(
 
     monthly = []
     if trend_periods:
-        def trend_q(q):
-            q = q.where(Vente.annee_mois.in_(trend_periods), Vente.statut_commande == 'Facturé')
-            if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-                q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
-            if famille:
-                q = q.where(Vente.famille.ilike(famille))
-            if fdv:
-                q = q.where(Vente.code_fdv == fdv)
-            if canal:
-                q = q.where(Vente.canal == canal)
-            return q
-
+        trend_conds = ["v.annee_mois = ANY(:trend_periods)", "v.statut_commande = 'Facturé'"]
+        trend_params: dict = {"trend_periods": trend_periods}
+        if current_distributor:
+            trend_conds.append("(v.distributor_id = :dist_id OR v.distributor_id IS NULL)")
+            trend_params["dist_id"] = current_distributor.id
+        if famille:
+            trend_conds.append("LOWER(v.famille) = LOWER(:famille)")
+            trend_params["famille"] = famille
+        if fdv:
+            trend_conds.append("v.code_fdv = :fdv")
+            trend_params["fdv"] = fdv
+        if canal:
+            trend_conds.append("v.canal = :canal")
+            trend_params["canal"] = canal
+        trend_where = " AND ".join(trend_conds)
         trend_rows = {
             r[0]: (round(r[1] or 0), r[2] or 0)
-            for r in session.exec(trend_q(
-                select(
-                    Vente.annee_mois,
-                    func.coalesce(func.sum(_norm), 0),
-                    func.count(Vente.code_fdv),
-                ).group_by(Vente.annee_mois)
-            )).all()
+            for r in session.execute(text(f"""
+                SELECT v.annee_mois, COALESCE(SUM({_qty}), 0), COUNT(v.code_fdv)
+                {_from()}
+                WHERE {trend_where}
+                GROUP BY v.annee_mois
+            """), trend_params).all()
         }
         monthly = [
             {"month": p, "total": trend_rows.get(p, (0, 0))[0], "nb_fdvs": trend_rows.get(p, (0, 0))[1]}
             for p in trend_periods
         ]
 
-    # By famille (unfiltered by famille so bars always show)
+    # ── Breakdowns ─────────────────────────────────────────────────────────────
+    # By famille (unfiltered by famille so all families always appear)
     by_famille = [
         {"famille": r[0], "total": round(r[1] or 0)}
-        for r in session.exec(apply_filters(
-            select(Vente.famille, func.coalesce(func.sum(_norm), 0))
-            .where(Vente.famille.isnot(None))
-            .group_by(Vente.famille)
-            .order_by(func.sum(_norm).desc()),
-            include_famille=False,
-        )).all()
+        for r in session.execute(text(f"""
+            SELECT v.famille, COALESCE(SUM({_qty}), 0) AS t
+            {_from()}
+            WHERE {_where(_commune_cond, _produit_cond)} AND v.famille IS NOT NULL
+            GROUP BY v.famille ORDER BY t DESC
+        """), base_params).all()
     ]
 
-    # Top 10 produits — never filtered by produit so list always shows all options
+    # Top 10 produits (unfiltered by produit so list always shows)
     by_produit = [
         {"nom": r[0] or "?", "code": r[1], "total": round(r[2] or 0)}
-        for r in session.exec(apply_filters(
-            select(Vente.description_produit, Vente.code_produit, func.coalesce(func.sum(_norm), 0))
-            .where(Vente.description_produit.isnot(None))
-            .group_by(Vente.description_produit, Vente.code_produit)
-            .order_by(func.sum(_norm).desc())
-            .limit(10),
-            include_produit=False,
-        )).all()
+        for r in session.execute(text(f"""
+            SELECT v.description_produit, v.code_produit, COALESCE(SUM({_qty}), 0) AS t
+            {_from()}
+            WHERE {_where(_famille_cond, _commune_cond)} AND v.description_produit IS NOT NULL
+            GROUP BY v.description_produit, v.code_produit ORDER BY t DESC LIMIT 10
+        """), base_params).all()
     ]
 
-    # Top 10 FDVs (with famille filter)
+    # Top 10 FDVs
     by_fdv = [
         {"nom": fdv_name_map.get(r[0], r[0]), "code": r[0], "total": round(r[1] or 0)}
-        for r in session.exec(apply_filters(
-            select(Vente.code_fdv, func.coalesce(func.sum(_norm), 0))
-            .where(Vente.code_fdv.isnot(None))
-            .group_by(Vente.code_fdv)
-            .order_by(func.sum(_norm).desc())
-            .limit(10)
-        )).all()
+        for r in session.execute(text(f"""
+            SELECT v.code_fdv, COALESCE(SUM({_qty}), 0) AS t
+            {_from()}
+            WHERE {_where(_famille_cond, _commune_cond, _produit_cond)} AND v.code_fdv IS NOT NULL
+            GROUP BY v.code_fdv ORDER BY t DESC LIMIT 10
+        """), base_params).all()
     ]
 
-    # By location — join ventes with location_communes by commune name
-    loc_params: dict = {"loc_annee_mois": annee_mois}
-    loc_conditions = [
-        "v.annee_mois = :loc_annee_mois",
-        "v.statut_commande = 'Facturé'",
-        "v.commune IS NOT NULL",
-    ]
-    if current_user.role != UserRole.PLATFORM_ADMIN and current_distributor:
-        loc_conditions.append("v.distributor_id = :loc_distributor_id")
-        loc_params["loc_distributor_id"] = current_distributor.id
-    if famille:
-        loc_conditions.append("LOWER(v.famille) = LOWER(:loc_famille)")
-        loc_params["loc_famille"] = famille
-    if fdv:
-        loc_conditions.append("v.code_fdv = :loc_fdv")
-        loc_params["loc_fdv"] = fdv
-    if canal:
-        loc_conditions.append("v.canal = :loc_canal")
-        loc_params["loc_canal"] = canal
-    if produit:
-        loc_conditions.append("v.code_produit = :loc_produit")
-        loc_params["loc_produit"] = produit
-
-    # Simplified SQL without produits table (model removed)
-    # Use qte_livree directly without weight/colisage normalization
-    where_clause = " AND ".join(loc_conditions)
-    loc_sql = f"""
-        SELECT lc.commune_code, lc.commune_name,
-               COALESCE(SUM(v.qte_livree), 0) AS total
-        FROM ventes v
-        JOIN location_communes lc
-          ON LOWER(v.commune) = LOWER(lc.commune_name)
-         AND LOWER(v.wilaya)  = LOWER(lc.wilaya_name)
-        WHERE {where_clause}
-        GROUP BY lc.commune_code, lc.commune_name
-        ORDER BY total DESC
-    """
-    loc_rows = session.execute(text(loc_sql), loc_params).all()
+    # By location
+    _loc_join = "JOIN location_communes lc ON LOWER(v.commune) = LOWER(lc.commune_name) AND LOWER(v.wilaya) = LOWER(lc.wilaya_name)"
     by_location = [
-        {"code": row[0], "name": row[1], "total": round(row[2] or 0)}
-        for row in loc_rows
+        {"code": r[0], "name": r[1], "total": round(r[2] or 0)}
+        for r in session.execute(text(f"""
+            SELECT lc.commune_code, lc.commune_name, COALESCE(SUM({_qty}), 0) AS total
+            {_from(_loc_join)}
+            WHERE {_where(_famille_cond, _commune_cond, _produit_cond)} AND v.commune IS NOT NULL
+            GROUP BY lc.commune_code, lc.commune_name ORDER BY total DESC
+        """), base_params).all()
     ]
 
     return {
         "kpis": {
             "total_ventes": total_ventes,
             "nb_fdvs": nb_fdvs,
-            "top_famille": {"nom": top_famille_row[0], "total": round(top_famille_row[1])}
-                           if top_famille_row else None,
+            "top_famille": {"nom": tf_row[0], "total": round(tf_row[1])} if tf_row else None,
             "top_fdv": {
-                "nom": fdv_name_map.get(top_fdv_row[0], top_fdv_row[0]),
-                "code": top_fdv_row[0],
-                "total": round(top_fdv_row[1]),
-            } if top_fdv_row else None,
+                "nom": fdv_name_map.get(tfdv_row[0], tfdv_row[0]),
+                "code": tfdv_row[0],
+                "total": round(tfdv_row[1]),
+            } if tfdv_row else None,
         },
         "monthly": monthly,
         "by_famille": by_famille,
@@ -962,12 +951,15 @@ def prevendeur_objectifs(
         .where(Objectif.mois == mois_int, Objectif.annee == annee_int)
     ).all()
 
-    obj_by_code: dict = {}
+    raw_obj: dict = {}
     for obj in obj_rows:
         if not obj.code_produit:
             continue
         objectif = obj.objectif_packs_vd_tournee if use_vd else obj.objectif_packs_vh_tournee
-        obj_by_code[obj.code_produit] = objectif or 0
+        raw_obj[obj.code_produit] = objectif or 0
+
+    # Remap objective codes (may be code_dd) → vente codes
+    obj_by_code = remap_by_vente_code(raw_obj, session)
 
     all_codes = set(sales_by_code.keys()) | set(obj_by_code.keys())
     code_to_produit = {}  # Produit model removed
