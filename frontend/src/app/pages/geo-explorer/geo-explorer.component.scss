@@ -1,19 +1,17 @@
 @use '../../../styles/mixins' as *;
 
-// ── Host — full-height block ───────────────────────────────────────────────────
+// ── Host — bleeds out of .admin-content padding to fill the viewport ──────────
 :host {
   display: block;
-  height: calc(100vh - 3rem);
+  height: 100vh;
   overflow: hidden;
+  margin: calc(-1 * var(--space-6)) calc(-1 * var(--space-8));
 }
 
-// ── Body — unified card container ─────────────────────────────────────────────
+// ── Body ──────────────────────────────────────────────────────────────────────
 .geo-body {
   display: flex;
   height: 100%;
-  border-radius: 0.875rem;
-  border: var(--border-width) solid var(--surface-border);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
   overflow: hidden;
 }
 
@@ -240,6 +238,7 @@
 
 // ── Mobile ────────────────────────────────────────────────────────────────────
 @include mobile-only {
+  :host        { margin: 0; height: auto; }
   .geo-body    { flex-direction: column; }
   .geo-map     { flex: 1; }
   .geo-sidebar { flex: 0 0 280px; border-right: none; border-bottom: var(--border-width) solid var(--surface-border); }
