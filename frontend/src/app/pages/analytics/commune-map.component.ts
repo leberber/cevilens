@@ -7,6 +7,10 @@ import { HttpClient } from '@angular/common/http';
 import { CommuneMapStyleService } from './services/commune-map-style.service';
 import { CommuneMapTooltipService } from './services/commune-map-tooltip.service';
 import { environment } from '../../../environments/environment';
+import {
+  DateRangePickerComponent,
+  type DateRange,
+} from '../../shared/components/date-range-picker/date-range-picker.component';
 
 export interface CommuneDatum { code: number; total: number; }
 
@@ -20,40 +24,71 @@ interface GeoFeatureCollection {
 @Component({
   selector: 'app-commune-map',
   standalone: true,
+  imports: [DateRangePickerComponent],
   template: `
     <div #mapEl style="width:100%;height:100%;"></div>
     <div #cardEl class="map-card"></div>
 
-    <!-- Mode toggle -->
-    <div class="map-mode-toggle">
-      <button [class.active]="mapMode() === 'choropleth'" (click)="setMapMode('choropleth')" title="Choroplèthe">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <path d="M1 3h5v4H1zM1 8h5v3H1zM7 1h6v5H7zM7 7h6v4H7z" fill="currentColor" opacity=".85"/>
-        </svg>
-      </button>
-      <button [class.active]="mapMode() === 'bubbles'" (click)="setMapMode('bubbles')" title="Bulles">
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-          <circle cx="4"  cy="10" r="3"   fill="currentColor" opacity=".5"/>
-          <circle cx="10" cy="7"  r="4.5" fill="currentColor" opacity=".85"/>
-          <circle cx="5"  cy="4"  r="2"   fill="currentColor" opacity=".65"/>
-        </svg>
-      </button>
-    </div>
+    <!-- Top-left control row: mode toggle · fullscreen · canal -->
+    <div class="map-controls-row">
+      <div class="map-mode-toggle">
+        <button [class.active]="mapMode() === 'choropleth'" (click)="setMapMode('choropleth')" title="Choroplèthe">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path d="M1 3h5v4H1zM1 8h5v3H1zM7 1h6v5H7zM7 7h6v4H7z" fill="currentColor" opacity=".85"/>
+          </svg>
+        </button>
+        <button [class.active]="mapMode() === 'bubbles'" (click)="setMapMode('bubbles')" title="Bulles">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <circle cx="4"  cy="10" r="3"   fill="currentColor" opacity=".5"/>
+            <circle cx="10" cy="7"  r="4.5" fill="currentColor" opacity=".85"/>
+            <circle cx="5"  cy="4"  r="2"   fill="currentColor" opacity=".65"/>
+          </svg>
+        </button>
+      </div>
 
-    <!-- Fullscreen button -->
-    <button class="map-fs-btn" (click)="toggleFullscreen()"
-            [class.active]="isFullscreen()"
-            [title]="isFullscreen() ? 'Quitter le plein écran' : 'Plein écran'">
-      @if (isFullscreen()) {
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <path d="M4 1v3H1M8 1v3h3M8 11V8h3M4 11V8H1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      } @else {
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <path d="M1 4V1h3M8 1h3v3M11 8v3H8M4 11H1V8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
+      <button class="map-fs-btn" (click)="toggleFullscreen()"
+              [class.active]="isFullscreen()"
+              [title]="isFullscreen() ? 'Quitter le plein écran' : 'Plein écran'">
+        @if (isFullscreen()) {
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M4 1v3H1M8 1v3h3M8 11V8h3M4 11V8H1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        } @else {
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+            <path d="M1 4V1h3M8 1h3v3M11 8v3H8M4 11H1V8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        }
+      </button>
+
+      @if (canalOptions().length) {
+        <div class="map-canal-toggle">
+          @for (opt of canalOptions(); track opt.value) {
+            <button [class.active]="canal() === opt.value" (click)="canalChange.emit(opt.value)">
+              {{ opt.label }}
+            </button>
+          }
+        </div>
       }
-    </button>
+
+      @if (uniteOptions().length) {
+        <div class="map-canal-toggle">
+          @for (opt of uniteOptions(); track opt.value) {
+            <button [class.active]="unite() === opt.value" (click)="uniteChange.emit(opt.value)">
+              {{ opt.label }}
+            </button>
+          }
+        </div>
+      }
+
+      @if (periodes().length) {
+        <app-date-range-picker
+          [compact]="true"
+          [periodes]="periodes()"
+          [dateFrom]="dateFrom()"
+          [dateTo]="dateTo()"
+          (rangeChange)="rangeChange.emit($event)" />
+      }
+    </div>
 
     @if (activeCommuneCount() > 0) {
       <div class="map-legend">
@@ -92,17 +127,22 @@ interface GeoFeatureCollection {
       &.fading   { opacity:0; }
     }
 
-    .map-mode-toggle {
+    .map-controls-row {
       position:absolute; top:10px; left:10px; z-index:500;
+      display:flex; align-items:center; gap:6px;
+    }
+
+    .map-mode-toggle, .map-canal-toggle {
       display:flex; border-radius:8px; overflow:hidden;
       border:1px solid #e2e8f0;
       box-shadow:0 1px 4px rgba(0,0,0,.08);
 
       button {
         display:flex; align-items:center; justify-content:center;
-        width:30px; height:28px;
+        height:28px; padding:0 9px;
         background:rgba(255,255,255,.92);
         color:#64748b; border:none; cursor:pointer;
+        font-size:11px; font-weight:600;
         transition:background .15s, color .15s;
 
         &:hover { background:#f1f5f9; color:#1e293b; }
@@ -110,6 +150,8 @@ interface GeoFeatureCollection {
         &:not(:last-child) { border-right:1px solid #e2e8f0; }
       }
     }
+
+    .map-mode-toggle button { width:30px; padding:0; }
 
     .map-legend {
       position:absolute; bottom:18px; right:10px; z-index:500;
@@ -148,7 +190,6 @@ interface GeoFeatureCollection {
     }
 
     .map-fs-btn {
-      position:absolute; top:10px; left:76px; z-index:500;
       display:flex; align-items:center; justify-content:center;
       width:30px; height:28px;
       background:rgba(255,255,255,.92); color:#64748b;
@@ -175,7 +216,17 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
 
   readonly data          = input<CommuneDatum[]>([]);
   readonly selectedCode  = input<number | null>(null);
+  readonly canal         = input<string>('');
+  readonly canalOptions  = input<{ value: string; label: string }[]>([]);
+  readonly unite         = input<string>('');
+  readonly uniteOptions  = input<{ value: string; label: string }[]>([]);
+  readonly periodes      = input<string[]>([]);
+  readonly dateFrom      = input<string>('');
+  readonly dateTo        = input<string>('');
   readonly communeSelect = output<{ code: number; name: string } | null>();
+  readonly canalChange   = output<string>();
+  readonly uniteChange   = output<string>();
+  readonly rangeChange   = output<DateRange>();
 
   readonly geoLoading   = signal(true);
   readonly geoError     = signal(false);
@@ -244,7 +295,7 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
         next: geo => { this.geoData.set(geo); this.geoLoading.set(false); },
         error: () => { this.geoLoading.set(false); this.geoError.set(true); },
       });
-    }, { allowSignalWrites: true });
+    });
 
     // Re-render when geo data, data values, or map mode changes
     effect(() => {
@@ -253,7 +304,7 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
       void this.mapMode(); // track mode changes
       if (!this.mapReady() || !geo) return;
       this.renderLayer(geo, data);
-    }, { allowSignalWrites: true });
+    });
 
     // Highlight selected commune
     effect(() => {

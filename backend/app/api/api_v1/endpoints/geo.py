@@ -47,7 +47,8 @@ def get_communes_geojson(
 
 @router.get("/by-location")
 def get_by_location(
-    annee_mois: str = Query(...),
+    date_from: str = Query(...),
+    date_to: str = Query(...),
     canal: Optional[str] = Query(None),
     produit: Optional[str] = Query(None),
     fdv: Optional[str] = Query(None),
@@ -64,11 +65,11 @@ def get_by_location(
     unit (tonnes or packs).
     """
     base_conditions = [
-        "v.annee_mois = :annee_mois",
+        "v.date_commande BETWEEN :date_from AND :date_to",
         "v.statut_commande = 'Facturé'",
         "v.wilaya IS NOT NULL",
     ]
-    params: dict = {"annee_mois": annee_mois}
+    params: dict = {"date_from": date_from, "date_to": date_to}
 
     if current_distributor:
         base_conditions.append(
@@ -140,7 +141,8 @@ def get_by_location(
 
 @router.get("/product-tree")
 def get_product_tree(
-    annee_mois: str = Query(...),
+    date_from: str = Query(...),
+    date_to: str = Query(...),
     canal: Optional[str] = Query(None),
     commune: Optional[str] = Query(None),
     fdv: Optional[str] = Query(None),
@@ -153,18 +155,20 @@ def get_product_tree(
     Returns a famille → sous_famille → produit hierarchy with sales totals
     and objectives. Totals are in the requested unit (tonnes or packs).
     """
+    from datetime import date as _date
     try:
-        annee = int(annee_mois[:4])
-        mois  = int(annee_mois[5:])
-    except (ValueError, IndexError):
+        d     = _date.fromisoformat(date_from)
+        annee = d.year
+        mois  = d.month
+    except (ValueError, TypeError):
         return []
 
     conds: list = [
-        "v.annee_mois = :annee_mois",
+        "v.date_commande BETWEEN :date_from AND :date_to",
         "v.statut_commande = 'Facturé'",
         "v.famille IS NOT NULL",
     ]
-    params: dict = {"annee_mois": annee_mois}
+    params: dict = {"date_from": date_from, "date_to": date_to}
 
     if current_distributor:
         conds.append("(v.distributor_id = :dist_id OR v.distributor_id IS NULL)")

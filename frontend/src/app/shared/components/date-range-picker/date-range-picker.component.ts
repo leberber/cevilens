@@ -2,18 +2,25 @@ import {
   Component, Input, Output, EventEmitter, OnChanges, SimpleChanges,
   HostListener, ElementRef, inject,
 } from '@angular/core';
+import { NgStyle } from '@angular/common';
 
 export interface DateRange { from: string; to: string; }
 
 @Component({
   selector: 'app-date-range-picker',
   standalone: true,
-  imports: [],
+  imports: [NgStyle],
   template: `
 <div class="drp">
 
-  <!-- ── Trigger ──────────────────────────────────────── -->
-  <div class="drp__trigger" (click)="toggle()">
+  <!-- ── Compact single-pill trigger (for map control rows) -->
+  @if (compact) {
+    <button class="drp__compact-btn" (click)="toggle($event)" [class.active]="open">
+      {{ compactLabel }}
+    </button>
+  } @else {
+  <!-- ── Full trigger ──────────────────────────────────── -->
+  <div class="drp__trigger" (click)="toggle($event)">
     <div class="drp__icon"><i class="pi pi-calendar"></i></div>
     <div class="drp__body">
       <span class="drp__lbl">Période</span>
@@ -21,10 +28,11 @@ export interface DateRange { from: string; to: string; }
     </div>
     <i class="pi pi-chevron-down drp__caret" [class.drp__caret--open]="open"></i>
   </div>
+  } <!-- end @else (full trigger) -->
 
   <!-- ── Panel ────────────────────────────────────────── -->
   @if (open) {
-    <div class="drp__panel" (click)="$event.stopPropagation()">
+    <div class="drp__panel" [ngStyle]="panelStyle" (click)="$event.stopPropagation()">
 
       <!-- Month chips -->
       <div class="drp__chips-wrap">
@@ -87,6 +95,20 @@ export interface DateRange { from: string; to: string; }
 </div>
   `,
   styles: [`
+/* Compact pill trigger — shows selected period, click opens calendar panel */
+.drp__compact-btn {
+  display: flex; align-items: center; justify-content: center;
+  height: 28px; padding: 0 10px;
+  background: #2563eb; color: #fff;
+  border: none; border-radius: 8px; cursor: pointer;
+  font-size: 11px; font-weight: 600; white-space: nowrap; font-family: inherit;
+  box-shadow: 0 1px 4px rgba(0,0,0,.12);
+  transition: background .12s;
+
+  &:hover { background: #1d4ed8; }
+  &.active { background: #1d4ed8; }
+}
+
 .drp { position: relative; display: inline-block; }
 
 /* ── Trigger ─────────────────────────────── */
@@ -140,10 +162,8 @@ export interface DateRange { from: string; to: string; }
 
 /* ── Panel ───────────────────────────────── */
 .drp__panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  z-index: 1100;
+  /* position/top/left/z-index set via [ngStyle] using fixed coords from getBoundingClientRect() */
+  z-index: 9999;
   width: 360px;
   background: var(--surface-card);
   border: 1px solid var(--surface-border);
@@ -280,11 +300,13 @@ export class DateRangePickerComponent implements OnChanges {
   @Input() periodes: string[] = [];
   @Input() dateFrom = '';
   @Input() dateTo   = '';
+  @Input() compact  = false;
   @Output() rangeChange = new EventEmitter<DateRange>();
 
   private el = inject(ElementRef);
 
   open      = false;
+  panelStyle: Record<string, string> = {};
   navYear   = new Date().getFullYear();
   navMonth  = new Date().getMonth();
   phase: 'from' | 'to' = 'from';
@@ -292,7 +314,7 @@ export class DateRangePickerComponent implements OnChanges {
   tempFrom  = '';
   tempTo    = '';
 
-  readonly DAYS   = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'];
+readonly DAYS   = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'];
   readonly today  = this.toISO(new Date());
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -313,13 +335,62 @@ export class DateRangePickerComponent implements OnChanges {
     if (!this.el.nativeElement.contains(e.target as Node)) this.open = false;
   }
 
-  toggle(): void {
+  toggle(event: MouseEvent): void {
     this.open = !this.open;
     if (this.open) {
       this.tempFrom = this.dateFrom;
       this.tempTo   = this.dateTo;
       this.phase    = 'from';
+      // Use fixed positioning so the panel escapes any overflow:hidden parent.
+      // event.currentTarget is always the clicked trigger element.
+      const trigger = event.currentTarget as HTMLElement;
+      const rect    = trigger.getBoundingClientRect();
+      this.panelStyle = {
+        position: 'fixed',
+        top:  `${rect.bottom + 8}px`,
+        left: `${rect.left}px`,
+        zIndex: '9999',
+      };
     }
+  }
+
+  get compactLabel(): string {
+    if (!this.dateFrom) return 'Période';
+
+    const to     = this.dateTo || this.dateFrom;
+    const fromP  = this.dateFrom.substring(0, 7);
+    const toP    = to.substring(0, 7);
+
+    const fmtMonth = (period: string) => {
+      const [y, m] = period.split('-').map(Number);
+      const s = new Date(y, m - 1, 1)
+        .toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' })
+        .replace('.', '');
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    };
+
+    // Full-month selection → show just the month name (e.g. "Août 26")
+    if (fromP === toP && this.dateFrom.endsWith('-01')) {
+      const [y, m] = fromP.split('-').map(Number);
+      const lastDay = new Date(y, m, 0).getDate();
+      if (to.endsWith(`-${String(lastDay).padStart(2, '0')}`)) {
+        return fmtMonth(fromP);
+      }
+    }
+
+    // Custom same-month range → "1 → 15 Août"
+    if (fromP === toP) {
+      const fd = +this.dateFrom.substring(8);
+      const td = +to.substring(8);
+      const [y, m] = fromP.split('-').map(Number);
+      const mon = new Date(y, m - 1, 1)
+        .toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '');
+      const monCap = mon.charAt(0).toUpperCase() + mon.slice(1);
+      return fd === td ? `${fd} ${monCap}` : `${fd} → ${td} ${monCap}`;
+    }
+
+    // Cross-month range → "Août → Sept 26"
+    return `${fmtMonth(fromP)} → ${fmtMonth(toP)}`;
   }
 
   /* ── Calendar ──────────────────────────────────── */

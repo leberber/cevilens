@@ -7,7 +7,7 @@
         <app-product-tree
           [tree]="treeData()"
           [selection]="selection()"
-          [loading]="loading() || treeLoading()"
+          [loading]="loading()"
           (selectionChange)="onSelectionChange($event)" />
       </div>
 
@@ -19,7 +19,7 @@
             @if (loading()) {
               <div class="geo-kpi__sk"></div>
             } @else {
-              <div class="geo-kpi__val">{{ kpis()?.kpis?.total_ventes | number:'1.0-0' }}</div>
+              <div class="geo-kpi__val">{{ totalVentes() | number:'1.0-0' }}</div>
             }
           </div>
         </div>
@@ -36,19 +36,6 @@
           </div>
         </div>
 
-        @if (commune()) {
-          <div class="geo-kpi">
-            <div class="geo-kpi__icon geo-kpi__icon--amber"><i class="pi pi-flag"></i></div>
-            <div class="geo-kpi__body">
-              <div class="geo-kpi__label">{{ commune()!.name }}</div>
-              @if (communeTotal()) {
-                <div class="geo-kpi__val">{{ communeTotal()!.total | number:'1.0-0' }}</div>
-              } @else {
-                <div class="geo-kpi__val">—</div>
-              }
-            </div>
-          </div>
-        }
       </div>
     }
   </aside>
@@ -62,48 +49,53 @@
 
   <!-- Map -->
   <div class="geo-map">
+    <!-- Commune drawer (slides in from left edge of map) -->
+    <div class="geo-drawer" [class.geo-drawer--open]="!!commune()">
+      <div class="geo-drawer__header">
+        <div class="geo-drawer__title">
+          <i class="pi pi-map-marker"></i>
+          <span>{{ commune()?.name ?? '' }}</span>
+          @if (communeTotal()) {
+            <span class="geo-drawer__total">{{ communeTotal()!.total | number:'1.0-0' }} {{ uniteLabel() }}</span>
+          }
+        </div>
+        <button class="geo-drawer__close" (click)="clearCommune()" aria-label="Fermer">
+          <i class="pi pi-times"></i>
+        </button>
+      </div>
+      <div class="geo-drawer__body">
+        <app-product-tree
+          [tree]="drawerTree()"
+          [selection]="null"
+          [loading]="drawerLoading()" />
+      </div>
+    </div>
+
     <app-commune-map
       [data]="mapData()"
       [selectedCode]="commune()?.code ?? null"
-      (communeSelect)="setCommune($event)" />
+      [canal]="canal()"
+      [canalOptions]="canals"
+      [unite]="unite()"
+      [uniteOptions]="unites"
+      [periodes]="periodes()"
+      [dateFrom]="dateFrom()"
+      [dateTo]="dateTo()"
+      (communeSelect)="setCommune($event)"
+      (canalChange)="setCanal($event)"
+      (uniteChange)="setUnite($event)"
+      (rangeChange)="onRangeChange($event)" />
 
     <!-- Floating controls overlay -->
-    <div class="geo-map-controls">
-      <div class="geo-map-controls__left">
-        @if (selectionLabel()) {
-          <span class="geo-tag">
-            <i [class]="'pi ' + selectionLabel()!.icon"></i>
-            {{ selectionLabel()!.text }}
-            <button (click)="clearSelection()" aria-label="Effacer le filtre">×</button>
-          </span>
-        }
-        @if (commune()) {
-          <span class="geo-tag geo-tag--commune">
-            <i class="pi pi-map-marker"></i>
-            {{ commune()!.name }}
-            <button (click)="clearCommune()" aria-label="Effacer la commune">×</button>
-          </span>
-        }
+    @if (selectionLabel()) {
+      <div class="geo-map-controls">
+        <span class="geo-tag">
+          <i [class]="'pi ' + selectionLabel()!.icon"></i>
+          {{ selectionLabel()!.text }}
+          <button (click)="clearSelection()" aria-label="Effacer le filtre">×</button>
+        </span>
       </div>
-
-      <div class="geo-map-controls__right">
-        <div class="seg-control seg-control--glass">
-          @for (u of unites; track u.value) {
-            <button class="seg-btn" [class.seg-btn--active]="unite() === u.value" (click)="setUnite(u.value)">{{ u.label }}</button>
-          }
-        </div>
-        <div class="seg-control seg-control--glass">
-          @for (c of canals; track c.value) {
-            <button class="seg-btn" [class.seg-btn--active]="canal() === c.value" (click)="setCanal(c.value)">{{ c.label }}</button>
-          }
-        </div>
-        <select class="geo-select" (change)="setPeriode($any($event.target).value)">
-          @for (p of periodes(); track p) {
-            <option [value]="p" [selected]="periode() === p">{{ formatPeriode(p) }}</option>
-          }
-        </select>
-      </div>
-    </div>
+    }
   </div>
 
 </div>
