@@ -2,6 +2,9 @@
 
   <!-- Sidebar (always in DOM; width=0 means collapsed) -->
   <aside class="geo-sidebar" [style.width.px]="sidebarWidth()">
+    <!-- Drag-to-resize strip on the right edge -->
+    <div class="geo-sidebar__resizer" (mousedown)="startResize($event)" title="Glisser pour redimensionner"></div>
+
     @if (panelOpen()) {
       <div class="geo-sidebar__tree">
         <app-product-tree
@@ -39,13 +42,6 @@
       </div>
     }
   </aside>
-
-  <!-- Drag handle -->
-  <div class="geo-resize-handle" (mousedown)="startResize($event)" title="Glisser pour redimensionner">
-    <div class="geo-resize-handle__grip">
-      <span></span><span></span><span></span><span></span><span></span>
-    </div>
-  </div>
 
   <!-- Map -->
   <div class="geo-map">
