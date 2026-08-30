@@ -30,6 +30,14 @@
     </div>
   </ng-template>
 
+  @if (showMapper()) {
+    <app-product-code-mapper
+      [codes]="unmatchedCodes()"
+      (allResolved)="load()"
+      (dismissed)="mapperDismissed.set(true)">
+    </app-product-code-mapper>
+  }
+
   <app-objectifs-table
     [rows]="filteredRows()"
     [loading]="loading()"

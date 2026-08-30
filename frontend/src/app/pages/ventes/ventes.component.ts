@@ -113,7 +113,6 @@ export class VentesComponent implements OnInit {
   ];
 
   readonly visibleColumns = computed(() => this.allColumns.filter(c => c.visible));
-  readonly totalCount = computed(() => this.total());
   readonly skWidths = ['72%','55%','88%','50%','78%','63%','90%','42%','70%','82%','58%','68%'];
 
   // Watch for distributor changes and reload data

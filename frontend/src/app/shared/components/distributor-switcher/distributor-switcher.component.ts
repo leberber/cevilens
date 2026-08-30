@@ -13,14 +13,14 @@ export class DistributorSwitcherComponent {
   private readonly roleService = inject(RoleService);
   private readonly distContext = inject(DistributorContextService);
 
-  readonly isPlatformAdmin = this.roleService.isPlatformAdmin();
+  readonly isPlatformAdmin = computed(() => this.roleService.isPlatformAdmin());
   readonly showMenu = signal(false);
 
   readonly distributors = this.distContext.distributors;
   readonly selected = this.distContext.distributor;
 
   readonly displayName = computed(() =>
-    this.distContext.distributor()?.nom ?? (this.isPlatformAdmin ? 'Sélectionner' : 'Aucun')
+    this.distContext.distributor()?.nom ?? (this.isPlatformAdmin() ? 'Sélectionner' : 'Aucun')
   );
 
   readonly distributorChange = output<Distributor | null>();

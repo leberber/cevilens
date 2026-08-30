@@ -56,6 +56,30 @@
   &:hover td { filter: brightness(0.95); }
 }
 
+.obj-toggle-all {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  margin-right: 0.25rem;
+  border: none;
+  background: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--text-color-secondary);
+  vertical-align: middle;
+  transition: background 0.15s, color 0.15s;
+
+  i { font-size: 0.6rem; }
+
+  &:hover {
+    background: rgba(var(--primary-rgb), 0.1);
+    color: var(--primary-color);
+  }
+}
+
 .obj-fam-inner  { display: flex; align-items: center; gap: 0.5rem; }
 .obj-fam-chevron { font-size: 0.7rem; transition: transform 0.18s ease; flex-shrink: 0; }
 .obj-fam-total  { text-align: right; font-weight: 800; }
@@ -68,12 +92,16 @@
   letter-spacing: 0;
 }
 
+.table tbody tr td {
+  border-bottom-color: rgba(0, 0, 0, 0.035);
+}
+
 .obj-sf-row td {
   padding: 0.45rem 1.25rem 0.45rem 2rem;
   font-size: 0.74rem;
   font-weight: 600;
   color: var(--text-color-secondary);
-  border-bottom: 1px solid var(--surface-border);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.035);
   font-style: italic;
 }
 

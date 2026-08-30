@@ -1,14 +1,14 @@
 <div class="dist-switcher">
   <button
     class="dist-switcher__name dist-switcher__name--btn"
-    [disabled]="!isPlatformAdmin"
+    [disabled]="!isPlatformAdmin()"
     (click)="toggleMenu($event)">
     <i class="pi pi-building"></i>
     {{ displayName() }}
     <i class="pi pi-chevron-down dist-switcher__caret"></i>
   </button>
 
-  @if (isPlatformAdmin && showMenu() && distributors().length > 0) {
+  @if (isPlatformAdmin() && showMenu() && distributors().length > 0) {
     <div class="dist-switcher__menu">
       @for (d of distributors(); track d.id) {
         <button class="dist-switcher__item"

@@ -6,13 +6,14 @@ import logging
 
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, distinct
+from sqlalchemy import func, distinct, or_
 from sqlmodel import Session, select
 
 from app.api.deps import get_current_user, get_current_distributor
 from app.database import get_session
 from app.models.distributor import Distributor
 from app.models.objectif import Objectif
+from app.models.produit import Produit
 from app.models.user import User, UserRole
 from app.models.vente import Vente
 
@@ -98,8 +99,8 @@ def batch_upsert(
         return float(v) if v is not None else None
 
     # Resolve code_dd aliases → canonical code_produit
-    # TODO: Produit model needs to be created for this to work
-    dd_map = {}
+    dd_produits = session.exec(select(Produit).where(Produit.code_dd.isnot(None))).all()
+    dd_map = {p.code_dd: p.code_produit for p in dd_produits if p.code_dd}
 
     # Load all existing objectifs for this period in one query
     q = select(Objectif).where(Objectif.mois == mois, Objectif.annee == annee)
@@ -177,6 +178,20 @@ def list_objectifs(
 
     rows = session.exec(q).all()
 
+    # Join with produits to get famille / sous_famille (also resolve code_dd aliases)
+    codes = {obj.code_produit for obj in rows}
+    produit_map: dict = {}
+    if codes:
+        produits = session.exec(
+            select(Produit).where(
+                or_(Produit.code_produit.in_(codes), Produit.code_dd.in_(codes))
+            )
+        ).all()
+        for p in produits:
+            produit_map[p.code_produit] = p
+            if p.code_dd:
+                produit_map[p.code_dd] = p
+
     user_ids = {obj.updated_by_id for obj in rows if obj.updated_by_id}
     users_map: dict = {}
     if user_ids:
@@ -187,6 +202,8 @@ def list_objectifs(
         {
             "code_produit": obj.code_produit,
             "nom_produit": obj.nom_produit,
+            "famille": produit_map[obj.code_produit].famille if obj.code_produit in produit_map else None,
+            "sous_famille": produit_map[obj.code_produit].sous_famille if obj.code_produit in produit_map else None,
             "nom_distributeur": obj.nom_distributeur,
             "objectif_tonne_vd": obj.objectif_tonne_vd,
             "objectif_tonne_vd_tournee": obj.objectif_tonne_vd_tournee,
@@ -210,8 +227,9 @@ async def parse_excel(
     current_user: User = Depends(get_current_user),
 ) -> Any:
     import openpyxl
-    # TODO: Produit model needs to be created for alias mapping
-    dd_map = {}
+
+    dd_produits = session.exec(select(Produit).where(Produit.code_dd.isnot(None))).all()
+    dd_map = {p.code_dd: p.code_produit for p in dd_produits if p.code_dd}
 
     content = await file.read()
     wb = openpyxl.load_workbook(io.BytesIO(content), data_only=True)

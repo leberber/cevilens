@@ -9,6 +9,7 @@ import { HttpClient } from '@angular/common/http';
 import { DistributorContextService } from '../../../core/services/distributor-context.service';
 import { RoleService } from '../../../core/services/role.service';
 import { NotificationService } from '../../../core/services/notification.service';
+import { CanalHelper } from '../../../core/services/canal.helper';
 import { Distributor } from '../../../core/models/distributor.model';
 import { UploadComponent } from '../../upload/upload.component';
 
@@ -826,9 +827,10 @@ import { UploadComponent } from '../../upload/upload.component';
 })
 export class ObjectifsUploadDialogComponent implements OnInit {
   private readonly http       = inject(HttpClient);
-  private readonly distContext = inject(DistributorContextService);
-  private readonly roleService = inject(RoleService);
-  private readonly notify      = inject(NotificationService);
+  private readonly distContext  = inject(DistributorContextService);
+  private readonly roleService  = inject(RoleService);
+  private readonly notify       = inject(NotificationService);
+  private readonly canalHelper  = inject(CanalHelper);
   private readonly destroyRef  = inject(DestroyRef);
 
   @Input() visible = false;
@@ -991,7 +993,7 @@ export class ObjectifsUploadDialogComponent implements OnInit {
       ? this.distributors().find(d => d.id === this.selectedDistributor)?.nom || 'Inconnu'
       : this.distributorName() || 'Distributeur';
 
-    const routeCount = canal === 'VD' ? this.prevendeurVDValue : this.prevendeurVHValue;
+    const routeCount = this.canalHelper.selectByCanal(canal, this.prevendeurVDValue, this.prevendeurVHValue) ?? 0;
     this.productsExpanded.set(false);
     this.confirmState.set({
       visible: true,
@@ -1010,9 +1012,9 @@ export class ObjectifsUploadDialogComponent implements OnInit {
   onConfirmImport() {
     const state = this.confirmState();
     if (this.uploadComponent && state.canal) {
-      const routeCount = state.canal === 'VD' ? this.prevendeurVDValue : this.prevendeurVHValue;
+      const routeCount = this.canalHelper.selectByCanal(state.canal as 'VD' | 'VH', this.prevendeurVDValue, this.prevendeurVHValue) ?? 1;
       this.confirmState.update(s => ({ ...s, visible: false }));
-      this.uploadComponent.uploadObjectives(state.canal as 'VD' | 'VH', this.selectedDistributor || undefined, routeCount || 1);
+      this.uploadComponent.uploadObjectives(state.canal as 'VD' | 'VH', this.selectedDistributor || undefined, routeCount);
     }
   }
 

@@ -6,6 +6,7 @@ import { CanalToggleComponent } from '../../shared/components/canal-toggle/canal
 import { PeriodStepperComponent } from '../../shared/period-stepper/period-stepper.component';
 import { ObjectifsTableComponent, ObjectifRow } from './components/objectifs-table.component';
 import { ObjectifsUploadDialogComponent } from '../objectifs/components/objectifs-upload-dialog.component';
+import { ProductCodeMapperComponent } from '../../shared/components/product-code-mapper/product-code-mapper.component';
 import { DistributorContextService } from '../../core/services/distributor-context.service';
 import { SortHelper } from '../../core/services/sort.helper';
 import { CanalHelper } from '../../core/services/canal.helper';
@@ -20,6 +21,7 @@ import { CanalHelper } from '../../core/services/canal.helper';
     PeriodStepperComponent,
     ObjectifsTableComponent,
     ObjectifsUploadDialogComponent,
+    ProductCodeMapperComponent,
   ],
   templateUrl: './objectifs-admin.component.html',
   styleUrl: './objectifs-admin.component.scss',
@@ -39,7 +41,16 @@ export class ObjectifsAdminComponent {
   readonly sortCol = signal('');
   readonly sortDir = signal<1 | -1>(1);
   readonly search  = signal('');
-  readonly showUploadDialog = signal(false);
+  readonly showUploadDialog  = signal(false);
+  readonly mapperDismissed  = signal(false);
+
+  readonly unmatchedCodes = computed(() =>
+    [...new Set(this.rows().filter(r => r.famille == null).map(r => r.code_produit))]
+  );
+
+  readonly showMapper = computed(() =>
+    !this.mapperDismissed() && this.unmatchedCodes().length > 0
+  );
 
   readonly sortedRows = computed((): ObjectifRow[] => {
     const rows  = this.rows();
@@ -54,6 +65,7 @@ export class ObjectifsAdminComponent {
     const tonneT = (r: ObjectifRow) => this.canalHelper.selectByCanal(canal, r.objectif_tonne_vd_tournee, r.objectif_tonne_vh_tournee);
 
     const selectors: Record<string, (r: ObjectifRow) => unknown> = {
+      famille:      (r) => r.famille,
       code:         (r) => r.code_produit,
       produit:      (r) => r.nom_produit,
       distributeur: (r) => r.nom_distributeur,
@@ -82,7 +94,7 @@ export class ObjectifsAdminComponent {
 
   readonly filledProducts = computed(() =>
     this.rows().filter(r =>
-      (this.canal() === 'VD' ? r.objectif_packs_vd : r.objectif_packs_vh) != null
+      this.canalHelper.selectByCanal(this.canal(), r.objectif_packs_vd, r.objectif_packs_vh) != null
     ).length
   );
   readonly totalProducts = computed(() => this.rows().length);
@@ -109,7 +121,7 @@ export class ObjectifsAdminComponent {
     this.http.get<ObjectifRow[]>(url)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: data => { this.rows.set(data); this.loading.set(false); },
+        next: data => { this.rows.set(data); this.loading.set(false); this.mapperDismissed.set(false); },
         error: () => this.loading.set(false),
       });
   }
