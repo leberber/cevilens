@@ -10,12 +10,12 @@
            [class.pi-chevron-right]="collapsedSfs.has(sf.nom)"></i>
         <span class="db-tree-sf-name">{{ sf.nom }}</span>
         <span class="db-tree-sf-total">
-          {{ displayVal(sf.total, sf.objectif_packs, sf.objectif_tonne) }}
-          @if (sf.objectif_packs) {
-            <span class="db-tree-sf-total__obj">/ {{ displayObjVal(sf.objectif_packs, sf.objectif_tonne) }} obj.</span>
+          {{ displayVal(sf.total) }}
+          @if (sf.objectif_tonne || sf.objectif_packs) {
+            <span class="db-tree-sf-total__obj">/ {{ displayObjVal(sf.objectif_tonne, sf.objectif_packs) }} obj.</span>
           }
         </span>
-        @if (sf.objectif_packs) {
+        @if (sf.objectif_tonne || sf.objectif_packs) {
           <span class="db-tree-sf-obj" [class.db-tree-sf-obj--ok]="sfObjPct(sf) >= 100">
             {{ sfObjPct(sf) }}%
           </span>
@@ -34,12 +34,12 @@
                    [style.transition-delay.ms]="i * 40"></div>
             </div>
             <span class="db-bar-num">
-              {{ displayVal(p.total, p.objectif_packs, p.objectif_tonne) }}
-              @if (p.objectif_packs) {
-                <span class="db-bar-num__obj">/ {{ displayObjVal(p.objectif_packs, p.objectif_tonne) }}</span>
+              {{ displayVal(p.total) }}
+              @if (p.objectif_tonne || p.objectif_packs) {
+                <span class="db-bar-num__obj">/ {{ displayObjVal(p.objectif_tonne, p.objectif_packs) }}</span>
               }
             </span>
-            @if (p.objectif_packs) {
+            @if (p.objectif_tonne || p.objectif_packs) {
               <span class="db-prod-obj-pct" [style.color]="calc.prodObjColor(p)">{{ prodObjPct(p) }}%</span>
             }
           </div>
@@ -89,8 +89,8 @@
              [class.pi-chevron-down]="!collapsedOverviewFamilles.has(f.nom)"
              [class.pi-chevron-right]="collapsedOverviewFamilles.has(f.nom)"></i>
           <span class="db-ov-fam-name">{{ capitalize(f.nom) }}</span>
-          @if (f.objectif_packs) {
-            <span class="db-ov-fam-obj" [class.db-ov-fam-obj--ok]="calc.displayObjPct(f.total, f.objectif_packs, f.objectif_tonne, displayMode) >= 100">{{ calc.displayObjPct(f.total, f.objectif_packs, f.objectif_tonne, displayMode) }}%</span>
+          @if (f.objectif_tonne || f.objectif_packs) {
+            <span class="db-ov-fam-obj" [class.db-ov-fam-obj--ok]="calc.displayObjPct(f.total, f.objectif_tonne, f.objectif_packs) >= 100">{{ calc.displayObjPct(f.total, f.objectif_tonne, f.objectif_packs) }}%</span>
           }
           <span class="db-ov-fam-total">{{ formatNum(f.total) }}</span>
         </button>

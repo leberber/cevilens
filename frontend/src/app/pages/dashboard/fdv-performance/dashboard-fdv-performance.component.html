@@ -34,13 +34,14 @@
             <div class="db-fdv-bar-track">
               <div class="db-fdv-bar-fill" [style.width.%]="(item.total / fdvPerfMax) * 100"></div>
             </div>
-            @if (selectedProduct?.objectif_packs_tournee) {
+            @if (selectedProduct?.objectif_tonne || selectedProduct?.objectif_packs_tournee) {
+              @let prodObj = selectedProduct!.objectif_tonne ?? selectedProduct!.objectif_packs_tournee!;
               <span class="db-fdv-nums">
-                {{ formatNum(item.total) }}<span class="db-fdv-nums__obj">/{{ formatNum(selectedProduct!.objectif_packs_tournee) }}</span>
+                {{ formatNum(item.total) }}<span class="db-fdv-nums__obj">/{{ formatNum(prodObj) }}</span>
               </span>
               <span class="db-fdv-obj-pct"
-                    [class.db-fdv-obj-pct--ok]="fdvObjPct(item, selectedProduct!.objectif_packs_tournee!) >= 100">
-                {{ fdvObjPct(item, selectedProduct!.objectif_packs_tournee!) }}%
+                    [class.db-fdv-obj-pct--ok]="fdvObjPct(item, prodObj) >= 100">
+                {{ fdvObjPct(item, prodObj) }}%
               </span>
             } @else {
               <span class="db-fdv-val">{{ formatNum(item.total) }}</span>

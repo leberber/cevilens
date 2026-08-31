@@ -4,36 +4,16 @@
 
 .db-kpi-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
-  gap: 1rem;
-  padding: 0 1.5rem 1rem;
-  transition: grid-template-columns 0.2s ease;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.6rem;
+  padding: 0.5rem 1rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  max-height: 40vh;
 
-  &--selection {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 0.75rem;
-  }
-
-  &--compact {
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0.5rem;
-
-    .db-kpi-card {
-      padding: 0.5rem;
-
-      &__top { margin-bottom: 0.2rem; }
-      &__label { font-size: 0.7rem; }
-      &__body { margin: 0.2rem 0; }
-      &__value { font-size: 1.1rem; }
-      &__unit { font-size: 0.65rem; }
-      &__ca { font-size: 0.7rem; }
-      &__prev { font-size: 0.65rem; }
-      &__weeks { gap: 0.25rem; }
-      &__week-val { font-size: 0.6rem; }
-      &__week-lbl { font-size: 0.55rem; }
-      &__spark { height: 16px; }
-    }
-  }
+  @media (max-width: 1200px) { grid-template-columns: repeat(3, 1fr); }
+  @media (max-width: 900px)  { grid-template-columns: repeat(2, 1fr); }
+  @media (max-width: 600px)  { grid-template-columns: 1fr; }
 }
 
 // =============================================================================
@@ -43,134 +23,143 @@
 .db-kpi-card {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  padding: 1rem;
-  border-radius: 8px;
-  border: 1px solid rgba(var(--primary-rgb), 0.12);
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(4px);
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.85rem;
+  border: 1.5px solid var(--surface-border);
+  background: var(--surface-card);
   cursor: pointer;
-  transition: all 0.18s ease;
+  transition: all 0.15s ease;
   text-align: left;
+  font-family: inherit;
 
   &:hover {
-    border-color: rgba(var(--primary-rgb), 0.25);
-    background: rgba(255, 255, 255, 0.8);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    border-color: var(--fc);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07);
   }
 
   &--active {
-    background: linear-gradient(135deg, rgba(var(--primary-rgb), 0.08), rgba(var(--primary-rgb), 0.04));
-    border-color: var(--primary-color);
-    box-shadow: 0 0 0 2px rgba(var(--primary-rgb), 0.12);
+    border-color: var(--fc) !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
   }
 
-  &__top {
+  // ── Main: left volume + right objective ──
+
+  &__main {
     display: flex;
     align-items: flex-start;
-    justify-content: space-between;
     gap: 0.5rem;
-    margin-bottom: 0.3rem;
   }
 
-  &__label {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--text-color);
+  &__left {
     flex: 1;
+    min-width: 0;
   }
 
-  &__top-right {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
+  &__right {
     flex-shrink: 0;
   }
 
-  &__body {
+  // ── Left side ──
+
+  &__label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fc);
+    margin-bottom: 0.25rem;
+  }
+
+  &__value-row {
     display: flex;
     align-items: baseline;
-    gap: 0.3rem;
-    margin: 0.4rem 0;
+    gap: 0.2rem;
+    margin-bottom: 0.3rem;
   }
 
   &__value {
-    font-size: 1.4rem;
-    font-weight: 700;
+    font-size: 1.65rem;
+    font-weight: 800;
     color: var(--text-color);
     line-height: 1;
+    letter-spacing: -0.02em;
   }
 
   &__unit {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: var(--text-color-secondary);
     font-weight: 500;
   }
 
-  &__ca {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: var(--primary-color);
+  &__meta {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
   }
 
   &__prev {
-    font-size: 0.75rem;
-    color: var(--text-color-secondary);
+    font-size: 0.85rem;
+    color: var(--text-color-muted);
   }
 
-  &__weeks {
-    display: flex;
-    gap: 0.4rem;
-    margin-top: 0.2rem;
-  }
+  // ── Right side: objective box ──
 
-  &__week {
+  &__obj-box {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 0.15rem;
-    flex: 1;
+    gap: 0.4rem;
   }
 
-  &__week-val {
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--text-color);
-  }
-
-  &__week-lbl {
-    font-size: 0.65rem;
+  &__ca {
+    font-size: 0.75rem;
+    font-weight: 700;
     color: var(--text-color-secondary);
+    white-space: nowrap;
   }
 
-  &__spark {
-    height: 28px;
-    margin-top: 0.2rem;
-  }
-
-  &__arrow {
+  &__action-icon {
+    font-size: 0.85rem;
     color: var(--text-color-secondary);
-    transition: transform 0.2s ease;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.15s;
 
-    &--open {
-      transform: rotate(90deg);
-    }
+    &:hover { opacity: 1; }
+  }
+
+  // ── Footer: progress bar ──
+
+  &__footer {
+    margin-top: 0.5rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.04);
+  }
+
+  &__footer-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.55rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-color-muted);
+    margin-bottom: 0.3rem;
   }
 }
 
 // =============================================================================
-// KPI BADGE (delta)
+// DELTA BADGE
 // =============================================================================
 
 .db-kpi-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  padding: 0.2rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  white-space: nowrap;
+  gap: 0.15rem;
+  padding: 0.12rem 0.4rem;
+  border-radius: 999px;
+  font-size: 0.55rem;
+  font-weight: 700;
 
   &--up {
     background: rgba(34, 197, 94, 0.12);
@@ -187,137 +176,72 @@
     color: #6b7280;
   }
 
-  i { font-size: 0.65rem; }
+  i { font-size: 0.5rem; }
 }
 
 // =============================================================================
-// PIN BUTTON
+// PROGRESS BAR
 // =============================================================================
-
-.db-pin-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-color-secondary);
-  cursor: pointer;
-  transition: all 0.15s ease;
-
-  &:hover {
-    background: rgba(var(--primary-rgb), 0.08);
-    color: var(--primary-color);
-  }
-
-  &--active {
-    color: var(--primary-color);
-    background: rgba(var(--primary-rgb), 0.15);
-  }
-
-  i { font-size: 0.9rem; }
-}
-
-// =============================================================================
-// OBJECTIVE BAR
-// =============================================================================
-
-.db-kpi-obj {
-  display: flex;
-  flex-direction: column;
-  gap: 0.3rem;
-  padding: 0.4rem 0;
-}
 
 .db-kpi-obj__bar-track {
-  height: 4px;
-  background: var(--surface-border);
-  border-radius: 2px;
+  height: 6px;
+  background: var(--surface-200);
+  border-radius: 3px;
   overflow: hidden;
 }
 
 .db-kpi-obj__bar-fill {
   height: 100%;
-  border-radius: 2px;
-  transition: width 0.3s ease;
-}
-
-.db-kpi-obj__label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-color);
-}
-
-.db-kpi-obj__sub {
-  font-size: 0.7rem;
-  font-weight: 500;
-  color: var(--text-color-secondary);
-  margin-left: 0.25rem;
+  border-radius: 3px;
+  transition: width 0.4s ease;
 }
 
 // =============================================================================
-// SKELETON LOADING
+// NO DATA
+// =============================================================================
+
+.db-no-data {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 1rem;
+  color: var(--text-color-secondary);
+  font-size: 0.8rem;
+  grid-column: 1 / -1;
+  i { opacity: 0.35; }
+}
+
+// =============================================================================
+// SKELETON
 // =============================================================================
 
 .db-kpi-sk {
-  padding: 1rem;
-  border-radius: 8px;
-  border: 1px solid var(--surface-border);
-  background: var(--surface-ground);
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.85rem;
+  border: 1.5px solid var(--surface-border);
+  background: var(--surface-card);
   animation: pulse 1.5s ease-in-out infinite;
 
   &__label {
-    height: 0.75rem;
-    width: 60%;
+    height: 0.6rem;
+    width: 40%;
     background: var(--surface-300);
     border-radius: 3px;
     margin-bottom: 0.6rem;
   }
 
   &__value {
-    height: 1.8rem;
-    width: 70%;
+    height: 1.6rem;
+    width: 55%;
     background: var(--surface-300);
     border-radius: 4px;
-    margin-bottom: 0.4rem;
-  }
-
-  &__prev {
-    height: 0.65rem;
-    width: 50%;
-    background: var(--surface-300);
-    border-radius: 3px;
-    margin-bottom: 0.4rem;
+    margin-bottom: 0.5rem;
   }
 
   &__bar {
-    height: 4px;
+    height: 6px;
     width: 100%;
-    background: var(--surface-300);
-    border-radius: 2px;
-    margin-bottom: 0.4rem;
-  }
-
-  &__weeks {
-    display: flex;
-    gap: 0.4rem;
-    margin-bottom: 0.4rem;
-  }
-
-  &__week {
-    height: 2.5rem;
-    flex: 1;
     background: var(--surface-300);
     border-radius: 3px;
   }
-
-  &__spark {
-    height: 28px;
-    background: var(--surface-300);
-    border-radius: 4px;
-  }
 }
-
-

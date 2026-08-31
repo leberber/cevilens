@@ -26,14 +26,15 @@ export class DashboardFdvRankingService {
     for (const f of data.familles ?? []) {
       for (const sf of f.sous_familles) {
         for (const p of sf.produits) {
-          if (!p.objectif_packs_tournee) continue;
+          const obj = p.objectif_tonne ?? p.objectif_packs_tournee;
+          if (!obj) continue;
           const sold = p.top_fdv.find(x => x.code === code)?.total ?? 0;
-          const pct = calculatePercentageCapped(sold, p.objectif_packs_tournee, 100);
+          const pct = calculatePercentageCapped(sold, obj, 100);
           result.push({
             nom: p.nom,
             sf: sf.nom,
             sold,
-            obj: p.objectif_packs_tournee,
+            obj,
             pct,
           });
         }
@@ -71,9 +72,8 @@ export class DashboardFdvRankingService {
    * 90%+ = green, 70%+ = amber, 50%+ = orange, <50% = red
    */
   pvObjClass(pct: number): string {
-    if (pct >= 90) return 'pv-obj--green';
-    if (pct >= 70) return 'pv-obj--amber';
-    if (pct >= 50) return 'pv-obj--orange';
+    if (pct >= 95) return 'pv-obj--green';
+    if (pct >= 60) return 'pv-obj--orange';
     return 'pv-obj--red';
   }
 

@@ -1,11 +1,13 @@
-import { Component, OnInit, OnDestroy, inject, HostListener, ChangeDetectionStrategy, effect, untracked } from '@angular/core';
+import { Component, OnInit, OnDestroy, inject, ChangeDetectionStrategy, effect, untracked } from '@angular/core';
+import { NgClass } from '@angular/common';
 import { DashboardHeaderComponent } from './header/dashboard-header.component';
 import { DashboardOverviewComponent } from './overview/dashboard-overview.component';
 import { DashboardProductTreeComponent } from './product-tree/dashboard-product-tree.component';
 import { DashboardFdvPerformanceComponent } from './fdv-performance/dashboard-fdv-performance.component';
-import { DashboardPinnedSummaryComponent } from './pinned-summary/dashboard-pinned-summary.component';
 import { DashboardStateService } from './services/dashboard-state.service';
 import { DashboardAnimationService } from './services/dashboard-animation.service';
+import { DashboardFormatterService } from './services/dashboard-formatter.service';
+import { DashboardCalculationService } from './services/dashboard-calculation.service';
 import { DashboardFdvRankingService } from './services/dashboard-fdv-ranking.service';
 import { PrevendeurService, DrilldownData, DrilldownFamille } from '../../core/services/prevendeur.service';
 import { RoleService } from '../../core/services/role.service';
@@ -16,11 +18,11 @@ import { DistributorContextService } from '../../core/services/distributor-conte
   selector: 'app-dashboard',
   standalone: true,
   imports: [
+    NgClass,
     DashboardHeaderComponent,
     DashboardOverviewComponent,
     DashboardProductTreeComponent,
     DashboardFdvPerformanceComponent,
-    DashboardPinnedSummaryComponent,
   ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
@@ -32,29 +34,34 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly animationSvc  = inject(DashboardAnimationService);
   private readonly fdvRankingSvc = inject(DashboardFdvRankingService);
   private readonly distContext   = inject(DistributorContextService);
+  readonly formatter = inject(DashboardFormatterService);
+  readonly calc = inject(DashboardCalculationService);
 
   readonly state = inject(DashboardStateService);
 
   private animCancelFn: (() => void) | null = null;
 
+  private initialLoaded = false;
+
   constructor() {
     effect(() => {
       this.distContext.selectedDistributorId();
-      if (untracked(() => !!this.state.data())) this.load();
+      untracked(() => {
+        if (this.initialLoaded) {
+          this.load();
+        } else {
+          this.loadInitial();
+        }
+      });
     });
   }
 
   ngOnInit() {
-    this.loadInitial();
+    if (!this.initialLoaded) this.loadInitial();
   }
 
   ngOnDestroy() {
     if (this.animCancelFn) this.animCancelFn();
-  }
-
-  @HostListener('document:click')
-  onDocumentClick() {
-    this.state.showDistMenu.set(false);
   }
 
   private loadInitial() {
@@ -69,6 +76,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
     this.prevendeurSvc.getDrilldown(guess, null, 'VD', null).subscribe({
       next: d => {
+        this.initialLoaded = true;
         if (d.periodes.length && !d.periodes.includes(guess)) {
           this.state.selectedPeriode.set(d.periodes[0]);
           this.load();
@@ -108,10 +116,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
       .sort((a, b) => a.nom.localeCompare(b.nom))
       .map(f => ({ ...f, sous_familles: [...f.sous_familles].sort((a, b) => a.nom.localeCompare(b.nom)) })));
 
-    // Global totals (fixed at load, not reactive to FDV selection)
-    this.state.globalTotal.set(d.prevendeurs.reduce((s, p) => s + p.total, 0));
-    this.state.globalObjectif.set(d.global_objectif_packs ?? d.familles.reduce((s, f) => s + (f.objectif_packs ?? 0), 0));
-    this.state.globalObjectifTonne.set(d.global_objectif_tonne ?? d.familles.reduce((s, f) => s + (f.objectif_tonne ?? 0), 0));
+    // Global totals (already in tonnes from backend)
+    // Derive objectives from family totals so they match the scope of actual sales data
+    this.state.globalTotal.set(d.familles.reduce((s, f) => s + f.total, 0));
+    this.state.globalObjectif.set(d.familles.reduce((s, f) => s + (f.objectif_packs ?? 0), 0));
+    this.state.globalObjectifTonne.set(d.familles.reduce((s, f) => s + (f.objectif_tonne ?? 0), 0));
     this.state.globalCa.set(d.global_ca ?? 0);
 
     // Initialize overview collapse on FDV selection
@@ -131,7 +140,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.state.selectedPeriode(),
       this.state.selectedFdv(),
       this.state.selectedCanal(),
-      this.state.selectedDistributeur()
+      null
     ).subscribe({
       next: d => {
         this.applyData(d);
@@ -171,31 +180,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.load(true);
   }
 
-  onDisplayModeChange(mode: 'packs' | 'tonnes') {
-    this.state.displayMode.set(mode);
-  }
-
   onFdvSelect(code: string | null) {
     this.state.selectedFdv.set(this.state.selectedFdv() === code ? null : code);
     this.state.compactCards.set(false);
     this.load(true);
-  }
-
-  onDistributeurSelect(d: string) {
-    if (this.state.selectedDistributeur() === d) return;
-    this.state.selectedDistributeur.set(d);
-    this.state.selectedFdv.set(null);
-    this.load(true);
-  }
-
-  onDistributeurClear() {
-    this.state.selectedDistributeur.set(null);
-    this.state.selectedFdv.set(null);
-    this.load(true);
-  }
-
-  onDistMenuToggle() {
-    this.state.showDistMenu.set(!this.state.showDistMenu());
   }
 
   onDrillToRoot() {
@@ -209,10 +197,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.state.selectedProduct.set(null);
     this.state.resetCollapse();
     if (this.state.selectedFamille()) this.state.barsReady.set(true);
-  }
-
-  onPinToggle({ nom }: { nom: string; event: MouseEvent }) {
-    this.state.togglePin(nom);
   }
 
   // Wire tree outputs
@@ -233,31 +217,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.onFdvSelect(code);
   }
 
-  // Wire pinned outputs
-  onPinToggleFromPinned({ nom }: { nom: string; event: MouseEvent }) {
-    this.state.togglePin(nom);
+  // Sidebar pill helpers
+  fdvRank(code: string): number {
+    return this.fdvRankingSvc.fdvRank(code, this.state.fdvPerfSorted());
   }
 
-  onPinnedClear() {
-    this.state.clearPinned();
+  pvSimplePct(pv: { total: number }): number {
+    const obj = this.state.data()?.objectif_tonne_per_route ?? this.state.data()?.objectif_packs_per_route ?? 0;
+    if (!obj) return 0;
+    return Math.round((pv.total / obj) * 100);
   }
 
-  onPillTooltipToggle({ event, code }: { event: MouseEvent; code: string }) {
-    event.stopPropagation();
-    if (this.state.hoveredFdv() === code) {
-      this.state.setHoveredFdv(null);
-      return;
-    }
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const maxH = window.innerHeight * 0.72;
-    const top = rect.bottom + 8 + maxH > window.innerHeight
-      ? Math.max(rect.top - maxH - 8, 8)
-      : rect.bottom + 8;
-
-    const rates = this.fdvRankingSvc.buildFdvRates(code, this.state.data());
-    this.state.setHoveredFdv(code, rates);
-    this.state.setTooltipTop(top);
+  pvObjClass(pv: { total: number }): string {
+    return this.calc.pvObjClass(this.pvSimplePct(pv));
   }
-
-
 }

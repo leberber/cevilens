@@ -1,42 +1,140 @@
 <div class="db-root">
 
-  <!-- Header: breadcrumb, period nav, canal/mode toggles, FDV pills -->
+  <!-- Header: breadcrumb, period nav, canal/mode toggles -->
   <app-dashboard-header
     (prevPeriod)="onPrevPeriod()"
     (nextPeriod)="onNextPeriod()"
     (canalChange)="onCanalChange($event)"
-    (displayModeChange)="onDisplayModeChange($event)"
-    (fdvSelect)="onFdvSelect($event)"
-    (distributeurSelect)="onDistributeurSelect($event)"
-    (distributeurClear)="onDistributeurClear()"
-    (distMenuToggle)="onDistMenuToggle()"
-    (drillToRoot)="onDrillToRoot()"
-    (pillTooltipToggle)="onPillTooltipToggle($event)">
+    (drillToRoot)="onDrillToRoot()">
   </app-dashboard-header>
 
-  <!-- KPI grid: animated famille cards with sparklines -->
-  <app-dashboard-overview
-    (familleSelect)="onFamilleSelect($event)"
-    (pinToggle)="onPinToggle($event)">
-  </app-dashboard-overview>
+  <!-- Body: sidebar + main content -->
+  <div class="db-body">
 
-  <!-- Pinned families comparison bar -->
-  <app-dashboard-pinned-summary
-    (pinToggle)="onPinToggleFromPinned($event)"
-    (pinnedClear)="onPinnedClear()">
-  </app-dashboard-pinned-summary>
+    <!-- Left sidebar: prevendeur cards -->
+    @if (state.data()?.prevendeurs?.length) {
+      <aside class="db-sidebar">
+        <div class="db-sidebar__header">
+          <i class="pi pi-users"></i>
+          <span class="db-sidebar__title">Prévendeurs</span>
+        </div>
 
-  <!-- Bottom: product tree (left) + FDV performance (right) -->
-  <div class="db-middle" [class.db-middle--loading]="state.loading()">
-    <app-dashboard-product-tree
-      (sfCollapseToggle)="onSfCollapseToggle($event)"
-      (overviewFamilleToggle)="onOverviewFamilleToggle($event)"
-      (productSelect)="onProductSelect($event)">
-    </app-dashboard-product-tree>
+        <!-- "Tous" summary card -->
+        <button class="db-sidebar__card db-sidebar__card--tous" [class.db-sidebar__card--active]="!state.selectedFdv()" (click)="onFdvSelect(null)">
+          <div class="db-sidebar__card-avatar db-sidebar__card-avatar--tous">
+            <i class="pi pi-users"></i>
+          </div>
+          <div class="db-sidebar__card-info">
+            <span class="db-sidebar__card-name">Tous</span>
+            <span class="db-sidebar__card-sub">Total réalisé</span>
+          </div>
+          <div class="db-sidebar__card-right">
+            <span class="db-sidebar__card-total">{{ state.totalDisplay() }} <small>t</small></span>
+          </div>
+        </button>
 
-    <app-dashboard-fdv-performance
-      (fdvSelect)="onFdvSelectFromPerf($event)">
-    </app-dashboard-fdv-performance>
+        <!-- Individual prevendeur cards -->
+        @for (pv of state.data()!.prevendeurs; track pv.code) {
+          @let rank = fdvRank(pv.code);
+          @let pct = pvSimplePct(pv);
+          <button class="db-sidebar__card" [class.db-sidebar__card--active]="state.selectedFdv() === pv.code"
+                  (click)="onFdvSelect(pv.code)">
+            <div class="db-sidebar__card-avatar"
+                 [class.db-sidebar__card-avatar--gold]="rank === 0"
+                 [class.db-sidebar__card-avatar--silver]="rank === 1"
+                 [class.db-sidebar__card-avatar--bronze]="rank === 2">
+              {{ formatter.routeCode(pv.code) }}
+            </div>
+            <div class="db-sidebar__card-body">
+              <div class="db-sidebar__card-row">
+                <span class="db-sidebar__card-name">{{ pv.nom }}</span>
+                <span class="db-sidebar__card-total">{{ formatter.formatNum(pv.total) }} <small>t</small></span>
+              </div>
+              @if (state.data()!.objectif_tonne_per_route || state.data()!.objectif_packs_per_route) {
+                <div class="db-sidebar__card-progress" [ngClass]="pvObjClass(pv)">
+                  <div class="db-sidebar__card-bar">
+                    <div class="db-sidebar__card-bar-fill" [style.width.%]="pct"></div>
+                  </div>
+                  <span class="db-sidebar__card-pct">{{ pct }}%</span>
+                </div>
+              }
+            </div>
+            @if (rank >= 0 && rank < 3) {
+              <div class="db-sidebar__card-medal"
+                   [class.db-sidebar__card-medal--gold]="rank === 0"
+                   [class.db-sidebar__card-medal--silver]="rank === 1"
+                   [class.db-sidebar__card-medal--bronze]="rank === 2">
+                <span class="db-sidebar__card-medal-num">{{ rank + 1 }}</span>
+              </div>
+            }
+          </button>
+        }
+      </aside>
+    }
+
+    <!-- Main content -->
+    <div class="db-main">
+      <!-- KPI strip -->
+      @if (state.data() && !state.loading()) {
+        <div class="db-kpi-strip">
+          <div class="stat-card">
+            <div class="stat-card__icon stat-card__icon--primary">
+              <i class="pi pi-box"></i>
+            </div>
+            <div class="stat-card__body">
+              <div class="stat-card__value">{{ state.totalDisplay() }}</div>
+              <div class="stat-card__label">Total Ventes (t)</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__icon stat-card__icon--success">
+              <i class="pi pi-bullseye"></i>
+            </div>
+            <div class="stat-card__body">
+              <div class="stat-card__value" [style.color]="state.totalObjColor()">{{ state.totalObjPct() }}%</div>
+              <div class="stat-card__label">Objectif ({{ state.totalObjDisplay() }} t)</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__icon stat-card__icon--warning">
+              <i class="pi pi-wallet"></i>
+            </div>
+            <div class="stat-card__body">
+              <div class="stat-card__value">{{ formatter.formatCa(state.globalCa()) }}</div>
+              <div class="stat-card__label">Chiffre d'Affaires</div>
+            </div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-card__icon stat-card__icon--info">
+              <i class="pi pi-users"></i>
+            </div>
+            <div class="stat-card__body">
+              <div class="stat-card__value">{{ state.data()!.prevendeurs.length }}</div>
+              <div class="stat-card__label">Prévendeurs</div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Famille cards -->
+      <app-dashboard-overview
+        (familleSelect)="onFamilleSelect($event)">
+      </app-dashboard-overview>
+
+      <!-- Bottom: product tree (left) + FDV performance (right) -->
+      <div class="db-middle" [class.db-middle--loading]="state.loading()">
+        <app-dashboard-product-tree
+          (sfCollapseToggle)="onSfCollapseToggle($event)"
+          (overviewFamilleToggle)="onOverviewFamilleToggle($event)"
+          (productSelect)="onProductSelect($event)">
+        </app-dashboard-product-tree>
+
+        <app-dashboard-fdv-performance
+          (fdvSelect)="onFdvSelectFromPerf($event)">
+        </app-dashboard-fdv-performance>
+      </div>
+    </div>
+
   </div>
 
 </div>

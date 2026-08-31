@@ -19,6 +19,7 @@ from app.database import get_session
 from app.models.user import User, UserRole
 from app.models.vente import Vente
 from app.models.objectif import Objectif
+from app.models.produit import Produit
 
 router = APIRouter()
 
@@ -349,6 +350,7 @@ def prevendeur_admin_drilldown(
     code_fdv: Optional[str] = Query(None),
     canal: Optional[str] = Query(None),   # "VD" or "VH"
     nom_distributeur: Optional[str] = Query(None),
+    unite: str = Query("tonnes"),
     current_user: User = Depends(get_current_user),
     current_distributor = Depends(get_current_distributor),
     session: Session = Depends(get_session),
@@ -366,9 +368,25 @@ def prevendeur_admin_drilldown(
     prevendeurs_db = session.exec(q_pv.order_by(User.full_name)).all()
     fdv_name_map = {p.employe_code: p.full_name for p in prevendeurs_db if p.employe_code}
 
-    _norm = Vente.qte_facturee
+    # Quantity expression: tonnes (via produit weight) or raw packs
+    if unite == "tonnes":
+        _norm = sa_case(
+            (Produit.poids_unite_vente.isnot(None),
+             Vente.qte_facturee * Produit.poids_unite_vente / 1000),
+            else_=0,
+        )
+        _rq = lambda v: round(v, 2)
+    else:
+        _norm = Vente.qte_facturee
+        _rq = round
 
-    fdv_totals_q = (
+    def _produit_join(q):
+        """Add LEFT JOIN with produits when converting to tonnes."""
+        if unite == "tonnes":
+            return q.join(Produit, Vente.code_produit == Produit.code_produit, isouter=True)
+        return q
+
+    fdv_totals_q = _produit_join(
         select(Vente.code_fdv, func.sum(_norm))
         .where(Vente.annee_mois == annee_mois)
         .where(Vente.statut_commande == 'Facturé')
@@ -381,7 +399,7 @@ def prevendeur_admin_drilldown(
         fdv_totals_q = fdv_totals_q.where(Vente.canal == canal)
     if nom_distributeur:
         fdv_totals_q = fdv_totals_q.where(Vente.nom_distributeur == nom_distributeur)
-    fdv_totals = {row[0]: round(row[1] or 0) for row in session.exec(fdv_totals_q).all()}
+    fdv_totals = {row[0]: _rq(row[1] or 0) for row in session.exec(fdv_totals_q).all()}
 
     canal_upper = canal.upper() if canal else None
 
@@ -394,7 +412,7 @@ def prevendeur_admin_drilldown(
     trend_periods = list(reversed(all_periods_list[cur_idx: cur_idx + 6]))  # chronological
 
     def fetch_rows(periode: str) -> list:
-        q = select(
+        q = _produit_join(select(
             Vente.date_commande,
             Vente.famille,
             Vente.sous_famille,
@@ -404,7 +422,7 @@ def prevendeur_admin_drilldown(
             Vente.code_fdv,
             Vente.nom_fdv,
             Vente.source,
-        ).where(
+        )).where(
             Vente.annee_mois == periode, Vente.statut_commande == 'Facturé'
         )
         if current_distributor:
@@ -422,7 +440,7 @@ def prevendeur_admin_drilldown(
 
     period_totals: dict = defaultdict(float)
     if trend_periods:
-        q6 = (
+        q6 = _produit_join(
             select(Vente.annee_mois, func.sum(_norm))
             .where(Vente.annee_mois.in_(trend_periods))
             .where(Vente.statut_commande == 'Facturé')
@@ -439,7 +457,7 @@ def prevendeur_admin_drilldown(
         for periode, total in session.exec(q6).all():
             period_totals[periode] = total or 0
 
-    trend_6m = [round(period_totals.get(p, 0)) for p in trend_periods]
+    trend_6m = [_rq(period_totals.get(p, 0)) for p in trend_periods]
     trend_6m_labels = trend_periods
 
     # Product label resolution — Produit model removed, use description_produit from Vente
@@ -534,7 +552,7 @@ def prevendeur_admin_drilldown(
     objectif_per_route = round(sum(v for v in obj_by_prod.values() if v))
 
     # Per-fdv per-product sales — queried without code_fdv filter so all pills stay accurate
-    _fdv_prod_q = (
+    _fdv_prod_q = _produit_join(
         select(Vente.code_fdv, Vente.code_produit, func.sum(_norm))
         .where(Vente.annee_mois == annee_mois, Vente.statut_commande == 'Facturé', Vente.code_fdv.isnot(None), Vente.code_produit.isnot(None))
     )
@@ -618,7 +636,7 @@ def prevendeur_admin_drilldown(
                 for i in range(4):
                     sf_weeks[i] += wks[i]
                 prod_top_fdv = sorted(
-                    [{"code": c, "nom": fdv_name_map.get(c, c), "total": round(t)}
+                    [{"code": c, "nom": fdv_name_map.get(c, c), "total": _rq(t)}
                      for c, t in fdv_by_sf_prod[famille][sf][prod].items()],
                     key=lambda x: -x["total"]
                 )
@@ -628,8 +646,8 @@ def prevendeur_admin_drilldown(
                 prod_tonne = obj_tonne_by_prod.get(prod_code) if prod_code else None
                 prods_out.append({
                     "nom": prod,
-                    "total": round(sum(wks)),
-                    "weeks": [round(v) for v in wks],
+                    "total": _rq(sum(wks)),
+                    "weeks": [_rq(v) for v in wks],
                     "top_fdv": prod_top_fdv,
                     "objectif_packs": round(prod_obj) if prod_obj else None,
                     "objectif_packs_tournee": round(prod_obj_t) if prod_obj_t else None,
@@ -653,19 +671,19 @@ def prevendeur_admin_drilldown(
             sf_tonne = round(sum(sf_tonne_vals), 3) if sf_tonne_vals else None
             sfs_out.append({
                 "nom": sf,
-                "total": round(sum(sf_weeks)),
-                "weeks": [round(v) for v in sf_weeks],
+                "total": _rq(sum(sf_weeks)),
+                "weeks": [_rq(v) for v in sf_weeks],
                 "produits": sorted(prods_out, key=lambda x: -x["total"]),
                 "objectif_packs": sf_obj,
                 "objectif_tonne": sf_tonne,
             })
 
-        f_total = round(sum(f_weeks))
-        prev_total = round(prev_famille_total.get(famille, 0))
+        f_total = _rq(sum(f_weeks))
+        prev_total = _rq(prev_famille_total.get(famille, 0))
         delta_pct = round((f_total - prev_total) / prev_total * 100) if prev_total > 0 else None
 
         top_fdv = sorted(
-            [{"code": c, "nom": fdv_name_map.get(c, c), "total": round(t)} for c, t in fdv_by_famille[famille].items()],
+            [{"code": c, "nom": fdv_name_map.get(c, c), "total": _rq(t)} for c, t in fdv_by_famille[famille].items()],
             key=lambda x: -x["total"]
         )
 
@@ -680,7 +698,7 @@ def prevendeur_admin_drilldown(
             "total": f_total,
             "total_prev": prev_total,
             "delta_pct": delta_pct,
-            "weeks": [round(v) for v in f_weeks],
+            "weeks": [_rq(v) for v in f_weeks],
             "sous_familles": sorted(sfs_out, key=lambda x: -x["total"]),
             "top_fdv": top_fdv,
             "objectif_packs": f_obj,
@@ -700,6 +718,12 @@ def prevendeur_admin_drilldown(
         global_obj_tonne = sum((r.objectif_tonne_vd or 0) + (r.objectif_tonne_vh or 0) for r in obj_prod_rows)
         global_obj_packs = sum((r.objectif_packs_vd or 0) + (r.objectif_packs_vh or 0) for r in obj_prod_rows)
 
+    # Per-route objective in tonnes (derived from packs ratio)
+    if objectif_per_route and global_obj_packs and global_obj_tonne:
+        obj_tonne_per_route = round(objectif_per_route * global_obj_tonne / global_obj_packs, 3)
+    else:
+        obj_tonne_per_route = None
+
     return {
         "periode": annee_mois,
         "periodes": list(all_periods),
@@ -708,6 +732,7 @@ def prevendeur_admin_drilldown(
         "trend_6m_labels": trend_6m_labels,
         "familles": sorted(familles_out, key=lambda x: -x["total"]),
         "objectif_packs_per_route": objectif_per_route or None,
+        "objectif_tonne_per_route": obj_tonne_per_route,
         "global_objectif_tonne": round(global_obj_tonne, 3) if global_obj_tonne else None,
         "global_objectif_packs": round(global_obj_packs) if global_obj_packs else None,
         "global_ca": round(sum(ca_by_famille.values())) if ca_by_famille else None,

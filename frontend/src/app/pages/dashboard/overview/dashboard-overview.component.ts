@@ -19,9 +19,7 @@ export class DashboardOverviewComponent {
 
   // Outputs
   familleSelect = output<DrilldownFamille>();
-  pinToggle = output<{ nom: string; event: MouseEvent }>();
 
-  readonly WEEK_LABELS = ['S1', 'S2', 'S3', 'S4'];
   readonly Math = Math;
   readonly skeletonRows = Array(5).fill(0);
 
@@ -30,19 +28,9 @@ export class DashboardOverviewComponent {
   get data() { return this.state.data(); }
   get selectedFamille() { return this.state.selectedFamille(); }
   get displayValues() { return this.state.displayValues(); }
-  get compactCards() { return this.state.compactCards(); }
-  get displayMode() { return this.state.displayMode(); }
-  get unitLabel() { return this.state.unitLabel(); }
-  get barsReady() { return this.state.barsReady(); }
-  get pinnedFamilies() { return this.state.pinnedFamilies(); }
 
   onSelectFamille(f: DrilldownFamille) {
     this.familleSelect.emit(f);
-  }
-
-  onPin(nom: string, event: MouseEvent) {
-    event.stopPropagation();
-    this.pinToggle.emit({ nom, event });
   }
 
   // Formatters
@@ -63,16 +51,12 @@ export class DashboardOverviewComponent {
   }
 
   // Calculations
-  displayVal(total: number, objPacks?: number | null, objTonne?: number | null): string {
-    return this.calc.displayVal(total, objPacks, objTonne, this.displayMode);
-  }
-
-  displayObjVal(objPacks?: number | null, objTonne?: number | null): string {
-    return this.calc.displayObjVal(objPacks, objTonne, this.displayMode);
+  displayVal(total: number): string {
+    return this.calc.displayVal(total);
   }
 
   objPct(f: DrilldownFamille): number {
-    return this.calc.displayObjPct(f.total, f.objectif_packs, f.objectif_tonne, this.displayMode);
+    return this.calc.displayObjPct(f.total, f.objectif_tonne, f.objectif_packs);
   }
 
   familyColor(nom: string): string {
@@ -83,11 +67,4 @@ export class DashboardOverviewComponent {
     return getFamilyBg(nom);
   }
 
-  areaPath(weeks: number[], w: number, h: number): string {
-    return this.calc.areaPath(weeks, w, h);
-  }
-
-  linePath(weeks: number[], w: number, h: number): string {
-    return this.calc.linePath(weeks, w, h);
-  }
 }

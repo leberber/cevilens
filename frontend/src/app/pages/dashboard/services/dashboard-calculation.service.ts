@@ -1,64 +1,43 @@
 import { Injectable, inject } from '@angular/core';
-import { calculatePercentage, calculatePercentageCapped } from '../../../core/utils/math.util';
+import { calculatePercentage } from '../../../core/utils/math.util';
 import { DashboardFormatterService } from './dashboard-formatter.service';
 
 /**
- * Pure calculation functions for the Dashboard component.
- * All calculations are stateless — displayMode is passed as parameter, not stored.
+ * Pure calculation functions for the Dashboard.
+ * Backend returns data in tonnes by default; this service just formats and computes percentages.
  */
 @Injectable({ providedIn: 'root' })
 export class DashboardCalculationService {
   private formatter = inject(DashboardFormatterService);
 
   /**
-   * Convert packs to tonnes using objectif ratio as conversion factor
-   * (total / objPacks) * objTonne
+   * Format a total value (already in tonnes from backend).
    */
-  inTonnes(total: number, objPacks: number | null | undefined, objTonne: number | null | undefined): number | null {
-    if (!objPacks || !objTonne) return null;
-    return (total / objPacks) * objTonne;
-  }
-
-  /**
-   * Format a value in the current display mode (packs or tonnes)
-   * Returns compact string representation
-   */
-  displayVal(total: number, objPacks: number | null | undefined, objTonne: number | null | undefined, displayMode: 'packs' | 'tonnes'): string {
-    if (displayMode === 'tonnes') {
-      const t = this.inTonnes(total, objPacks, objTonne);
-      return t != null ? t.toFixed(2) : '—';
-    }
+  displayVal(total: number): string {
     return this.formatter.formatNum(total);
   }
 
   /**
-   * Format an objective value in the current display mode
+   * Format an objective value. Prefers tonnes, falls back to packs.
    */
-  displayObjVal(objPacks: number | null | undefined, objTonne: number | null | undefined, displayMode: 'packs' | 'tonnes'): string {
-    if (displayMode === 'tonnes') return objTonne != null ? objTonne.toFixed(2) : '—';
+  displayObjVal(objTonne: number | null | undefined, objPacks?: number | null | undefined): string {
+    if (objTonne != null) return this.formatter.formatNum(objTonne);
     return objPacks != null ? this.formatter.formatNum(objPacks) : '—';
   }
 
   /**
-   * Calculate achievement percentage in the current display mode
+   * Calculate achievement percentage. Total is already in tonnes, compare against tonne objective.
    */
-  displayObjPct(total: number, objPacks: number | null | undefined, objTonne: number | null | undefined, displayMode: 'packs' | 'tonnes'): number {
-    if (displayMode === 'tonnes') {
-      const t = this.inTonnes(total, objPacks, objTonne);
-      return calculatePercentage(t ?? 0, objTonne);
-    }
+  displayObjPct(total: number, objTonne: number | null | undefined, objPacks?: number | null | undefined): number {
+    if (objTonne) return calculatePercentage(total, objTonne);
     return calculatePercentage(total, objPacks);
   }
 
   /**
    * Color for product objective achievement percentage
-   * 90%+ = success (green)
-   * 70-89% = warning (amber)
-   * 50-69% = alert (orange)
-   * <50% = error (red)
    */
-  prodObjColor(p: { total: number; objectif_packs: number | null }): string {
-    const pct = calculatePercentage(p.total, p.objectif_packs);
+  prodObjColor(p: { total: number; objectif_tonne: number | null }): string {
+    const pct = calculatePercentage(p.total, p.objectif_tonne);
     if (pct >= 90) return 'var(--color-success)';
     if (pct >= 70) return 'var(--color-warning)';
     if (pct >= 50) return '#f97316';
@@ -136,9 +115,8 @@ export class DashboardCalculationService {
    * CSS class for objective achievement tier
    */
   pvObjClass(pct: number): string {
-    if (pct >= 90) return 'pv-obj--green';
-    if (pct >= 70) return 'pv-obj--amber';
-    if (pct >= 50) return 'pv-obj--orange';
+    if (pct >= 95) return 'pv-obj--green';
+    if (pct >= 60) return 'pv-obj--orange';
     return 'pv-obj--red';
   }
 }

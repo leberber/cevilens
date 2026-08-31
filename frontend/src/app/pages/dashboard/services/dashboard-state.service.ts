@@ -2,7 +2,6 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 import type { DrilldownData, DrilldownFamille, DrilldownProduit, FdvItem } from '../../../core/services/prevendeur.service';
 import { calculatePercentage } from '../../../core/utils/math.util';
 import { DashboardFormatterService } from './dashboard-formatter.service';
-import { DashboardCalculationService } from './dashboard-calculation.service';
 
 /**
  * Centralized state management for Dashboard using Angular signals.
@@ -12,7 +11,6 @@ import { DashboardCalculationService } from './dashboard-calculation.service';
 @Injectable({ providedIn: 'root' })
 export class DashboardStateService {
   private formatter = inject(DashboardFormatterService);
-  private calc = inject(DashboardCalculationService);
 
   // ==========================================================================
   // WRITABLE SIGNALS (set by container component)
@@ -23,8 +21,6 @@ export class DashboardStateService {
   selectedProduct = signal<DrilldownProduit | null>(null);
   selectedFdv = signal<string | null>(null);
   selectedCanal = signal<'VD' | 'VH'>('VD');
-  displayMode = signal<'packs' | 'tonnes'>('tonnes');
-  selectedDistributeur = signal<string | null>(null);
   data = signal<DrilldownData | null>(null);
   loading = signal<boolean>(true);
   overviewFamilles = signal<DrilldownFamille[]>([]);
@@ -32,15 +28,10 @@ export class DashboardStateService {
   displayValues = signal<Record<string, number>>({});
   barsReady = signal<boolean>(false);
   compactCards = signal<boolean>(false);
-  pinnedFamilies = signal<Set<string>>(new Set());
 
   // UI state
-  showDistMenu = signal<boolean>(false);
   collapsedSfs = signal<Set<string>>(new Set());
   collapsedOverviewFamilles = signal<Set<string>>(new Set());
-  hoveredFdv = signal<string | null>(null);
-  hoveredFdvRates = signal<{ nom: string; sf: string; sold: number; obj: number; pct: number }[]>([]);
-  tooltipTop = signal<number>(0);
 
   // Cached global totals (fixed at load time)
   globalTotal = signal<number>(0);
@@ -52,8 +43,6 @@ export class DashboardStateService {
   // ==========================================================================
   // COMPUTED SIGNALS (derived automatically)
   // ==========================================================================
-
-  unitLabel = computed(() => this.displayMode() === 'tonnes' ? 't' : 'caisses');
 
   canGoPrev = computed(() => {
     const d = this.data();
@@ -73,10 +62,11 @@ export class DashboardStateService {
     return d?.prevendeurs.find(p => p.code === code)?.nom ?? code ?? '';
   });
 
-  // Objective percentages in current display mode
+  // Objective percentage (total is already in tonnes from backend)
   totalObjPct = computed(() => {
-    const objPacks = this.globalObjectif();
-    return calculatePercentage(this.globalTotal(), objPacks);
+    const objTonne = this.globalObjectifTonne();
+    if (objTonne) return calculatePercentage(this.globalTotal(), objTonne);
+    return calculatePercentage(this.globalTotal(), this.globalObjectif());
   });
 
   // FDV performance context
@@ -104,73 +94,27 @@ export class DashboardStateService {
     return this.fdvPerfItems().reduce((s, x) => s + x.total, 0);
   });
 
-  // Pinned families calculations
-  hasPinned = computed(() => this.pinnedFamilies().size > 0);
-
-  pinnedFamiliesArray = computed(() => [...this.pinnedFamilies()]);
-
-  pinnedData = computed(() => {
-    const d = this.data();
-    const pinned = this.pinnedFamilies();
-    return d?.familles.filter(f => pinned.has(f.nom)) ?? [];
-  });
-
-  pinnedTotal = computed(() => {
-    return this.pinnedData().reduce((s, f) => s + f.total, 0);
-  });
-
-  pinnedCa = computed(() => {
-    return this.pinnedData().reduce((s, f) => s + (f.ca ?? 0), 0);
-  });
-
-  pinnedObjPacks = computed(() => {
-    return this.pinnedData().reduce((s, f) => s + (f.objectif_packs ?? 0), 0);
-  });
-
-  pinnedObjTonne = computed(() => {
-    return this.pinnedData().reduce((s, f) => s + (f.objectif_tonne ?? 0), 0);
-  });
-
-  pinnedHasObjectif = computed(() => this.pinnedObjPacks() > 0);
-
-  pinnedObjPct = computed(() => {
-    return calculatePercentage(this.pinnedTotal(), this.pinnedObjPacks());
-  });
-
-  // Global totals display (for header global achievement badge)
+  // Global totals display (data is already in tonnes from backend)
   totalDisplay = computed(() => {
     return this.formatter.formatNum(this.globalTotal());
   });
 
   totalObjDisplay = computed(() => {
-    return this.formatter.formatNum(this.globalObjectif());
+    const objTonne = this.globalObjectifTonne();
+    const val = objTonne || this.globalObjectif();
+    return val ? val.toLocaleString('fr-FR', { maximumFractionDigits: 2 }) : '0';
   });
 
-  totalObjClass = computed(() => {
+  totalObjColor = computed(() => {
     const pct = this.totalObjPct();
-    if (pct >= 90) return 'pv-obj--green';
-    if (pct >= 70) return 'pv-obj--amber';
-    if (pct >= 50) return 'pv-obj--orange';
-    return 'pv-obj--red';
+    if (pct >= 95) return '#16a34a';
+    if (pct >= 60) return '#f97316';
+    return '#dc2626';
   });
 
   // ==========================================================================
   // METHODS (for container component to call)
   // ==========================================================================
-
-  togglePin(nom: string): void {
-    const pinned = new Set(this.pinnedFamilies());
-    if (pinned.has(nom)) {
-      pinned.delete(nom);
-    } else {
-      pinned.add(nom);
-    }
-    this.pinnedFamilies.set(pinned);
-  }
-
-  clearPinned(): void {
-    this.pinnedFamilies.set(new Set());
-  }
 
   toggleOverviewFamille(nom: string): void {
     const collapsed = new Set(this.collapsedOverviewFamilles());
@@ -203,22 +147,4 @@ export class DashboardStateService {
     this.resetCollapse();
   }
 
-  setDistributorMenu(visible: boolean): void {
-    this.showDistMenu.set(visible);
-  }
-
-  setHoveredFdv(code: string | null, rates?: { nom: string; sf: string; sold: number; obj: number; pct: number }[]): void {
-    this.hoveredFdv.set(code);
-    if (rates) {
-      this.hoveredFdvRates.set(rates);
-    }
-  }
-
-  setTooltipTop(top: number): void {
-    this.tooltipTop.set(top);
-  }
-
-  closeTooltip(): void {
-    this.hoveredFdv.set(null);
-  }
 }

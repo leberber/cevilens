@@ -33,7 +33,6 @@ export class DashboardProductTreeComponent {
   get selectedFamille() { return this.state.selectedFamille(); }
   get selectedFdv() { return this.state.selectedFdv(); }
   get selectedProduct() { return this.state.selectedProduct(); }
-  get displayMode() { return this.state.displayMode(); }
   get collapsedSfs() { return this.state.collapsedSfs(); }
   get collapsedOverviewFamilles() { return this.state.collapsedOverviewFamilles(); }
   get overviewFamilles() { return this.state.overviewFamilles(); }
@@ -62,20 +61,20 @@ export class DashboardProductTreeComponent {
   }
 
   // Calculations
-  displayVal(total: number, objPacks?: number | null, objTonne?: number | null): string {
-    return this.calc.displayVal(total, objPacks, objTonne, this.displayMode);
+  displayVal(total: number): string {
+    return this.calc.displayVal(total);
   }
 
-  displayObjVal(objPacks?: number | null, objTonne?: number | null): string {
-    return this.calc.displayObjVal(objPacks, objTonne, this.displayMode);
+  displayObjVal(objTonne?: number | null, objPacks?: number | null): string {
+    return this.calc.displayObjVal(objTonne, objPacks);
   }
 
-  sfObjPct(sf: { total: number; objectif_packs: number | null }): number {
-    return calculatePercentage(sf.total, sf.objectif_packs);
+  sfObjPct(sf: { total: number; objectif_tonne: number | null; objectif_packs: number | null }): number {
+    return calculatePercentage(sf.total, sf.objectif_tonne ?? sf.objectif_packs);
   }
 
-  prodObjPct(p: { total: number; objectif_packs: number | null }): number {
-    return calculatePercentage(p.total, p.objectif_packs);
+  prodObjPct(p: { total: number; objectif_tonne: number | null; objectif_packs: number | null }): number {
+    return calculatePercentage(p.total, p.objectif_tonne ?? p.objectif_packs);
   }
 
   prodPct(p: DrilldownProduit, sf: DrilldownSousFamille): number {

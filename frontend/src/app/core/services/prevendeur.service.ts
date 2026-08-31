@@ -88,6 +88,7 @@ export interface DrilldownData {
   trend_6m_labels: string[];
   familles: DrilldownFamille[];
   objectif_packs_per_route: number | null;
+  objectif_tonne_per_route: number | null;
   global_objectif_tonne: number | null;
   global_objectif_packs: number | null;
   global_ca: number | null;
