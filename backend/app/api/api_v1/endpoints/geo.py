@@ -300,6 +300,7 @@ def get_commune_analytics(
     date_from: str = Query(...),
     date_to: str = Query(...),
     canal: Optional[str] = Query(None),
+    code_client: Optional[str] = Query(None),
     unite: str = Query("tonnes"),
     current_user: User = Depends(get_current_user),
     current_distributor=Depends(get_current_distributor),
@@ -330,17 +331,19 @@ def get_commune_analytics(
     if canal:
         common.append("v.canal = :canal")
         p["canal"] = canal
+    if code_client:
+        common.append("v.code_client = :code_client")
+        p["code_client"] = code_client
 
     curr_where = " AND ".join(common + ["v.date_commande BETWEEN :date_from AND :date_to"])
     prev_where = " AND ".join(common + ["v.annee_mois = :prev_ym"])
-    cli_where  = " AND ".join(common + ["v.code_client IS NOT NULL", "v.annee_mois = :ym"])
-
     curr_p = {**p, "date_from": date_from, "date_to": date_to}
     prev_p = {**p, "prev_ym": prev_ym}
 
     # 1. by famille
     fam_rows = session.execute(text(f"""
-        SELECT TRIM(v.famille) AS fam, SUM({_qty}) AS total
+        SELECT TRIM(v.famille) AS fam, SUM({_qty}) AS total,
+               SUM(v.qte_facturee) AS packs
         FROM ventes v {_pjoin}
         WHERE {curr_where} AND v.famille IS NOT NULL
         GROUP BY TRIM(v.famille)
@@ -350,7 +353,8 @@ def get_commune_analytics(
     # 2. by produit (top 20)
     prod_rows = session.execute(text(f"""
         SELECT v.code_produit, v.description_produit,
-               TRIM(v.famille) AS famille, SUM({_qty}) AS total
+               TRIM(v.famille) AS famille, SUM({_qty}) AS total,
+               SUM(v.qte_facturee) AS packs
         FROM ventes v {_pjoin}
         WHERE {curr_where} AND v.code_produit IS NOT NULL
         GROUP BY v.code_produit, v.description_produit, TRIM(v.famille)
@@ -391,53 +395,87 @@ def get_commune_analytics(
         WHERE {prev_where}
     """), prev_p).one()
 
-    # 7. clients servis (current month)
-    servis_rows = session.execute(text(f"""
-        SELECT v.code_client, MAX(v.nom_client), COALESCE(SUM(v.total_facture), 0)
-        FROM ventes v
-        WHERE {cli_where}
-        GROUP BY v.code_client
-        ORDER BY 3 DESC NULLS LAST
-        LIMIT 20
-    """), {**p, "ym": curr_ym}).all()
-
-    servis_codes = {r[0] for r in servis_rows}
-
-    # 8. clients manqués (prev month, not in current)
-    prev_cli_rows = session.execute(text(f"""
-        SELECT v.code_client, MAX(v.nom_client), COALESCE(SUM(v.total_facture), 0)
-        FROM ventes v
-        WHERE {cli_where}
-        GROUP BY v.code_client
-        ORDER BY 3 DESC NULLS LAST
-        LIMIT 50
-    """), {**p, "ym": prev_ym}).all()
-
-    # 9. per-client famille breakdown (current period — for servis bars)
-    cli_fam_rows = session.execute(text(f"""
-        SELECT v.code_client, TRIM(v.famille) AS fam, SUM({_qty}) AS total
+    # 6b. prev period by famille (for variance)
+    prev_fam_rows = session.execute(text(f"""
+        SELECT TRIM(v.famille) AS fam, SUM({_qty}) AS total
         FROM ventes v {_pjoin}
-        WHERE {curr_where} AND v.code_client IS NOT NULL AND v.famille IS NOT NULL
-        GROUP BY v.code_client, TRIM(v.famille)
-        ORDER BY v.code_client, total DESC
-    """), curr_p).all()
-
-    cli_fam_map: dict = defaultdict(list)
-    for code, fam, total in cli_fam_rows:
-        cli_fam_map[code].append({"nom": fam, "total": round(float(total or 0), 3)})
-
-    # 10. per-client famille breakdown (prev period — for manqués bars)
-    prev_cli_fam_rows = session.execute(text(f"""
-        SELECT v.code_client, TRIM(v.famille) AS fam, SUM({_qty}) AS total
-        FROM ventes v {_pjoin}
-        WHERE {prev_where} AND v.code_client IS NOT NULL AND v.famille IS NOT NULL
-        GROUP BY v.code_client, TRIM(v.famille)
-        ORDER BY v.code_client, total DESC
+        WHERE {prev_where} AND v.famille IS NOT NULL
+        GROUP BY TRIM(v.famille)
+        ORDER BY total DESC
     """), prev_p).all()
 
+    # 6c. prev period by produit (for variance)
+    prev_prod_rows = session.execute(text(f"""
+        SELECT v.code_produit, v.description_produit,
+               TRIM(v.famille) AS famille, SUM({_qty}) AS total
+        FROM ventes v {_pjoin}
+        WHERE {prev_where} AND v.code_produit IS NOT NULL
+        GROUP BY v.code_produit, v.description_produit, TRIM(v.famille)
+        ORDER BY total DESC
+        LIMIT 20
+    """), prev_p).all()
+
+    # 7+8. clients servis + manqués (both months in one query)
+    cli_both_where = " AND ".join(common + [
+        "v.code_client IS NOT NULL",
+        "v.annee_mois IN (:curr_ym, :prev_ym)",
+    ])
+    all_cli_rows = session.execute(text(f"""
+        SELECT v.annee_mois, v.code_client, MAX(v.nom_client),
+               COALESCE(SUM(v.total_facture), 0)
+        FROM ventes v
+        WHERE {cli_both_where}
+        GROUP BY v.annee_mois, v.code_client
+        ORDER BY 4 DESC NULLS LAST
+    """), {**p, "curr_ym": curr_ym, "prev_ym": prev_ym}).all()
+
+    # Split by period, preserving original tuple shape (code, nom, total)
+    servis_rows = [(r[1], r[2], r[3]) for r in all_cli_rows if r[0] == curr_ym]
+    prev_cli_rows = [(r[1], r[2], r[3]) for r in all_cli_rows if r[0] == prev_ym]
+    servis_codes = {r[0] for r in servis_rows}
+    prev_cli_total_map = {r[0]: float(r[2] or 0) for r in prev_cli_rows}
+
+    # 9+10. per-client famille breakdown (both periods in one query)
+    cli_fam_both_where = " AND ".join(common + [
+        "v.code_client IS NOT NULL",
+        "v.famille IS NOT NULL",
+        "(v.date_commande BETWEEN :date_from AND :date_to OR v.annee_mois = :prev_ym)",
+    ])
+    all_cli_fam_rows = session.execute(text(f"""
+        SELECT CASE WHEN v.date_commande BETWEEN :date_from AND :date_to
+                    THEN 'curr' ELSE 'prev' END AS period,
+               v.code_client, TRIM(v.famille) AS fam, SUM({_qty}) AS total
+        FROM ventes v {_pjoin}
+        WHERE {cli_fam_both_where}
+        GROUP BY 1, v.code_client, TRIM(v.famille)
+        ORDER BY v.code_client, total DESC
+    """), {**p, "date_from": date_from, "date_to": date_to, "prev_ym": prev_ym}).all()
+
+    cli_fam_map: dict = defaultdict(list)
     prev_cli_fam_map: dict = defaultdict(list)
-    for code, fam, total in prev_cli_fam_rows:
-        prev_cli_fam_map[code].append({"nom": fam, "total": round(float(total or 0), 3)})
+    for period, code, fam, total in all_cli_fam_rows:
+        entry = {"nom": fam, "total": round(float(total or 0), 3)}
+        if period == 'curr':
+            cli_fam_map[code].append(entry)
+        else:
+            prev_cli_fam_map[code].append(entry)
+
+    # 11. monthly history (last 12 months) — volume + nb_clients per month
+    hist_where = " AND ".join(common + [
+        "v.date_commande >= (CAST(:hist_to AS date) - INTERVAL '11 months')",
+        "v.date_commande <= CAST(:hist_to AS date)",
+    ])
+    hist_p = {**p, "hist_to": date_to}
+    hist_rows = session.execute(text(f"""
+        SELECT v.annee_mois,
+               COALESCE(SUM({_qty}), 0) AS total,
+               COUNT(DISTINCT v.code_client) AS nb_clients,
+               COUNT(DISTINCT v.date_commande) AS nb_visits
+        FROM ventes v {_pjoin}
+        WHERE {hist_where}
+        GROUP BY v.annee_mois
+        ORDER BY v.annee_mois
+    """), hist_p).all()
 
     curr_total = float(kpi_row[0] or 0)
     prev_total = float(prev_row[0] or 0)
@@ -452,13 +490,24 @@ def get_commune_analytics(
             "nb_clients": int(kpi_row[1] or 0),
         },
         "by_famille": [
-            {"nom": r[0], "total": round(float(r[1] or 0), 3)}
+            {"nom": r[0], "total": round(float(r[1] or 0), 3),
+             "packs": round(float(r[2] or 0), 0)}
             for r in fam_rows if r[0]
+        ],
+        "by_famille_prev": [
+            {"nom": r[0], "total": round(float(r[1] or 0), 3)}
+            for r in prev_fam_rows if r[0]
         ],
         "by_produit": [
             {"code": r[0] or "", "nom": r[1] or r[0] or "?",
-             "famille": r[2] or "", "total": round(float(r[3] or 0), 3)}
+             "famille": r[2] or "", "total": round(float(r[3] or 0), 3),
+             "packs": round(float(r[4] or 0), 0)}
             for r in prod_rows
+        ],
+        "by_produit_prev": [
+            {"code": r[0] or "", "nom": r[1] or r[0] or "?",
+             "famille": r[2] or "", "total": round(float(r[3] or 0), 3)}
+            for r in prev_prod_rows
         ],
         "by_fdv": [
             {"code": r[0] or "", "nom": r[1] or r[0] or "FDV",
@@ -469,17 +518,24 @@ def get_commune_analytics(
             "vd": round(canal_map.get("VD", 0), 3),
             "vh": round(canal_map.get("VH", 0), 3),
         },
+        "monthly_history": [
+            {"month": r[0], "total": round(float(r[1] or 0), 3),
+             "nb_clients": int(r[2] or 0), "nb_visits": int(r[3] or 0)}
+            for r in hist_rows
+        ],
         "clients": {
             "servis": [
                 {"code": r[0], "nom": r[1] or r[0], "total": round(float(r[2] or 0), 2),
+                 "total_prev": round(float(prev_cli_total_map.get(r[0], 0)), 2),
                  "by_famille": cli_fam_map.get(r[0], [])}
                 for r in servis_rows
             ],
             "manques": [
                 {"code": r[0], "nom": r[1] or r[0], "total": round(float(r[2] or 0), 2),
+                 "total_prev": round(float(r[2] or 0), 2),
                  "by_famille": prev_cli_fam_map.get(r[0], [])}
                 for r in prev_cli_rows if r[0] not in servis_codes
-            ][:20],
+            ],
         },
     }
 
@@ -620,3 +676,68 @@ def get_commune_clients(
     ][:20]
 
     return {"servis": servis, "manques": manques}
+
+
+@router.get("/client-history")
+def get_client_history(
+    code_client: str = Query(...),
+    commune: str = Query(...),
+    canal: Optional[str] = Query(None),
+    unite: str = Query("tonnes"),
+    current_user: User = Depends(get_current_user),
+    current_distributor=Depends(get_current_distributor),
+    session: Session = Depends(get_session),
+) -> Any:
+    """Monthly purchase history for a single client in a commune.
+    Returns [{period, total, prev_total}] for the last 12 months.
+    Months with total=0 but prev_total>0 represent missed opportunities."""
+    _qty = qty_expr(unite)
+    _pjoin = PRODUITS_JOIN if unite == "tonnes" else ""
+
+    conds: list = [
+        "v.statut_commande = 'Facturé'",
+        "v.code_client = :code_client",
+        "LOWER(v.commune) = LOWER(:commune)",
+    ]
+    params: dict = {"code_client": code_client, "commune": commune}
+    if current_distributor:
+        conds.append("(v.distributor_id = :dist_id OR v.distributor_id IS NULL)")
+        params["dist_id"] = current_distributor.id
+    if canal:
+        conds.append("v.canal = :canal")
+        params["canal"] = canal
+    where = " AND ".join(conds)
+
+    rows = session.execute(text(f"""
+        SELECT v.annee_mois, COALESCE(SUM({_qty}), 0) AS total
+        FROM ventes v {_pjoin}
+        WHERE {where} AND v.annee_mois IS NOT NULL
+        GROUP BY v.annee_mois
+        ORDER BY v.annee_mois
+    """), params).all()
+
+    month_map = {r[0]: round(float(r[1] or 0), 3) for r in rows}
+
+    # Build last 12 months from today
+    today = date.today()
+    periods = []
+    for i in range(11, -1, -1):
+        m = today.month - i
+        y = today.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        periods.append(f"{y}-{m:02d}")
+
+    result = []
+    prev_total = 0.0
+    for period in periods:
+        total = month_map.get(period, 0.0)
+        result.append({
+            "period": period,
+            "total": total,
+            "missed": round(prev_total, 3) if total == 0 and prev_total > 0 else 0,
+        })
+        prev_total = total
+
+    return result

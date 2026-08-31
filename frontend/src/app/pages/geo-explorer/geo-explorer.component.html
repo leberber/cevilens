@@ -19,7 +19,7 @@
         <div class="geo-kpi">
           <div class="geo-kpi__icon geo-kpi__icon--blue"><i class="pi pi-chart-bar"></i></div>
           <div class="geo-kpi__body">
-            <div class="geo-kpi__label">Total ventes ({{ uniteLabel() }})</div>
+            <div class="geo-kpi__label">Total ventes ({{ uniteLabel }})</div>
             @if (loading()) {
               <div class="geo-kpi__sk"></div>
             } @else {
@@ -51,14 +51,11 @@
       [selectedCode]="commune()?.code ?? null"
       [canal]="canal()"
       [canalOptions]="canals"
-      [unite]="unite()"
-      [uniteOptions]="unites"
       [periodes]="periodes()"
       [dateFrom]="dateFrom()"
       [dateTo]="dateTo()"
       (communeSelect)="setCommune($event)"
       (canalChange)="setCanal($event)"
-      (uniteChange)="setUnite($event)"
       (rangeChange)="onRangeChange($event)" />
 
     <!-- Floating controls overlay -->
@@ -79,12 +76,9 @@
     [dateFrom]="dateFrom()"
     [dateTo]="dateTo()"
     [canal]="canal()"
-    [unite]="unite()"
     [periodes]="periodes()"
     [canalOptions]="canals"
-    [uniteOptions]="unites"
     (canalChange)="setCanal($event)"
-    (uniteChange)="setUnite($event)"
     (rangeChange)="onRangeChange($event)"
     (closed)="clearCommune()" />
 

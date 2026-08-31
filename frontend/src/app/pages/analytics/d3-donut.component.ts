@@ -27,13 +27,17 @@ export interface DonutSlice {
   `],
 })
 export class D3DonutComponent extends D3ChartBase<DonutSlice> {
-  readonly data        = input<DonutSlice[]>([]);
-  readonly centerVal   = input('');
-  readonly centerUnit  = input('');
-  readonly selectedNom = input<string | null>(null);
-  readonly sliceSelect = output<string | null>();
+  readonly data            = input<DonutSlice[]>([]);
+  readonly centerVal       = input('');
+  readonly centerUnit      = input('');
+  readonly selectedNom     = input<string | null>(null);
+  readonly deltas          = input<Record<string, number | null>>({});
+  readonly secondaryValues = input<Record<string, number>>({});
+  readonly secondaryUnit   = input('');
+  readonly sliceSelect     = output<string | null>();
 
   private arcsG!: d3.Selection<SVGGElement, unknown, null, undefined>;
+  private pctsG!: d3.Selection<SVGGElement, unknown, null, undefined>;
   private labelsG!: d3.Selection<SVGGElement, unknown, null, undefined>;
   private centerG!: d3.Selection<SVGGElement, unknown, null, undefined>;
 
@@ -69,8 +73,6 @@ export class D3DonutComponent extends D3ChartBase<DonutSlice> {
       .innerRadius(ri).outerRadius(r).cornerRadius(5);
     const arcHover = d3.arc<d3.PieArcDatum<DonutSlice>>()
       .innerRadius(ri).outerRadius(r + 8).cornerRadius(5);
-    const arcLabel = d3.arc<d3.PieArcDatum<DonutSlice>>()
-      .innerRadius(r + 16).outerRadius(r + 16);
 
     const slices = pie(data);
     const selNom = untracked(() => this.selectedNom());
@@ -79,6 +81,7 @@ export class D3DonutComponent extends D3ChartBase<DonutSlice> {
       this.svgSel  = d3.select(el);
       this.gSel    = this.svgSel.append('g');
       this.arcsG   = this.gSel.append('g');
+      this.pctsG   = this.gSel.append('g').attr('pointer-events', 'none');
       this.labelsG = this.gSel.append('g').attr('class', 'labels');
       this.centerG = this.gSel.append('g');
       this.built   = true;
@@ -117,12 +120,18 @@ export class D3DonutComponent extends D3ChartBase<DonutSlice> {
         .each(function (d) { (this as any)._prev = d; });
     }
 
+    const secMap  = this.secondaryValues();
+    const secUnit = this.secondaryUnit();
+
     joined
       .on('mouseover', function (_, d) {
         d3.select(this).raise().transition('hover').duration(150)
           .attr('d', arcHover(d) ?? '');
         const pct = grand ? Math.round((d.data.value / grand) * 100) : 0;
-        tip.innerHTML = `<b>${d.data.nom}</b><br/>${fmtShort(d.data.value)} (${pct}%)`;
+        let html = `<b>${d.data.nom}</b><br/>${fmtShort(d.data.value)} t (${pct}%)`;
+        const sec = secMap[d.data.nom];
+        if (sec != null) html += ` · ${fmtShort(sec)} ${secUnit}`;
+        tip.innerHTML = html;
         tip.style.opacity = '1';
       })
       .on('mousemove', (event: MouseEvent) => {
@@ -141,8 +150,8 @@ export class D3DonutComponent extends D3ChartBase<DonutSlice> {
         this.sliceSelect.emit(cur === d.data.nom ? null : d.data.nom);
       });
 
-    // Percentage labels inside arcs
-    this.arcsG.selectAll<SVGTextElement, d3.PieArcDatum<DonutSlice>>('.pct')
+    // Percentage labels (in separate group so .raise() on arcs doesn't cover them)
+    this.pctsG.selectAll<SVGTextElement, d3.PieArcDatum<DonutSlice>>('.pct')
       .data(slices.filter(d => (d.endAngle - d.startAngle) > 0.25), d => d.data.nom)
       .join(
         enter => enter.append('text').attr('class', 'pct')
@@ -159,32 +168,141 @@ export class D3DonutComponent extends D3ChartBase<DonutSlice> {
       .attr('transform', d => `translate(${d3.arc<d3.PieArcDatum<DonutSlice>>().innerRadius((ri + r) / 2).outerRadius((ri + r) / 2).centroid(d)})`)
       .text(d => grand ? `${Math.round((d.data.value / grand) * 100)}%` : '');
 
-    // Name labels outside arcs
-    this.labelsG.selectAll<SVGTextElement, d3.PieArcDatum<DonutSlice>>('.lbl')
-      .data(slices.filter(d => (d.endAngle - d.startAngle) > 0.18), d => d.data.nom)
+    // Name labels outside arcs with leader lines + optional deltas
+    const deltaMap = this.deltas();
+    const hasDeltas = Object.keys(deltaMap).length > 0;
+    const elbowR   = r + 6;                          // where the line bends
+    const labelX   = r + 14;                         // horizontal end x
+    const lh       = hasDeltas ? 20 : 13;            // min spacing per label
+
+    // Build raw label positions from arc midpoints
+    interface LblDatum {
+      d: d3.PieArcDatum<DonutSlice>; mid: number;
+      y: number; side: 1 | -1; anchor: 'start' | 'end';
+    }
+    const rawLabels: LblDatum[] = slices.map(d => {
+      const mid = (d.startAngle + d.endAngle) / 2;
+      const side: 1 | -1 = mid < Math.PI ? 1 : -1;
+      return {
+        d, mid,
+        y: Math.sin(mid - Math.PI / 2) * elbowR,
+        side,
+        anchor: side === 1 ? 'start' as const : 'end' as const,
+      };
+    });
+
+    // Resolve vertical collisions per side
+    const resolveOverlaps = (labels: LblDatum[]) => {
+      labels.sort((a, b) => a.y - b.y);
+      for (let i = 1; i < labels.length; i++) {
+        if (labels[i].y - labels[i - 1].y < lh)
+          labels[i].y = labels[i - 1].y + lh;
+      }
+      // Re-center the stack around its natural midpoint
+      if (labels.length > 1) {
+        const top = labels[0].y;
+        const bot = labels[labels.length - 1].y;
+        const natTop = Math.min(...labels.map(l => Math.sin(l.mid - Math.PI / 2) * elbowR));
+        const natBot = Math.max(...labels.map(l => Math.sin(l.mid - Math.PI / 2) * elbowR));
+        const shift = ((natTop + natBot) - (top + bot)) / 2;
+        labels.forEach(l => l.y += shift);
+      }
+    };
+    const rightLabels = rawLabels.filter(l => l.side === 1);
+    const leftLabels  = rawLabels.filter(l => l.side === -1);
+    resolveOverlaps(rightLabels);
+    resolveOverlaps(leftLabels);
+    const posLabels = [...rightLabels, ...leftLabels];
+
+    // Leader lines (polylines): arc edge → elbow → horizontal
+    this.labelsG.selectAll<SVGPolylineElement, LblDatum>('.ldr')
+      .data(posLabels, d => d.d.data.nom)
       .join(
-        enter => enter.append('text').attr('class', 'lbl')
-          .attr('dominant-baseline', 'central')
-          .attr('font-size', 10).attr('fill', 'var(--text-color-secondary)')
+        enter => enter.append('polyline').attr('class', 'ldr')
+          .attr('fill', 'none')
+          .attr('stroke', 'var(--text-color-secondary)')
+          .attr('stroke-width', 0.8)
+          .attr('opacity', 0)
+          .call(e => dur
+            ? e.transition().delay(dur * 0.7).duration(250).attr('opacity', 0.35)
+            : e.attr('opacity', 0.35)),
+        update => update.attr('opacity', 0.35),
+        exit => exit.remove()
+      )
+      .attr('points', l => {
+        const angle = l.mid - Math.PI / 2;
+        const sx = Math.cos(angle) * (r + 2);
+        const sy = Math.sin(angle) * (r + 2);
+        const hx = l.side * labelX;
+        return `${sx},${sy} ${hx},${l.y}`;
+      });
+
+    // Small dot at leader line start
+    this.labelsG.selectAll<SVGCircleElement, LblDatum>('.ldr-dot')
+      .data(posLabels, d => d.d.data.nom)
+      .join(
+        enter => enter.append('circle').attr('class', 'ldr-dot')
+          .attr('r', 2)
+          .attr('fill', d => d.d.data.color)
+          .attr('opacity', 0)
+          .call(e => dur
+            ? e.transition().delay(dur * 0.7).duration(250).attr('opacity', 1)
+            : e.attr('opacity', 1)),
+        update => update.attr('fill', d => d.d.data.color).attr('opacity', 1),
+        exit => exit.remove()
+      )
+      .attr('cx', l => Math.cos(l.mid - Math.PI / 2) * (r + 2))
+      .attr('cy', l => Math.sin(l.mid - Math.PI / 2) * (r + 2));
+
+    // Label groups
+    const lblJoin = this.labelsG.selectAll<SVGGElement, LblDatum>('.lbl-g')
+      .data(posLabels, d => d.d.data.nom)
+      .join(
+        enter => enter.append('g').attr('class', 'lbl-g')
           .attr('pointer-events', 'none')
           .attr('opacity', 0)
+          .call(g => {
+            g.append('text').attr('class', 'lbl')
+              .attr('dominant-baseline', 'central')
+              .attr('font-size', 9.5).attr('fill', 'var(--text-color-secondary)');
+            g.append('text').attr('class', 'lbl-delta')
+              .attr('dominant-baseline', 'central')
+              .attr('font-size', 8).attr('font-weight', 700)
+              .attr('dy', 11);
+          })
           .call(e => dur
             ? e.transition().delay(dur * 0.7).duration(250).attr('opacity', 1)
             : e.attr('opacity', 1)),
         update => update,
         exit => exit.remove()
-      )
-      .attr('transform', d => {
-        const c = arcLabel.centroid(d);
-        return `translate(${c})`;
+      );
+
+    lblJoin.attr('transform', l => {
+      const tx = l.side * labelX + l.side * 4;
+      return `translate(${tx},${l.y})`;
+    });
+
+    lblJoin.select<SVGTextElement>('.lbl')
+      .attr('text-anchor', l => l.anchor)
+      .text(l => {
+        const name = l.d.data.nom.length > 20 ? l.d.data.nom.slice(0, 20) + '…' : l.d.data.nom;
+        return `${name} ${fmtShort(l.d.data.value)}t`;
+      });
+
+    lblJoin.select<SVGTextElement>('.lbl-delta')
+      .attr('text-anchor', l => l.anchor)
+      .attr('fill', l => {
+        const pct = deltaMap[l.d.data.nom];
+        if (pct == null) return 'transparent';
+        return pct >= 0 ? 'var(--color-success-dark, #16a34a)' : '#dc2626';
       })
-      .attr('text-anchor', d => {
-        const mid = (d.startAngle + d.endAngle) / 2;
-        return mid < Math.PI ? 'start' : 'end';
-      })
-      .text(d => {
-        const parts = d.data.nom.split(' ');
-        return parts.length > 2 ? parts.slice(0, 2).join(' ') + '…' : d.data.nom;
+      .text(l => {
+        if (!hasDeltas) return '';
+        const pct = deltaMap[l.d.data.nom];
+        if (pct == null) return '';
+        const arrow = pct >= 0 ? '▲' : '▼';
+        const sign = pct > 0 ? '+' : '';
+        return `${arrow} ${sign}${pct}%`;
       });
 
     // Center label

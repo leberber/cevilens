@@ -7,6 +7,15 @@
   <h2 class="cd-header__name">
     <i class="pi pi-map-marker"></i>
     {{ commune()?.name ?? '' }}
+    @if (selectedClient(); as sc) {
+      <span class="cd-header__client">
+        <i class="pi pi-chevron-right"></i>
+        {{ sc.nom }}
+        <button class="cd-header__clear" (click)="selectClient(null)" aria-label="Effacer">
+          <i class="pi pi-times"></i>
+        </button>
+      </span>
+    }
   </h2>
 
   <div class="cd-header__filters">
@@ -15,17 +24,6 @@
         @for (opt of canalOptions(); track opt.value) {
           <button [class.cd-toggle--active]="canal() === opt.value"
                   (click)="canalChange.emit(opt.value)">
-            {{ opt.label }}
-          </button>
-        }
-      </div>
-    }
-
-    @if (uniteOptions().length) {
-      <div class="cd-toggle">
-        @for (opt of uniteOptions(); track opt.value) {
-          <button [class.cd-toggle--active]="unite() === opt.value"
-                  (click)="uniteChange.emit(opt.value)">
             {{ opt.label }}
           </button>
         }
@@ -49,10 +47,10 @@
 
   <!-- KPI strip -->
   <div class="cd-kpis">
-    <div class="cd-kpi">
+    <div class="cd-kpi cd-kpi--active">
       <div class="cd-kpi__icon cd-kpi__icon--blue"><i class="pi pi-chart-bar"></i></div>
       <div class="cd-kpi__body">
-        <div class="cd-kpi__val">{{ a.kpis.total | number:'1.1-1' }} {{ uniteShort() }}</div>
+        <div class="cd-kpi__val">{{ (activeData() ?? a).kpis.total | number:'1.1-1' }} {{ uniteShort }}</div>
         <div class="cd-kpi__label">Volume total</div>
       </div>
       @if (pctChange() !== null) {
@@ -64,53 +62,127 @@
       }
     </div>
 
-    <div class="cd-kpi">
-      <div class="cd-kpi__icon cd-kpi__icon--green"><i class="pi pi-check-circle"></i></div>
-      <div class="cd-kpi__body">
-        <div class="cd-kpi__val">{{ a.clients.servis.length }}</div>
-        <div class="cd-kpi__label">Clients servis</div>
+    <div class="cd-kpi-wrap">
+      <div class="cd-kpi" [class.cd-kpi--open]="openDropdown() === 'servis'"
+           (click)="toggleDropdown('servis'); $event.stopPropagation()">
+        <div class="cd-kpi__icon cd-kpi__icon--green"><i class="pi pi-check-circle"></i></div>
+        <div class="cd-kpi__body">
+          <div class="cd-kpi__val">{{ nbServis() }}</div>
+          <div class="cd-kpi__label">Clients servis</div>
+        </div>
+        <i class="pi cd-kpi__chevron" [class.pi-chevron-down]="openDropdown() !== 'servis'"
+           [class.pi-chevron-up]="openDropdown() === 'servis'"></i>
       </div>
+
+      @if (openDropdown() === 'servis') {
+        <div class="cd-dropdown" (click)="$event.stopPropagation()">
+          <div class="cd-dropdown__search">
+            <i class="pi pi-search"></i>
+            <input type="text" placeholder="Rechercher un client…"
+                   [ngModel]="clientSearch()" (ngModelChange)="clientSearch.set($event)" />
+          </div>
+          <div class="cd-dropdown__list">
+            @for (c of filteredDropdownClients(); track c.code) {
+              <div class="cd-dropdown__item" [class.cd-dropdown__item--active]="selectedClient()?.code === c.code"
+                   (click)="pickClient(c)">
+                <div class="cd-dropdown__avatar">{{ c.nom.charAt(0) }}</div>
+                <div class="cd-dropdown__info">
+                  <span class="cd-dropdown__name" [title]="c.nom">{{ c.nom }}</span>
+                  <div class="cd-dropdown__metrics">
+                    <span class="cd-dropdown__da"><i class="pi pi-wallet"></i> {{ c.total | number:'1.0-0' }}</span>
+                    <span class="cd-dropdown__sep"></span>
+                    <span class="cd-dropdown__qty"><i class="pi pi-box"></i> {{ c.qty | number:'1.1-1' }} {{ uniteShort }}</span>
+                  </div>
+                </div>
+                @if (c.pctChange !== null) {
+                  <span class="cd-dropdown__pct" [class.cd-dropdown__pct--up]="c.pctChange! >= 0"
+                        [class.cd-dropdown__pct--down]="c.pctChange! < 0">
+                    <i [class]="'pi ' + (c.pctChange! >= 0 ? 'pi-arrow-up' : 'pi-arrow-down')"></i>
+                    {{ c.pctChange! > 0 ? '+' : '' }}{{ c.pctChange }}%
+                  </span>
+                }
+                <span class="cd-dropdown__status">
+                  <i class="pi pi-check-circle"></i>
+                </span>
+              </div>
+            } @empty {
+              <div class="cd-dropdown__empty">Aucun client</div>
+            }
+          </div>
+        </div>
+      }
     </div>
 
-    <div class="cd-kpi">
-      <div class="cd-kpi__icon cd-kpi__icon--amber"><i class="pi pi-exclamation-circle"></i></div>
-      <div class="cd-kpi__body">
-        <div class="cd-kpi__val">{{ a.clients.manques.length }}</div>
-        <div class="cd-kpi__label">Clients manqués</div>
+    <div class="cd-kpi-wrap">
+      <div class="cd-kpi" [class.cd-kpi--open]="openDropdown() === 'manques'"
+           (click)="toggleDropdown('manques'); $event.stopPropagation()">
+        <div class="cd-kpi__icon cd-kpi__icon--amber"><i class="pi pi-exclamation-circle"></i></div>
+        <div class="cd-kpi__body">
+          <div class="cd-kpi__val">{{ nbManques() }}</div>
+          <div class="cd-kpi__label">Clients manqués</div>
+        </div>
+        <i class="pi cd-kpi__chevron" [class.pi-chevron-down]="openDropdown() !== 'manques'"
+           [class.pi-chevron-up]="openDropdown() === 'manques'"></i>
       </div>
+
+      @if (openDropdown() === 'manques') {
+        <div class="cd-dropdown" (click)="$event.stopPropagation()">
+          <div class="cd-dropdown__search">
+            <i class="pi pi-search"></i>
+            <input type="text" placeholder="Rechercher un client…"
+                   [ngModel]="clientSearch()" (ngModelChange)="clientSearch.set($event)" />
+          </div>
+          <div class="cd-dropdown__list">
+            @for (c of filteredDropdownClients(); track c.code) {
+              <div class="cd-dropdown__item" [class.cd-dropdown__item--active]="selectedClient()?.code === c.code"
+                   (click)="pickClient(c)">
+                <div class="cd-dropdown__avatar cd-dropdown__avatar--missed">{{ c.nom.charAt(0) }}</div>
+                <div class="cd-dropdown__info">
+                  <span class="cd-dropdown__name" [title]="c.nom">{{ c.nom }}</span>
+                  <div class="cd-dropdown__metrics">
+                    <span class="cd-dropdown__da"><i class="pi pi-wallet"></i> {{ c.total | number:'1.0-0' }}</span>
+                    <span class="cd-dropdown__sep"></span>
+                    <span class="cd-dropdown__qty"><i class="pi pi-box"></i> {{ c.qty | number:'1.1-1' }} {{ uniteShort }}</span>
+                  </div>
+                </div>
+                <span class="cd-dropdown__pct cd-dropdown__pct--down">
+                  <i class="pi pi-arrow-down"></i> -100%
+                </span>
+                <span class="cd-dropdown__status cd-dropdown__status--missed">
+                  <i class="pi pi-exclamation-circle"></i>
+                </span>
+              </div>
+            } @empty {
+              <div class="cd-dropdown__empty">Aucun client</div>
+            }
+          </div>
+        </div>
+      }
     </div>
 
-    <div class="cd-kpi">
+    <div class="cd-kpi cd-kpi--static">
       <div class="cd-kpi__icon cd-kpi__icon--purple"><i class="pi pi-arrows-h"></i></div>
       <div class="cd-kpi__body">
         <div class="cd-kpi__val cd-kpi__val--split">
-          <span class="cd-kpi__vd">VD {{ a.canal_split.vd | number:'1.1-1' }}</span>
-          <span class="cd-kpi__vh">VH {{ a.canal_split.vh | number:'1.1-1' }}</span>
+          <span class="cd-kpi__vd">VD {{ (activeData() ?? a).canal_split.vd | number:'1.1-1' }}</span>
+          <span class="cd-kpi__vh">VH {{ (activeData() ?? a).canal_split.vh | number:'1.1-1' }}</span>
         </div>
-        <div class="cd-kpi__label">Répartition canal ({{ uniteShort() }})</div>
+        <div class="cd-kpi__label">Répartition canal ({{ uniteShort }})</div>
       </div>
     </div>
   </div>
 
-  <!-- Two-column content -->
+  <!-- Content -->
   <div class="cd-content">
-    <div class="cd-content__left">
+    <div class="cd-sidebar">
       <app-produits-tab
-        [byFamille]="a.by_famille"
-        [byProduit]="a.by_produit"
-        [canalSplit]="a.canal_split"
-        [unite]="unite()" />
-    </div>
-    <div class="cd-content__right">
-      <app-clients-tab
-        [servis]="a.clients.servis"
-        [manques]="a.clients.manques"
-        [globalFamilles]="a.by_famille"
-        [commune]="commune()!"
-        [dateFrom]="dateFrom()"
-        [dateTo]="dateTo()"
-        [canal]="canal()"
-        [unite]="unite()" />
+        [byFamille]="(activeData() ?? a).by_famille"
+        [byFamillePrev]="(activeData() ?? a).by_famille_prev"
+        [byProduit]="(activeData() ?? a).by_produit"
+        [byProduitPrev]="(activeData() ?? a).by_produit_prev"
+        [monthlyHistory]="(activeData() ?? a).monthly_history"
+        [clientMode]="!!selectedClient()"
+        [dateTo]="dateTo()" />
     </div>
   </div>
 

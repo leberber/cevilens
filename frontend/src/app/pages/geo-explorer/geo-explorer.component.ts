@@ -21,7 +21,6 @@ interface LocationDatum {
 }
 
 type Canal = 'VD' | 'VH' | 'ALL';
-type Unite = 'packs' | 'tonnes';
 
 @Component({
   selector: 'app-geo-explorer',
@@ -43,7 +42,6 @@ export class GeoExplorerComponent implements OnInit {
   private readonly userDateSet = signal(false);
 
   readonly canal     = signal<Canal>('ALL');
-  readonly unite     = signal<Unite>('tonnes');
   readonly dateFrom  = signal('');
   readonly dateTo    = signal('');
   readonly periodes  = signal<string[]>([]);
@@ -61,11 +59,6 @@ export class GeoExplorerComponent implements OnInit {
     { value: 'VH',  label: 'VH'   },
   ];
 
-  readonly unites: { value: Unite; label: string }[] = [
-    { value: 'packs',  label: 'Packs'  },
-    { value: 'tonnes', label: 'Tonnes' },
-  ];
-
   readonly mapData = computed<CommuneDatum[]>(() =>
     this.mapLocations().map(r => ({ code: r.code, total: r.total }))
   );
@@ -78,7 +71,7 @@ export class GeoExplorerComponent implements OnInit {
     this.mapLocations().reduce((sum, r) => sum + r.total, 0)
   );
 
-  readonly uniteLabel = computed(() => this.unite() === 'tonnes' ? 'tonnes' : 'packs');
+  readonly uniteLabel = 'tonnes';
 
   readonly selectionLabel = computed(() => {
     const s = this.selection();
@@ -119,13 +112,6 @@ export class GeoExplorerComponent implements OnInit {
     if (!this.commune()) {
       this.selection.set(null);
     }
-    this.load();
-  }
-
-  setUnite(u: string): void {
-    const unite = u as Unite;
-    if (this.unite() === unite) return;
-    this.unite.set(unite);
     this.load();
   }
 
@@ -234,7 +220,7 @@ export class GeoExplorerComponent implements OnInit {
     let params = new HttpParams()
       .set('date_from', this.dateFrom())
       .set('date_to',   this.dateTo())
-      .set('unite',     this.unite());
+      .set('unite',     'tonnes');
     if (this.canal() !== 'ALL') params = params.set('canal', this.canal());
     return params;
   }

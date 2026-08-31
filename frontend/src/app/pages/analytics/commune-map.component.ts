@@ -70,16 +70,6 @@ interface GeoFeatureCollection {
         </div>
       }
 
-      @if (uniteOptions().length) {
-        <div class="map-canal-toggle">
-          @for (opt of uniteOptions(); track opt.value) {
-            <button [class.active]="unite() === opt.value" (click)="uniteChange.emit(opt.value)">
-              {{ opt.label }}
-            </button>
-          }
-        </div>
-      }
-
       @if (periodes().length) {
         <app-date-range-picker
           [compact]="true"
@@ -218,14 +208,11 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
   readonly selectedCode  = input<number | null>(null);
   readonly canal         = input<string>('');
   readonly canalOptions  = input<{ value: string; label: string }[]>([]);
-  readonly unite         = input<string>('');
-  readonly uniteOptions  = input<{ value: string; label: string }[]>([]);
   readonly periodes      = input<string[]>([]);
   readonly dateFrom      = input<string>('');
   readonly dateTo        = input<string>('');
   readonly communeSelect = output<{ code: number; name: string } | null>();
   readonly canalChange   = output<string>();
-  readonly uniteChange   = output<string>();
   readonly rangeChange   = output<DateRange>();
 
   readonly geoLoading   = signal(true);
