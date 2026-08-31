@@ -74,13 +74,20 @@ export class CommuneAnalyticsComponent implements OnInit {
   private readonly distContext = inject(DistributorContextService);
   private readonly ventesService = inject(VentesService);
 
-  private initialized = false;
+  private lastDistId: number | null | undefined = undefined;
 
   constructor() {
     effect(() => {
-      this.distContext.distributor();
+      const dist = this.distContext.distributor();
       untracked(() => {
-        if (!this.initialized) return; // skip first run — ngOnInit handles init
+        const newId = dist?.id ?? null;
+        if (this.lastDistId === undefined) {
+          // First run — just record the ID, ngOnInit handles init
+          this.lastDistId = newId;
+          return;
+        }
+        if (newId === this.lastDistId) return; // no actual change
+        this.lastDistId = newId;
         this.communeName.set('');
         this.selectedClient.set(null);
         this.clientAnalytics.set(null);
@@ -290,8 +297,6 @@ export class CommuneAnalyticsComponent implements OnInit {
       this.communeName.set(commune);
     }
     this.load();
-
-    this.initialized = true;
   }
 
   setCanal(c: CanalFilter): void {
