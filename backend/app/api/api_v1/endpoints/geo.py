@@ -492,7 +492,7 @@ def get_product_tree(
 
 @router.get("/commune-analytics")
 def get_commune_analytics(
-    commune: str = Query(...),
+    commune: Optional[str] = Query(None),
     date_from: str = Query(...),
     date_to: str = Query(...),
     canal: Optional[str] = Query(None),
@@ -518,9 +518,11 @@ def get_commune_analytics(
     # Shared base conditions (no date filter yet)
     common: list = [
         "v.statut_commande = 'Facturé'",
-        "LOWER(v.commune) = LOWER(:commune)",
     ]
-    p: dict = {"commune": commune}
+    p: dict = {}
+    if commune:
+        common.append("LOWER(v.commune) = LOWER(:commune)")
+        p["commune"] = commune
     if current_distributor:
         common.append("v.distributor_id = :dist_id")
         p["dist_id"] = current_distributor.id

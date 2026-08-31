@@ -12,7 +12,7 @@
       <button class="ca-commune-picker__btn" (click)="toggleCommuneDropdown(); $event.stopPropagation()"
               [class.ca-commune-picker__btn--open]="communeDropdownOpen()">
         <i class="pi pi-map-marker"></i>
-        <span class="ca-commune-picker__label">{{ communeName() || 'Sélectionner une commune' }}</span>
+        <span class="ca-commune-picker__label">{{ communeName() || 'Toutes les communes' }}</span>
         <i class="pi pi-chevron-down ca-commune-picker__chevron"
            [class.ca-commune-picker__chevron--open]="communeDropdownOpen()"></i>
       </button>
@@ -25,6 +25,15 @@
                    [ngModel]="communeSearch()" (ngModelChange)="communeSearch.set($event)" />
           </div>
           <div class="ca-commune-picker__list">
+            @if (!communeSearch()) {
+              <div class="ca-commune-picker__item"
+                   [class.ca-commune-picker__item--active]="!communeName()"
+                   (click)="clearCommune()">
+                <div class="ca-commune-picker__info">
+                  <span class="ca-commune-picker__name"><i class="pi pi-globe" style="margin-right:0.3rem"></i> Toutes les communes</span>
+                </div>
+              </div>
+            }
             @for (c of filteredCommunes(); track c.code) {
               <div class="ca-commune-picker__item"
                    [class.ca-commune-picker__item--active]="communeName() === c.name"
@@ -116,12 +125,7 @@
   </div>
 </div>
 
-@if (!communeName()) {
-  <div class="ca-empty">
-    <i class="pi pi-map-marker"></i>
-    <p>Sélectionnez une commune pour voir les analytics</p>
-  </div>
-} @else if (loading()) {
+@if (loading()) {
   <div class="ca-loading"><i class="pi pi-spin pi-spinner"></i> Chargement...</div>
 } @else if (analytics(); as a) {
   @let d = activeData() ?? a;
@@ -135,9 +139,7 @@
         <div class="cd-kpi__val">{{ d.kpis.total | number:'1.1-1' }} <span class="cd-kpi__unit">{{ uniteShort }}</span></div>
         <div class="cd-kpi__label">Volume total</div>
         <div class="cd-kpi__sub">
-          @if (d.kpis.total_da) { <span>{{ d.kpis.total_da | number:'1.0-0' }} DA</span> <span class="cd-kpi__dot"></span> }
-          <span>{{ d.kpis.nb_clients }} clients</span>
-          @if (nbFdv()) { <span class="cd-kpi__dot"></span> <span>{{ nbFdv() }} FDV</span> }
+          @if (d.kpis.total_da) { <span>{{ d.kpis.total_da | number:'1.0-0' }} DA</span> }
           @if (d.kpis.total_prev > 0) { <span class="cd-kpi__dot"></span> <span>vs {{ d.kpis.total_prev | number:'1.1-1' }}t préc.</span> }
         </div>
       </div>

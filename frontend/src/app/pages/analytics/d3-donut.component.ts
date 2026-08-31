@@ -323,7 +323,7 @@ export class D3DonutComponent extends D3ChartBase<DonutSlice> {
 
     // Center label
     this.centerG.selectAll('*').remove();
-    const cv = this.centerVal() || fmtShort(grand);
+    const cv = this.centerVal() || grand.toFixed(2);
     this.centerG.append('text')
       .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
       .attr('y', -6).attr('font-size', Math.min(ri * 0.45, 22))

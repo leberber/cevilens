@@ -169,7 +169,7 @@ export class D3DualAxisComponent extends D3ChartBase<DualAxisPoint> {
         },
         exit => exit.remove()
       )
-      .text(d => d.bar > 0 ? fmtShort(d.bar) : '');
+      .text(d => d.bar > 0 ? d.bar.toFixed(2) : '');
 
     // Missed bars (dashed red outline for months where client had no sales)
     const missedData = data.filter(d => d.missed);
@@ -291,7 +291,7 @@ export class D3DualAxisComponent extends D3ChartBase<DualAxisPoint> {
         this.vlineEl.attr('x1', px).attr('x2', px).style('opacity', 1);
         const lines = [
           `<b>${pt.label}</b>`,
-          `<span style="color:${barCol}">${this.barLabel()}: <b>${pt.bar.toFixed(1)} ${this.barUnit()}</b></span>`,
+          `<span style="color:${barCol}">${this.barLabel()}: <b>${pt.bar.toFixed(2)} ${this.barUnit()}</b></span>`,
           `<span style="color:${lineCol}">${this.lineLabel()}: <b>${pt.line}</b></span>`,
         ];
         if (pt.missed) lines.push(`<span style="color:#f87171">Manqué</span>`);

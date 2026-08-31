@@ -87,8 +87,9 @@ export class CommuneAnalyticsComponent implements OnInit {
         this.analytics.set(null);
         this.drilldownProduct.set(null);
         this.drilldownData.set(null);
-        this.loadCommunes(true);
+        this.loadCommunes();
         this.loadPeriodes();
+        this.load();
       });
     });
   }
@@ -287,8 +288,8 @@ export class CommuneAnalyticsComponent implements OnInit {
 
     if (commune) {
       this.communeName.set(commune);
-      this.load();
     }
+    this.load();
 
     this.initialized = true;
   }
@@ -296,7 +297,7 @@ export class CommuneAnalyticsComponent implements OnInit {
   setCanal(c: CanalFilter): void {
     this.canal.set(c);
     this.updateUrl();
-    if (this.communeName()) this.load();
+    this.load();
   }
 
   pickMonth(period: string): void {
@@ -305,7 +306,7 @@ export class CommuneAnalyticsComponent implements OnInit {
     this.customRangeOpen.set(false);
     this.updateUrl();
     this.loadCommunes();
-    if (this.communeName()) this.load();
+    this.load();
   }
 
   toggleCustomRange(): void {
@@ -318,11 +319,21 @@ export class CommuneAnalyticsComponent implements OnInit {
     this.customRangeOpen.set(false);
     this.updateUrl();
     this.loadCommunes();
-    if (this.communeName()) this.load();
+    this.load();
   }
 
   pickCommune(commune: CommuneOption): void {
     this.communeName.set(commune.name);
+    this.communeDropdownOpen.set(false);
+    this.communeSearch.set('');
+    this.selectedClient.set(null);
+    this.clientAnalytics.set(null);
+    this.updateUrl();
+    this.load();
+  }
+
+  clearCommune(): void {
+    this.communeName.set('');
     this.communeDropdownOpen.set(false);
     this.communeSearch.set('');
     this.selectedClient.set(null);
@@ -510,7 +521,7 @@ export class CommuneAnalyticsComponent implements OnInit {
       .subscribe({ next: periodes => this.periodes.set(periodes) });
   }
 
-  private loadCommunes(autoSelect = false): void {
+  private loadCommunes(): void {
     const params = new HttpParams()
       .set('date_from', this.dateFrom())
       .set('date_to', this.dateTo());
@@ -518,14 +529,7 @@ export class CommuneAnalyticsComponent implements OnInit {
     this.http.get<CommuneOption[]>('/api/v1/geo/distributor-communes', { params })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
-        next: communes => {
-          this.communes.set(communes);
-          if (autoSelect && communes.length) {
-            this.communeName.set(communes[0].name);
-            this.updateUrl();
-            this.load();
-          }
-        },
+        next: communes => this.communes.set(communes),
       });
   }
 
@@ -533,13 +537,13 @@ export class CommuneAnalyticsComponent implements OnInit {
     const commune = this.communeName();
     const from = this.dateFrom();
     const to = this.dateTo();
-    if (!commune || !from || !to) return null;
+    if (!from || !to) return null;
 
     let params = new HttpParams()
-      .set('commune', commune)
       .set('date_from', from)
       .set('date_to', to)
       .set('unite', 'tonnes');
+    if (commune) params = params.set('commune', commune);
     if (this.canal() !== 'ALL') params = params.set('canal', this.canal());
     if (extra) {
       for (const [k, v] of Object.entries(extra)) params = params.set(k, v);

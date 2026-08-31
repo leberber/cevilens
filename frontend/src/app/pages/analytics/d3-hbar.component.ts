@@ -240,7 +240,7 @@ export class D3HbarComponent extends D3ChartBase<HBarItem> {
           .attr('x', valX)
           .attr('text-anchor', valAnchor)
           .attr('fill', valColor)
-          .text(d => fmtShort(d.value))
+          .text(d => d.value.toFixed(2))
           .call(e => isUpdate ? e : this.tx(e, 'draw', dur).attr('opacity', 1)),
         update => {
           this.tx(update, 'draw', dur)
@@ -248,7 +248,7 @@ export class D3HbarComponent extends D3ChartBase<HBarItem> {
             .attr('x', valX)
             .attr('text-anchor', valAnchor)
             .attr('fill', valColor);
-          update.text(d => fmtShort(d.value));
+          update.text(d => d.value.toFixed(2));
           return update;
         },
         exit => exitDur
