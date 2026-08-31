@@ -1,5 +1,6 @@
 import { Component, inject, signal, computed, OnInit, effect, untracked } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
+import { Router } from '@angular/router';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { DistributorContextService } from '../../core/services/distributor-context.service';
 import { RoleService } from '../../core/services/role.service';
@@ -11,7 +12,7 @@ import {
   type TreeSelection,
 } from '../../shared/components/product-tree/product-tree.component';
 import { type DateRange } from '../../shared/components/date-range-picker/date-range-picker.component';
-import { CommuneDrawerComponent } from './commune-drawer/commune-drawer.component';
+import { type CanalFilter, CANAL_FILTER_OPTIONS } from '../../core/constants/canal.constants';
 
 interface LocationDatum {
   code: number;
@@ -20,17 +21,16 @@ interface LocationDatum {
   total: number;
 }
 
-type Canal = 'VD' | 'VH' | 'ALL';
-
 @Component({
   selector: 'app-geo-explorer',
   standalone: true,
-  imports: [DecimalPipe, CommuneMapComponent, ProductTreeComponent, CommuneDrawerComponent],
+  imports: [DecimalPipe, CommuneMapComponent, ProductTreeComponent],
   templateUrl: './geo-explorer.component.html',
   styleUrl: './geo-explorer.component.scss',
 })
 export class GeoExplorerComponent implements OnInit {
   private readonly http        = inject(HttpClient);
+  private readonly router      = inject(Router);
   private readonly distContext = inject(DistributorContextService);
   private readonly roleService = inject(RoleService);
   private readonly dateHelper  = inject(DateHelper);
@@ -41,23 +41,18 @@ export class GeoExplorerComponent implements OnInit {
 
   private readonly userDateSet = signal(false);
 
-  readonly canal     = signal<Canal>('ALL');
+  readonly canal     = signal<CanalFilter>('ALL');
   readonly dateFrom  = signal('');
   readonly dateTo    = signal('');
   readonly periodes  = signal<string[]>([]);
   readonly selection = signal<TreeSelection>(null);
-  readonly commune      = signal<{ code: number; name: string } | null>(null);
   readonly sidebarWidth = signal(350);
   readonly panelOpen    = computed(() => this.sidebarWidth() > 0);
 
   private readonly MIN_WIDTH     = 180;
   private readonly COLLAPSE_SNAP = 80;
 
-  readonly canals: { value: Canal; label: string }[] = [
-    { value: 'ALL', label: 'Tous' },
-    { value: 'VD',  label: 'VD'   },
-    { value: 'VH',  label: 'VH'   },
-  ];
+  readonly canals = CANAL_FILTER_OPTIONS;
 
   readonly mapData = computed<CommuneDatum[]>(() =>
     this.mapLocations().map(r => ({ code: r.code, total: r.total }))
@@ -106,12 +101,10 @@ export class GeoExplorerComponent implements OnInit {
   }
 
   setCanal(c: string): void {
-    const canal = c as Canal;
+    const canal = c as CanalFilter;
     if (this.canal() === canal) return;
     this.canal.set(canal);
-    if (!this.commune()) {
-      this.selection.set(null);
-    }
+    this.selection.set(null);
     this.load();
   }
 
@@ -119,9 +112,7 @@ export class GeoExplorerComponent implements OnInit {
     this.userDateSet.set(true);
     this.dateFrom.set(range.from);
     this.dateTo.set(range.to);
-    if (!this.commune()) {
-      this.selection.set(null);
-    }
+    this.selection.set(null);
     this.load();
   }
 
@@ -136,11 +127,15 @@ export class GeoExplorerComponent implements OnInit {
   }
 
   setCommune(evt: { code: number; name: string } | null): void {
-    this.commune.set(evt);
-  }
-
-  clearCommune(): void {
-    this.commune.set(null);
+    if (!evt) return;
+    this.router.navigate(['/carte/commune'], {
+      queryParams: {
+        commune: evt.name,
+        from: this.dateFrom(),
+        to: this.dateTo(),
+        canal: this.canal(),
+      },
+    });
   }
 
   startResize(event: MouseEvent): void {

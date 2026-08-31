@@ -54,3 +54,6 @@ export const CATEGORY_BADGES: Record<string, string> = {
 export const BATCH_SIZE = 100;
 export const SEARCH_DEBOUNCE_MS = 400;
 export const SCROLL_THRESHOLD = 300;
+
+// Short French month labels (0-indexed)
+export const MONTH_SHORT_FR = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'] as const;

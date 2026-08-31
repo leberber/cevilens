@@ -1,10 +1,8 @@
 import { Component, input, ElementRef } from '@angular/core';
 import * as d3 from 'd3';
-import { D3ChartBase, fmtShort, type D3G, type D3Path, type D3Line, type D3Rect } from './d3-chart-base';
+import { D3ChartBase, fmtShort, type D3G, type D3Path, type D3Line, type D3Rect, type D3Sel } from './d3-chart-base';
 
 export interface AreaPoint { label: string; v1: number; v2: number; }
-
-type D3Sel = d3.Selection<SVGGElement, unknown, null, undefined>;
 
 @Component({
   selector: 'app-d3-area',
@@ -47,6 +45,8 @@ export class D3AreaComponent extends D3ChartBase<AreaPoint> {
     const el  = this.svgRef?.nativeElement;
     const tip = this.tipRef?.nativeElement;
     if (!el || !tip) return;
+
+    if (!data.length) { this.clearChart(); return; }
 
     const W  = this.lastW || 400;
     const H  = this.lastH || 220;

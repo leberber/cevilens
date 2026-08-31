@@ -1,5 +1,6 @@
 from collections import defaultdict
-from datetime import date
+from datetime import date, timedelta
+from time import time
 from typing import Any, Optional
 import json as _json
 
@@ -13,6 +14,11 @@ from app.database import get_session
 from app.models.user import User
 
 router = APIRouter()
+
+# In-memory cache for distributor communes (TTL = 1 hour, max 50 distributors)
+_communes_cache: dict = {}
+_CACHE_TTL = 3600
+_CACHE_MAX = 50
 
 
 @router.get("/communes-geojson")
@@ -73,7 +79,7 @@ def get_by_location(
 
     if current_distributor:
         base_conditions.append(
-            "(v.distributor_id = :distributor_id OR v.distributor_id IS NULL)"
+            "v.distributor_id = :distributor_id"
         )
         params["distributor_id"] = current_distributor.id
     if canal:
@@ -139,6 +145,136 @@ def get_by_location(
     ]
 
 
+@router.get("/distributor-communes")
+def get_distributor_communes(
+    date_from: str = Query(...),
+    date_to: str = Query(...),
+    current_user: User = Depends(get_current_user),
+    current_distributor=Depends(get_current_distributor),
+    session: Session = Depends(get_session),
+) -> Any:
+    """
+    Returns all communes the current distributor has ever served,
+    with current-period totals and pct_change vs previous period.
+    The commune list (territory) is cached; period totals are live.
+    """
+    dist_id = current_distributor.id if current_distributor else 0
+
+    # ── 1. Territory list (cached) ──────────────────────────────────
+    cached = _communes_cache.get(dist_id)
+    if cached and (time() - cached[0]) < _CACHE_TTL:
+        territory = cached[1]
+    else:
+        t_conditions = [
+            "v.statut_commande = 'Facturé'",
+            "v.commune IS NOT NULL",
+            "v.wilaya IS NOT NULL",
+        ]
+        t_params = {}  # type: dict
+        if current_distributor:
+            t_conditions.append(
+                "v.distributor_id = :distributor_id"
+            )
+            t_params["distributor_id"] = current_distributor.id
+
+        t_where = " AND ".join(t_conditions)
+        t_sql = f"""
+            SELECT DISTINCT lc.commune_code, lc.commune_name, lc.wilaya_name
+            FROM ventes v
+            JOIN location_communes lc
+              ON LOWER(v.commune) = LOWER(lc.commune_name)
+             AND LOWER(v.wilaya)  = LOWER(lc.wilaya_name)
+            WHERE {t_where}
+            ORDER BY lc.commune_name
+        """
+        t_rows = session.execute(text(t_sql), t_params).all()
+        territory = [
+            {"code": r[0], "name": r[1], "wilaya": r[2]}
+            for r in t_rows
+        ]
+        if len(_communes_cache) >= _CACHE_MAX:
+            oldest = min(_communes_cache, key=lambda k: _communes_cache[k][0])
+            del _communes_cache[oldest]
+        _communes_cache[dist_id] = (time(), territory)
+
+    if not territory:
+        return []
+
+    # ── 2. Compute previous period dates ────────────────────────────
+    d_from = date.fromisoformat(date_from)
+    d_to = date.fromisoformat(date_to)
+    duration = (d_to - d_from).days + 1
+    prev_to = d_from - timedelta(days=1)
+    prev_from = prev_to - timedelta(days=duration - 1)
+
+    # ── 3. Period totals (current + previous) ───────────────────────
+    base_conds = [
+        "v.statut_commande = 'Facturé'",
+        "v.commune IS NOT NULL",
+        "v.wilaya IS NOT NULL",
+    ]
+    params = {
+        "date_from": date_from,
+        "date_to": date_to,
+        "prev_from": prev_from.isoformat(),
+        "prev_to": prev_to.isoformat(),
+    }  # type: dict
+    if current_distributor:
+        base_conds.append(
+            "v.distributor_id = :distributor_id"
+        )
+        params["distributor_id"] = current_distributor.id
+
+    base_where = " AND ".join(base_conds)
+    _qty = qty_expr("tonnes")
+
+    p_sql = f"""
+        SELECT lc.commune_code,
+               COALESCE(SUM(CASE WHEN v.date_commande BETWEEN :date_from AND :date_to
+                            THEN {_qty} ELSE 0 END), 0) AS cur_tonnes,
+               COALESCE(SUM(CASE WHEN v.date_commande BETWEEN :date_from AND :date_to
+                            THEN v.total_facture ELSE 0 END), 0) AS cur_da,
+               COALESCE(SUM(CASE WHEN v.date_commande BETWEEN :prev_from AND :prev_to
+                            THEN {_qty} ELSE 0 END), 0) AS prev_tonnes
+        FROM ventes v
+        {PRODUITS_JOIN}
+        JOIN location_communes lc
+          ON LOWER(v.commune) = LOWER(lc.commune_name)
+         AND LOWER(v.wilaya)  = LOWER(lc.wilaya_name)
+        WHERE {base_where}
+          AND v.date_commande BETWEEN :prev_from AND :date_to
+        GROUP BY lc.commune_code
+    """
+    p_rows = session.execute(text(p_sql), params).all()
+    period_map = {
+        r[0]: {"total": round(float(r[1] or 0), 3),
+               "da": round(float(r[2] or 0), 0),
+               "prev": float(r[3] or 0)}
+        for r in p_rows
+    }
+
+    # ── 4. Merge territory + period data ────────────────────────────
+    result = []
+    for c in territory:
+        p = period_map.get(c["code"], {"total": 0, "da": 0, "prev": 0})
+        pct = None
+        if p["prev"] > 0:
+            pct = round(((p["total"] - p["prev"]) / p["prev"]) * 100)
+        elif p["total"] > 0:
+            pct = 100
+        result.append({
+            "code": c["code"],
+            "name": c["name"],
+            "wilaya": c["wilaya"],
+            "total": p["total"],
+            "da": p["da"],
+            "pct_change": pct,
+        })
+
+    result.sort(key=lambda x: x["total"], reverse=True)
+    return result
+
+
 @router.get("/product-tree")
 def get_product_tree(
     date_from: str = Query(...),
@@ -170,7 +306,7 @@ def get_product_tree(
     params: dict = {"date_from": date_from, "date_to": date_to}
 
     if current_distributor:
-        conds.append("(v.distributor_id = :dist_id OR v.distributor_id IS NULL)")
+        conds.append("v.distributor_id = :dist_id")
         params["dist_id"] = current_distributor.id
     if canal:
         conds.append("v.canal = :canal")
@@ -326,7 +462,7 @@ def get_commune_analytics(
     ]
     p: dict = {"commune": commune}
     if current_distributor:
-        common.append("(v.distributor_id = :dist_id OR v.distributor_id IS NULL)")
+        common.append("v.distributor_id = :dist_id")
         p["dist_id"] = current_distributor.id
     if canal:
         common.append("v.canal = :canal")
@@ -381,9 +517,10 @@ def get_commune_analytics(
         GROUP BY v.canal
     """), curr_p).all()
 
-    # 5. current total + nb clients
+    # 5. current total + nb clients + total DA
     kpi_row = session.execute(text(f"""
-        SELECT COALESCE(SUM({_qty}), 0), COUNT(DISTINCT v.code_client)
+        SELECT COALESCE(SUM({_qty}), 0), COUNT(DISTINCT v.code_client),
+               COALESCE(SUM(v.total_facture), 0)
         FROM ventes v {_pjoin}
         WHERE {curr_where}
     """), curr_p).one()
@@ -422,16 +559,17 @@ def get_commune_analytics(
     ])
     all_cli_rows = session.execute(text(f"""
         SELECT v.annee_mois, v.code_client, MAX(v.nom_client),
-               COALESCE(SUM(v.total_facture), 0)
+               COALESCE(SUM(v.total_facture), 0),
+               MAX(v.commune)
         FROM ventes v
         WHERE {cli_both_where}
         GROUP BY v.annee_mois, v.code_client
         ORDER BY 4 DESC NULLS LAST
     """), {**p, "curr_ym": curr_ym, "prev_ym": prev_ym}).all()
 
-    # Split by period, preserving original tuple shape (code, nom, total)
-    servis_rows = [(r[1], r[2], r[3]) for r in all_cli_rows if r[0] == curr_ym]
-    prev_cli_rows = [(r[1], r[2], r[3]) for r in all_cli_rows if r[0] == prev_ym]
+    # Split by period, preserving tuple shape (code, nom, total, commune)
+    servis_rows = [(r[1], r[2], r[3], r[4]) for r in all_cli_rows if r[0] == curr_ym]
+    prev_cli_rows = [(r[1], r[2], r[3], r[4]) for r in all_cli_rows if r[0] == prev_ym]
     servis_codes = {r[0] for r in servis_rows}
     prev_cli_total_map = {r[0]: float(r[2] or 0) for r in prev_cli_rows}
 
@@ -488,6 +626,8 @@ def get_commune_analytics(
             "total_prev": round(prev_total, 3),
             "pct_change": pct_change,
             "nb_clients": int(kpi_row[1] or 0),
+            "total_da":   round(float(kpi_row[2] or 0), 2),
+            "nb_fdv":     len(fdv_rows),
         },
         "by_famille": [
             {"nom": r[0], "total": round(float(r[1] or 0), 3),
@@ -527,16 +667,88 @@ def get_commune_analytics(
             "servis": [
                 {"code": r[0], "nom": r[1] or r[0], "total": round(float(r[2] or 0), 2),
                  "total_prev": round(float(prev_cli_total_map.get(r[0], 0)), 2),
+                 "commune": r[3] or "",
                  "by_famille": cli_fam_map.get(r[0], [])}
                 for r in servis_rows
             ],
             "manques": [
                 {"code": r[0], "nom": r[1] or r[0], "total": round(float(r[2] or 0), 2),
                  "total_prev": round(float(r[2] or 0), 2),
+                 "commune": r[3] or "",
                  "by_famille": prev_cli_fam_map.get(r[0], [])}
                 for r in prev_cli_rows if r[0] not in servis_codes
             ],
         },
+    }
+
+
+@router.get("/product-drilldown")
+def get_product_drilldown(
+    code_produit: str = Query(...),
+    date_from: str = Query(...),
+    date_to: str = Query(...),
+    canal: Optional[str] = Query(None),
+    unite: str = Query("tonnes"),
+    current_user: User = Depends(get_current_user),
+    current_distributor=Depends(get_current_distributor),
+    session: Session = Depends(get_session),
+) -> Any:
+    """Top communes and top clients for a given product."""
+    _qty = qty_expr(unite)
+    _pjoin = PRODUITS_JOIN if unite == "tonnes" else ""
+
+    conds: list = [
+        "v.statut_commande = 'Facturé'",
+        "v.code_produit = :code_produit",
+        "v.date_commande BETWEEN :date_from AND :date_to",
+    ]
+    params: dict = {
+        "code_produit": code_produit,
+        "date_from": date_from,
+        "date_to": date_to,
+    }
+    if current_distributor:
+        conds.append("v.distributor_id = :dist_id")
+        params["dist_id"] = current_distributor.id
+    if canal:
+        conds.append("v.canal = :canal")
+        params["canal"] = canal
+    where = " AND ".join(conds)
+
+    commune_rows = session.execute(text(f"""
+        SELECT v.commune, v.wilaya, SUM({_qty}) AS total,
+               COUNT(DISTINCT v.code_client) AS nb_clients
+        FROM ventes v {_pjoin}
+        WHERE {where} AND v.commune IS NOT NULL
+        GROUP BY v.commune, v.wilaya
+        ORDER BY total DESC
+        LIMIT 10
+    """), params).all()
+
+    client_rows = session.execute(text(f"""
+        SELECT v.code_client, MAX(v.nom_client) AS nom,
+               MAX(v.commune) AS commune,
+               SUM({_qty}) AS total
+        FROM ventes v {_pjoin}
+        WHERE {where} AND v.code_client IS NOT NULL
+        GROUP BY v.code_client
+        ORDER BY total DESC
+        LIMIT 10
+    """), params).all()
+
+    return {
+        "communes": [
+            {"name": r[0] or "", "wilaya": r[1] or "",
+             "total": round(float(r[2] or 0), 3),
+             "nb_clients": int(r[3] or 0)}
+            for r in commune_rows
+        ],
+        "clients": [
+            {"code": r[0] or "", "nom": r[1] or r[0] or "?",
+             "commune": r[2] or "",
+             "total": round(float(r[3] or 0), 3)}
+            for r in client_rows
+        ],
     }
 
 
@@ -566,7 +778,7 @@ def get_client_products(
         "date_from": date_from, "date_to": date_to,
     }
     if current_distributor:
-        conds.append("(v.distributor_id = :dist_id OR v.distributor_id IS NULL)")
+        conds.append("v.distributor_id = :dist_id")
         params["dist_id"] = current_distributor.id
     if canal:
         conds.append("v.canal = :canal")
@@ -636,7 +848,7 @@ def get_commune_clients(
     ]
     params: dict = {"commune": commune}
     if current_distributor:
-        conds.append("(v.distributor_id = :dist_id OR v.distributor_id IS NULL)")
+        conds.append("v.distributor_id = :dist_id")
         params["dist_id"] = current_distributor.id
     if canal:
         conds.append("v.canal = :canal")
@@ -701,7 +913,7 @@ def get_client_history(
     ]
     params: dict = {"code_client": code_client, "commune": commune}
     if current_distributor:
-        conds.append("(v.distributor_id = :dist_id OR v.distributor_id IS NULL)")
+        conds.append("v.distributor_id = :dist_id")
         params["dist_id"] = current_distributor.id
     if canal:
         conds.append("v.canal = :canal")

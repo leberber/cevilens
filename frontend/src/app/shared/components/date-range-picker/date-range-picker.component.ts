@@ -13,6 +13,7 @@ export interface DateRange { from: string; to: string; }
   template: `
 <div class="drp">
 
+  @if (!inline) {
   <!-- ── Compact single-pill trigger (for map control rows) -->
   @if (compact) {
     <button class="drp__compact-btn" (click)="toggle($event)" [class.active]="open">
@@ -29,22 +30,11 @@ export interface DateRange { from: string; to: string; }
     <i class="pi pi-chevron-down drp__caret" [class.drp__caret--open]="open"></i>
   </div>
   } <!-- end @else (full trigger) -->
+  }
 
   <!-- ── Panel ────────────────────────────────────────── -->
-  @if (open) {
-    <div class="drp__panel" [ngStyle]="panelStyle" (click)="$event.stopPropagation()">
-
-      <!-- Month chips -->
-      <div class="drp__chips-wrap">
-        <div class="drp__chips">
-          @for (p of periodes; track p) {
-            <button class="drp__chip" [class.drp__chip--active]="isChipActive(p)"
-                    (click)="selectChip(p)">
-              {{ chipLabel(p) }}
-            </button>
-          }
-        </div>
-      </div>
+  @if (open || inline) {
+    <div class="drp__panel" [class.drp__panel--inline]="inline" [ngStyle]="inline ? {} : panelStyle" (click)="$event.stopPropagation()">
 
       <!-- Calendar nav -->
       <div class="drp__nav">
@@ -170,38 +160,13 @@ export interface DateRange { from: string; to: string; }
   border-radius: var(--radius-xl, 14px);
   box-shadow: 0 12px 32px rgba(0,0,0,.14);
   padding: 1rem;
-}
 
-/* Month chips */
-.drp__chips-wrap {
-  margin-bottom: .85rem;
-  overflow: hidden;
-}
-
-.drp__chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  max-height: 88px;
-  overflow-y: auto;
-  padding-right: 2px;
-}
-
-.drp__chip {
-  padding: 3px 9px;
-  border: 1px solid var(--surface-border);
-  border-radius: 20px;
-  background: var(--surface-ground);
-  color: var(--text-color-secondary);
-  font-size: .7rem; font-weight: 600; font-family: inherit;
-  cursor: pointer; transition: all .12s; white-space: nowrap;
-
-  &:hover { border-color: var(--primary-color); color: var(--primary-color); background: rgba(var(--primary-rgb),.06); }
-
-  &--active {
-    background: var(--primary-color);
-    border-color: var(--primary-color);
-    color: #fff;
+  &--inline {
+    position: static;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    z-index: auto;
   }
 }
 
@@ -301,6 +266,7 @@ export class DateRangePickerComponent implements OnChanges {
   @Input() dateFrom = '';
   @Input() dateTo   = '';
   @Input() compact  = false;
+  @Input() inline   = false;
   @Output() rangeChange = new EventEmitter<DateRange>();
 
   private el = inject(ElementRef);
@@ -345,10 +311,14 @@ readonly DAYS   = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'];
       // event.currentTarget is always the clicked trigger element.
       const trigger = event.currentTarget as HTMLElement;
       const rect    = trigger.getBoundingClientRect();
+      const panelW  = 360;
+      const left    = rect.left + panelW > window.innerWidth
+        ? Math.max(0, window.innerWidth - panelW - 16)
+        : rect.left;
       this.panelStyle = {
         position: 'fixed',
         top:  `${rect.bottom + 8}px`,
-        left: `${rect.left}px`,
+        left: `${left}px`,
         zIndex: '9999',
       };
     }
@@ -431,7 +401,7 @@ readonly DAYS   = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'];
       this.tempTo = iso;
       this.phase  = 'from';
       this.emit();
-      this.open   = false;
+      if (!this.inline) this.open = false;
     }
   }
 
@@ -440,34 +410,6 @@ readonly DAYS   = ['Lu', 'Ma', 'Me', 'Je', 'Ve', 'Sa', 'Di'];
     if (!from) return false;
     const to = this.tempTo || (this.hoverDate && this.hoverDate > from ? this.hoverDate : '');
     return !!to && iso > from && iso < to;
-  }
-
-  /* ── Chips ─────────────────────────────────────── */
-  chipLabel(period: string): string {
-    const [y, m] = period.split('-').map(Number);
-    const label = new Date(y, m - 1, 1)
-      .toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' })
-      .replace('.', '');
-    return label.charAt(0).toUpperCase() + label.substring(1);
-  }
-
-  isChipActive(period: string): boolean {
-    if (!this.tempFrom) return false;
-    const from = this.tempFrom.substring(0, 7);
-    const to   = (this.tempTo || this.tempFrom).substring(0, 7);
-    return period >= (from < to ? from : to) && period <= (from < to ? to : from);
-  }
-
-  selectChip(period: string): void {
-    const [y, m] = period.split('-').map(Number);
-    const lastDay = new Date(y, m, 0).getDate();
-    this.tempFrom = `${period}-01`;
-    this.tempTo   = `${period}-${String(lastDay).padStart(2, '0')}`;
-    this.navYear  = y;
-    this.navMonth = m - 1;
-    this.phase    = 'from';
-    this.emit();
-    this.open = false;
   }
 
   /* ── Helpers ───────────────────────────────────── */

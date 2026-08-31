@@ -32,7 +32,8 @@ export class LayoutComponent {
       filter(e => e instanceof NavigationEnd),
       takeUntilDestroyed(),
     ).subscribe((e: NavigationEnd) => {
-      this.collapsed.set(e.urlAfterRedirects.startsWith('/carte'));
+      const url = e.urlAfterRedirects.split('?')[0];
+      this.collapsed.set(url === '/carte');
     });
   }
 

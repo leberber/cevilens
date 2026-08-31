@@ -1,0 +1,372 @@
+<!-- Header -->
+<div class="ca-header">
+  <div class="ca-header__left">
+    <button class="ca-header__back" (click)="goBack()" aria-label="Retour à la carte">
+      <i class="pi pi-arrow-left"></i>
+    </button>
+
+    <div class="ca-header__sep"></div>
+
+    <!-- Commune picker -->
+    <div class="ca-commune-picker">
+      <button class="ca-commune-picker__btn" (click)="toggleCommuneDropdown(); $event.stopPropagation()"
+              [class.ca-commune-picker__btn--open]="communeDropdownOpen()">
+        <i class="pi pi-map-marker"></i>
+        <span class="ca-commune-picker__label">{{ communeName() || 'Sélectionner une commune' }}</span>
+        <i class="pi pi-chevron-down ca-commune-picker__chevron"
+           [class.ca-commune-picker__chevron--open]="communeDropdownOpen()"></i>
+      </button>
+
+      @if (communeDropdownOpen()) {
+        <div class="ca-commune-picker__dropdown" (click)="$event.stopPropagation()">
+          <div class="ca-commune-picker__search">
+            <i class="pi pi-search"></i>
+            <input type="text" placeholder="Rechercher une commune…"
+                   [ngModel]="communeSearch()" (ngModelChange)="communeSearch.set($event)" />
+          </div>
+          <div class="ca-commune-picker__list">
+            @for (c of filteredCommunes(); track c.code) {
+              <div class="ca-commune-picker__item"
+                   [class.ca-commune-picker__item--active]="communeName() === c.name"
+                   (click)="pickCommune(c)">
+                <div class="ca-commune-picker__info">
+                  <span class="ca-commune-picker__name">{{ c.name }}</span>
+                  <div class="ca-commune-picker__metrics">
+                    <span class="ca-commune-picker__da"><i class="pi pi-wallet"></i> {{ c.da | number:'1.0-0' }}</span>
+                    <span class="ca-commune-picker__sep"></span>
+                    <span class="ca-commune-picker__tonnes"><i class="pi pi-box"></i> {{ c.total | number:'1.1-1' }} t</span>
+                  </div>
+                </div>
+                @if (c.pct_change !== null) {
+                  <span class="ca-commune-picker__pct"
+                        [class.ca-commune-picker__pct--up]="c.pct_change! >= 0"
+                        [class.ca-commune-picker__pct--down]="c.pct_change! < 0">
+                    <i [class]="'pi ' + (c.pct_change! >= 0 ? 'pi-arrow-up' : 'pi-arrow-down')"></i>
+                    {{ c.pct_change! > 0 ? '+' : '' }}{{ c.pct_change }}%
+                  </span>
+                }
+                <span class="ca-commune-picker__wilaya">{{ c.wilaya }}</span>
+              </div>
+            } @empty {
+              <div class="ca-commune-picker__empty">Aucune commune</div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    @if (selectedClient(); as sc) {
+      <i class="pi pi-chevron-right ca-header__breadcrumb-sep"></i>
+      <span class="ca-header__client">
+        {{ sc.nom }}
+        <button class="ca-header__clear" (click)="selectClient(null)" aria-label="Effacer">
+          <i class="pi pi-times"></i>
+        </button>
+      </span>
+    }
+  </div>
+
+  <div class="ca-header__right">
+    <div class="ca-header__months">
+      @for (chip of monthChips(); track chip.period) {
+        <button class="ca-header__chip"
+                [class.ca-header__chip--active]="activeMonth() === chip.period"
+                [class.ca-header__chip--disabled]="!chip.hasData"
+                [class.ca-header__chip--up]="chip.trend === 'up'"
+                [class.ca-header__chip--down]="chip.trend === 'down'"
+                [disabled]="!chip.hasData"
+                (click)="pickMonth(chip.period)">
+          {{ chip.label }}
+        </button>
+      }
+    </div>
+    <div class="ca-header__custom">
+      <button class="ca-header__chip ca-header__chip--custom"
+              [class.ca-header__chip--active]="!activeMonth() || customRangeOpen()"
+              (click)="toggleCustomRange(); $event.stopPropagation()">
+        <i class="pi pi-calendar"></i>
+        @if (customRangeLabel(); as lbl) {
+          {{ lbl }}
+        } @else {
+          Personnalisé
+        }
+        <i class="pi pi-chevron-down ca-header__chip-chevron"
+           [class.ca-header__chip-chevron--open]="customRangeOpen()"></i>
+      </button>
+      @if (customRangeOpen() && periodes().length) {
+        <div class="ca-header__custom-dropdown" (click)="$event.stopPropagation()">
+          <app-date-range-picker
+            [inline]="true"
+            [periodes]="periodes()"
+            [dateFrom]="dateFrom()"
+            [dateTo]="dateTo()"
+            (rangeChange)="onRangeChange($event)" />
+        </div>
+      }
+    </div>
+    <div class="ca-header__sep"></div>
+    <div class="cd-toggle">
+      @for (opt of canals; track opt.value) {
+        <button [class.cd-toggle--active]="canal() === opt.value"
+                (click)="setCanal(opt.value)">
+          {{ opt.label }}
+        </button>
+      }
+    </div>
+  </div>
+</div>
+
+@if (!communeName()) {
+  <div class="ca-empty">
+    <i class="pi pi-map-marker"></i>
+    <p>Sélectionnez une commune pour voir les analytics</p>
+  </div>
+} @else if (loading()) {
+  <div class="ca-loading"><i class="pi pi-spin pi-spinner"></i> Chargement...</div>
+} @else if (analytics(); as a) {
+  @let d = activeData() ?? a;
+
+  <!-- KPI strip -->
+  <div class="cd-kpis">
+    <div class="cd-kpi cd-kpi--hero">
+      <div class="cd-kpi__accent cd-kpi__accent--blue"></div>
+      <div class="cd-kpi__icon cd-kpi__icon--blue"><i class="pi pi-chart-bar"></i></div>
+      <div class="cd-kpi__body">
+        <div class="cd-kpi__val">{{ d.kpis.total | number:'1.1-1' }} <span class="cd-kpi__unit">{{ uniteShort }}</span></div>
+        <div class="cd-kpi__label">Volume total</div>
+        <div class="cd-kpi__sub">
+          @if (d.kpis.total_da) { <span>{{ d.kpis.total_da | number:'1.0-0' }} DA</span> <span class="cd-kpi__dot"></span> }
+          <span>{{ d.kpis.nb_clients }} clients</span>
+          @if (nbFdv()) { <span class="cd-kpi__dot"></span> <span>{{ nbFdv() }} FDV</span> }
+          @if (d.kpis.total_prev > 0) { <span class="cd-kpi__dot"></span> <span>vs {{ d.kpis.total_prev | number:'1.1-1' }}t préc.</span> }
+        </div>
+      </div>
+      @if (pctChange() !== null) {
+        <span class="cd-badge" [class.cd-badge--up]="pctChange()! >= 0"
+              [class.cd-badge--down]="pctChange()! < 0">
+          <i [class]="'pi ' + (pctChange()! >= 0 ? 'pi-arrow-up' : 'pi-arrow-down')"></i>
+          {{ pctChange()! > 0 ? '+' : '' }}{{ pctChange() }}%
+        </span>
+      }
+    </div>
+
+    <div class="cd-kpi-wrap">
+      <div class="cd-kpi" [class.cd-kpi--open]="openDropdown() === 'servis'"
+           (click)="toggleDropdown('servis'); $event.stopPropagation()">
+        <div class="cd-kpi__accent cd-kpi__accent--green"></div>
+        <div class="cd-kpi__icon cd-kpi__icon--green"><i class="pi pi-check-circle"></i></div>
+        <div class="cd-kpi__body">
+          <div class="cd-kpi__val">{{ nbServis() }}</div>
+          <div class="cd-kpi__label">Clients servis</div>
+          @if (servisTotal()) {
+            <div class="cd-kpi__sub">{{ servisTotal() | number:'1.1-1' }}{{ uniteShort }} achetés</div>
+          }
+        </div>
+        <i class="pi cd-kpi__chevron" [class.pi-chevron-down]="openDropdown() !== 'servis'"
+           [class.pi-chevron-up]="openDropdown() === 'servis'"></i>
+      </div>
+
+      @if (openDropdown() === 'servis') {
+        <div class="cd-dropdown" (click)="$event.stopPropagation()">
+          <div class="cd-dropdown__search">
+            <i class="pi pi-search"></i>
+            <input type="text" placeholder="Rechercher un client…"
+                   [ngModel]="clientSearch()" (ngModelChange)="clientSearch.set($event)" />
+          </div>
+          <div class="cd-dropdown__list">
+            @for (c of filteredDropdownClients(); track c.code) {
+              <div class="cd-dropdown__item" [class.cd-dropdown__item--active]="selectedClient()?.code === c.code"
+                   (click)="pickClient(c)">
+                <div class="cd-dropdown__avatar">{{ c.nom.charAt(0) }}</div>
+                <div class="cd-dropdown__info">
+                  <span class="cd-dropdown__name" [title]="c.nom">{{ c.nom }}</span>
+                  <div class="cd-dropdown__metrics">
+                    <span class="cd-dropdown__da"><i class="pi pi-wallet"></i> {{ c.total | number:'1.0-0' }}</span>
+                    <span class="cd-dropdown__sep"></span>
+                    <span class="cd-dropdown__qty"><i class="pi pi-box"></i> {{ c.qty | number:'1.1-1' }} {{ uniteShort }}</span>
+                  </div>
+                </div>
+                @if (c.pctChange !== null) {
+                  <span class="cd-dropdown__pct" [class.cd-dropdown__pct--up]="c.pctChange! >= 0"
+                        [class.cd-dropdown__pct--down]="c.pctChange! < 0">
+                    <i [class]="'pi ' + (c.pctChange! >= 0 ? 'pi-arrow-up' : 'pi-arrow-down')"></i>
+                    {{ c.pctChange! > 0 ? '+' : '' }}{{ c.pctChange }}%
+                  </span>
+                }
+                <span class="cd-dropdown__status">
+                  <i class="pi pi-check-circle"></i>
+                </span>
+              </div>
+            } @empty {
+              <div class="cd-dropdown__empty">Aucun client</div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="cd-kpi-wrap">
+      <div class="cd-kpi" [class.cd-kpi--open]="openDropdown() === 'manques'"
+           (click)="toggleDropdown('manques'); $event.stopPropagation()">
+        <div class="cd-kpi__accent cd-kpi__accent--amber"></div>
+        <div class="cd-kpi__icon cd-kpi__icon--amber"><i class="pi pi-exclamation-circle"></i></div>
+        <div class="cd-kpi__body">
+          <div class="cd-kpi__val">{{ nbManques() }}</div>
+          <div class="cd-kpi__label">Clients manqués</div>
+          @if (manquesTotal()) {
+            <div class="cd-kpi__sub">{{ manquesTotal() | number:'1.1-1' }}{{ uniteShort }} perdus</div>
+          }
+        </div>
+        <i class="pi cd-kpi__chevron" [class.pi-chevron-down]="openDropdown() !== 'manques'"
+           [class.pi-chevron-up]="openDropdown() === 'manques'"></i>
+      </div>
+
+      @if (openDropdown() === 'manques') {
+        <div class="cd-dropdown" (click)="$event.stopPropagation()">
+          <div class="cd-dropdown__search">
+            <i class="pi pi-search"></i>
+            <input type="text" placeholder="Rechercher un client…"
+                   [ngModel]="clientSearch()" (ngModelChange)="clientSearch.set($event)" />
+          </div>
+          <div class="cd-dropdown__list">
+            @for (c of filteredDropdownClients(); track c.code) {
+              <div class="cd-dropdown__item" [class.cd-dropdown__item--active]="selectedClient()?.code === c.code"
+                   (click)="pickClient(c)">
+                <div class="cd-dropdown__avatar cd-dropdown__avatar--missed">{{ c.nom.charAt(0) }}</div>
+                <div class="cd-dropdown__info">
+                  <span class="cd-dropdown__name" [title]="c.nom">{{ c.nom }}</span>
+                  <div class="cd-dropdown__metrics">
+                    <span class="cd-dropdown__da"><i class="pi pi-wallet"></i> {{ c.total | number:'1.0-0' }}</span>
+                    <span class="cd-dropdown__sep"></span>
+                    <span class="cd-dropdown__qty"><i class="pi pi-box"></i> {{ c.qty | number:'1.1-1' }} {{ uniteShort }}</span>
+                  </div>
+                </div>
+                <span class="cd-dropdown__pct cd-dropdown__pct--down">
+                  <i class="pi pi-arrow-down"></i> -100%
+                </span>
+                <span class="cd-dropdown__status cd-dropdown__status--missed">
+                  <i class="pi pi-exclamation-circle"></i>
+                </span>
+              </div>
+            } @empty {
+              <div class="cd-dropdown__empty">Aucun client</div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="cd-kpi cd-kpi--static">
+      <div class="cd-kpi__accent cd-kpi__accent--purple"></div>
+      <div class="cd-kpi__icon cd-kpi__icon--purple"><i class="pi pi-arrows-h"></i></div>
+      <div class="cd-kpi__body">
+        <div class="cd-kpi__label">Répartition canal</div>
+        <div class="cd-canal-bar">
+          <div class="cd-canal-bar__fill" [style.width.%]="vdPct()"></div>
+        </div>
+        <div class="cd-canal-bar__labels">
+          <span class="cd-canal-bar__vd">VD {{ d.canal_split.vd | number:'1.1-1' }}{{ uniteShort }} <span class="cd-canal-bar__pct">({{ vdPct() }}%)</span></span>
+          <span class="cd-canal-bar__vh">VH {{ d.canal_split.vh | number:'1.1-1' }}{{ uniteShort }} <span class="cd-canal-bar__pct">({{ 100 - vdPct() }}%)</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="ca-content">
+    <app-produits-tab
+      [byFamille]="d.by_famille"
+      [byFamillePrev]="d.by_famille_prev"
+      [byProduit]="d.by_produit"
+      [byProduitPrev]="d.by_produit_prev"
+      [monthlyHistory]="d.monthly_history"
+      [clientMode]="!!selectedClient()"
+      [dateTo]="dateTo()"
+      (productDrilldown)="onProductDrilldown($event)" />
+  </div>
+
+  <!-- Product drilldown popover -->
+  @if (drilldownProduct(); as dp) {
+    <div class="cd-drilldown"
+         [style.top.px]="drilldownPos().y" [style.left.px]="drilldownPos().x"
+         [style.width.px]="drilldownSize().w">
+      <div class="cd-drilldown__header" (mousedown)="startDrag($event)">
+        <div class="cd-drilldown__header-icon"><i class="pi pi-box"></i></div>
+        <div class="cd-drilldown__header-text">
+          <span class="cd-drilldown__header-label">Analyse produit</span>
+          <span class="cd-drilldown__header-name">{{ dp.nom }}</span>
+        </div>
+        <button class="cd-drilldown__close" (mousedown)="$event.stopPropagation()"
+                (click)="closeDrilldown()" aria-label="Fermer">
+          <i class="pi pi-times"></i>
+        </button>
+      </div>
+
+      @if (drilldownLoading()) {
+        <div class="cd-drilldown__loading"><i class="pi pi-spin pi-spinner"></i> Chargement...</div>
+      } @else if (drilldownData(); as dd) {
+
+        @if (drilldownTabbed()) {
+          <!-- Tabbed layout (narrow) -->
+          <div class="cd-drilldown__tabs">
+            <button class="cd-drilldown__tab"
+                    [class.cd-drilldown__tab--active]="drilldownTab() === 'communes'"
+                    (click)="drilldownTab.set('communes')">
+              <i class="pi pi-map-marker"></i> Communes
+              <span class="cd-drilldown__tab-count">{{ dd.communes.length }}</span>
+            </button>
+            <button class="cd-drilldown__tab"
+                    [class.cd-drilldown__tab--active]="drilldownTab() === 'clients'"
+                    (click)="drilldownTab.set('clients')">
+              <i class="pi pi-users"></i> Clients
+              <span class="cd-drilldown__tab-count">{{ dd.clients.length }}</span>
+            </button>
+          </div>
+          <div class="cd-drilldown__tab-content">
+            @if (drilldownTab() === 'communes') {
+              <app-d3-hbar [data]="drilldownCommuneBars()" color="#2563eb" label="tonnes"
+                           (itemSelect)="onDrilldownCommuneClick($event)" />
+            } @else {
+              <app-d3-hbar [data]="drilldownClientBars()" color="#16a34a" label="tonnes"
+                           (itemSelect)="onDrilldownClientClick($event)" />
+            }
+          </div>
+        } @else {
+          <!-- Side-by-side layout (wide) -->
+          <div class="cd-drilldown__body">
+            <div class="cd-drilldown__section">
+              <div class="cd-drilldown__section-header">
+                <div class="cd-drilldown__section-icon cd-drilldown__section-icon--blue">
+                  <i class="pi pi-map-marker"></i>
+                </div>
+                <span class="cd-drilldown__section-title">Top communes</span>
+                <span class="cd-drilldown__section-count">{{ dd.communes.length }}</span>
+              </div>
+              <div class="cd-drilldown__chart-wrap">
+                <app-d3-hbar [data]="drilldownCommuneBars()" color="#2563eb" label="tonnes"
+                             (itemSelect)="onDrilldownCommuneClick($event)" />
+              </div>
+            </div>
+
+            <div class="cd-drilldown__section">
+              <div class="cd-drilldown__section-header">
+                <div class="cd-drilldown__section-icon cd-drilldown__section-icon--green">
+                  <i class="pi pi-users"></i>
+                </div>
+                <span class="cd-drilldown__section-title">Top clients</span>
+                <span class="cd-drilldown__section-count">{{ dd.clients.length }}</span>
+              </div>
+              <div class="cd-drilldown__chart-wrap">
+                <app-d3-hbar [data]="drilldownClientBars()" color="#16a34a" label="tonnes"
+                             (itemSelect)="onDrilldownClientClick($event)" />
+              </div>
+            </div>
+          </div>
+        }
+
+      }
+      <div class="cd-drilldown__resize" (mousedown)="startResize($event)"></div>
+    </div>
+  }
+
+}

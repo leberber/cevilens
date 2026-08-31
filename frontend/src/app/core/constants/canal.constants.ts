@@ -16,3 +16,11 @@ export const CANAL_DISPLAY = (canal: string | null): string => {
 };
 
 export type Canal = typeof CANAL_OPTIONS[number]['value'];
+
+export type CanalFilter = Canal | 'ALL';
+
+export const CANAL_FILTER_OPTIONS: { value: CanalFilter; label: string }[] = [
+  { value: 'ALL', label: 'Tous' },
+  { value: 'VD',  label: 'VD'   },
+  { value: 'VH',  label: 'VH'   },
+];

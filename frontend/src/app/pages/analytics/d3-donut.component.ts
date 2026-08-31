@@ -65,17 +65,6 @@ export class D3DonutComponent extends D3ChartBase<DonutSlice> {
     const cy  = H / 2;
     const r   = Math.min(cx, cy) * 0.78;
     const ri  = r * 0.72;
-    const dur = animate ? 650 : 0;
-    const grand = d3.sum(data, d => d.value);
-
-    const pie = d3.pie<DonutSlice>().value(d => d.value).sort(null).padAngle(0.02);
-    const arc = d3.arc<d3.PieArcDatum<DonutSlice>>()
-      .innerRadius(ri).outerRadius(r).cornerRadius(5);
-    const arcHover = d3.arc<d3.PieArcDatum<DonutSlice>>()
-      .innerRadius(ri).outerRadius(r + 8).cornerRadius(5);
-
-    const slices = pie(data);
-    const selNom = untracked(() => this.selectedNom());
 
     if (!this.built) {
       this.svgSel  = d3.select(el);
@@ -89,6 +78,30 @@ export class D3DonutComponent extends D3ChartBase<DonutSlice> {
 
     this.svgSel.attr('viewBox', `0 0 ${W} ${H}`);
     this.gSel.attr('transform', `translate(${cx},${cy})`);
+
+    if (!data.length) {
+      this.arcsG.selectAll('*').remove();
+      this.pctsG.selectAll('*').remove();
+      this.labelsG.selectAll('*').remove();
+      this.centerG.selectAll('*').remove();
+      this.centerG.append('text')
+        .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+        .attr('font-size', 11).attr('fill', 'var(--text-color-secondary)')
+        .text('Aucune donnée');
+      return;
+    }
+
+    const dur = animate ? 650 : 0;
+    const grand = d3.sum(data, d => d.value);
+
+    const pie = d3.pie<DonutSlice>().value(d => d.value).sort(null).padAngle(0.02);
+    const arc = d3.arc<d3.PieArcDatum<DonutSlice>>()
+      .innerRadius(ri).outerRadius(r).cornerRadius(5);
+    const arcHover = d3.arc<d3.PieArcDatum<DonutSlice>>()
+      .innerRadius(ri).outerRadius(r + 8).cornerRadius(5);
+
+    const slices = pie(data);
+    const selNom = untracked(() => this.selectedNom());
 
     // Arcs
     const joined = this.arcsG

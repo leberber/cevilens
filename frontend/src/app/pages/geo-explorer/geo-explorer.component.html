@@ -48,7 +48,7 @@
   <div class="geo-map">
     <app-commune-map
       [data]="mapData()"
-      [selectedCode]="commune()?.code ?? null"
+      [selectedCode]="null"
       [canal]="canal()"
       [canalOptions]="canals"
       [periodes]="periodes()"
@@ -69,17 +69,4 @@
       </div>
     }
   </div>
-
-  <!-- Full-page commune analytics overlay -->
-  <app-commune-drawer
-    [commune]="commune()"
-    [dateFrom]="dateFrom()"
-    [dateTo]="dateTo()"
-    [canal]="canal()"
-    [periodes]="periodes()"
-    [canalOptions]="canals"
-    (canalChange)="setCanal($event)"
-    (rangeChange)="onRangeChange($event)"
-    (closed)="clearCommune()" />
-
 </div>

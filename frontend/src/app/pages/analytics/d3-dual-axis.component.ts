@@ -1,6 +1,6 @@
 import { Component, input, ElementRef } from '@angular/core';
 import * as d3 from 'd3';
-import { D3ChartBase, fmtShort, type D3G, type D3Path, type D3Line, type D3Rect } from './d3-chart-base';
+import { D3ChartBase, fmtShort, type D3G, type D3Path, type D3Line, type D3Rect, type D3Sel } from './d3-chart-base';
 
 export interface DualAxisPoint {
   label: string;
@@ -8,8 +8,6 @@ export interface DualAxisPoint {
   line: number;
   missed?: boolean;
 }
-
-type D3Sel = d3.Selection<SVGGElement, unknown, null, undefined>;
 
 @Component({
   selector: 'app-d3-dual-axis',
@@ -42,6 +40,7 @@ export class D3DualAxisComponent extends D3ChartBase<DualAxisPoint> {
   private y1AxisG!: D3G;
   private y2AxisG!: D3G;
   private barsG!:   D3G;
+  private barLabelsG!: D3G;
   private missedG!: D3G;
   private lineEl!:  D3Path;
   private vlineEl!: D3Line;
@@ -55,6 +54,8 @@ export class D3DualAxisComponent extends D3ChartBase<DualAxisPoint> {
     const el  = this.svgRef?.nativeElement;
     const tip = this.tipRef?.nativeElement;
     if (!el || !tip) return;
+
+    if (!data.length) { this.clearChart(); return; }
 
     const W   = this.lastW || 400;
     const H   = this.lastH || 200;
@@ -89,6 +90,7 @@ export class D3DualAxisComponent extends D3ChartBase<DualAxisPoint> {
       const g       = this.gSel    = this.svgSel.append('g');
       this.gridG    = g.append('g');
       this.barsG    = g.append('g');
+      this.barLabelsG = g.append('g').attr('pointer-events', 'none');
       this.missedG  = g.append('g');
       this.lineEl   = g.append('path').attr('fill', 'none')
         .attr('stroke', lineCol).attr('stroke-width', 2.2);
@@ -136,6 +138,38 @@ export class D3DualAxisComponent extends D3ChartBase<DualAxisPoint> {
         },
         exit => exit.transition().duration(dur / 2).attr('height', 0).attr('y', iH).remove()
       );
+
+    const MIN_BAR_FOR_INNER_LABEL = 14;
+    const barLabelY = (d: DualAxisPoint) => {
+      const barTop = y1(d.bar);
+      return (iH - barTop) > MIN_BAR_FOR_INNER_LABEL ? barTop + 10 : barTop - 3;
+    };
+    const barLabelFill = (d: DualAxisPoint) =>
+      (iH - y1(d.bar)) > MIN_BAR_FOR_INNER_LABEL ? '#fff' : 'var(--text-color-secondary)';
+    this.barLabelsG.selectAll<SVGTextElement, DualAxisPoint>('.bar-val')
+      .data(data, (d: DualAxisPoint) => d.label)
+      .join(
+        enter => enter.append('text').attr('class', 'bar-val')
+          .attr('text-anchor', 'middle')
+          .attr('font-size', 7).attr('font-weight', 700)
+          .attr('x', d => x(d.label)! + bw / 2)
+          .attr('y', d => d.bar > 0 ? barLabelY(d) : iH)
+          .attr('fill', d => barLabelFill(d))
+          .attr('opacity', 0)
+          .call(e => dur
+            ? e.transition().delay(dur * 0.5).duration(250).attr('opacity', d => d.bar > 0 ? 1 : 0)
+            : e.attr('opacity', d => d.bar > 0 ? 1 : 0)),
+        update => {
+          this.tx(update, 'morph', dur)
+            .attr('x', (d: DualAxisPoint) => x(d.label)! + bw / 2)
+            .attr('y', (d: DualAxisPoint) => d.bar > 0 ? barLabelY(d) : iH)
+            .attr('fill', (d: DualAxisPoint) => barLabelFill(d))
+            .attr('opacity', (d: DualAxisPoint) => d.bar > 0 ? 1 : 0);
+          return update;
+        },
+        exit => exit.remove()
+      )
+      .text(d => d.bar > 0 ? fmtShort(d.bar) : '');
 
     // Missed bars (dashed red outline for months where client had no sales)
     const missedData = data.filter(d => d.missed);

@@ -10,6 +10,7 @@ export type D3G    = d3.Selection<SVGGElement,    unknown, null, undefined>;
 export type D3Path = d3.Selection<SVGPathElement, unknown, null, undefined>;
 export type D3Line = d3.Selection<SVGLineElement, unknown, null, undefined>;
 export type D3Rect = d3.Selection<SVGRectElement, unknown, null, undefined>;
+export type D3Sel  = d3.Selection<SVGGElement, unknown, null, undefined>;
 
 /** Format a number as 1.2M / 500k / 42 */
 export function fmtShort(v: number): string {
@@ -39,7 +40,8 @@ export abstract class D3ChartBase<T> implements AfterViewInit, OnDestroy {
     effect(() => {
       if (!this.ready()) return;
       const d = this.getInputData();
-      if (d.length && d !== this.lastDrawnData) this.schedule(d, true);
+      if (d !== this.lastDrawnData && (d.length || this.lastDrawnData?.length))
+        this.schedule(d, true);
     });
   }
 
@@ -50,7 +52,7 @@ export abstract class D3ChartBase<T> implements AfterViewInit, OnDestroy {
       const H = this.host.nativeElement.clientHeight;
       if (W === this.lastW && H === this.lastH) return;
       const d = untracked(() => this.getInputData());
-      if (d.length) this.schedule(d, false);
+      if (d.length || this.lastDrawnData?.length) this.schedule(d, false);
     });
     this.ro.observe(this.host.nativeElement);
   }
@@ -79,6 +81,13 @@ export abstract class D3ChartBase<T> implements AfterViewInit, OnDestroy {
   protected updateLayout(W: number, H: number, m: { top: number; left: number }): void {
     this.svgSel.attr('viewBox', `0 0 ${W} ${H}`);
     this.gSel.attr('transform', `translate(${m.left},${m.top})`);
+  }
+
+  protected clearChart(): void {
+    if (this.built) {
+      this.gSel.selectAll('*').remove();
+      this.built = false;
+    }
   }
 
   protected abstract getInputData(): T[];

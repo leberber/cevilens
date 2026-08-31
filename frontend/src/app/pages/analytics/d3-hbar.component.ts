@@ -2,7 +2,7 @@ import { Component, input, output, effect, ElementRef, untracked } from '@angula
 import * as d3 from 'd3';
 import { D3ChartBase, fmtShort, type D3G } from './d3-chart-base';
 
-export interface HBarItem { name: string; value: number; id?: number; }
+export interface HBarItem { name: string; value: number; id?: number; subtitle?: string; }
 
 @Component({
   selector: 'app-d3-hbar',
@@ -15,10 +15,12 @@ export interface HBarItem { name: string; value: number; id?: number; }
     :host { display:block; height:100%; width:100%; position:relative; }
     .d3tip {
       position:absolute; pointer-events:none;
-      background:rgba(15,23,42,.88); color:#fff;
-      font-size:12px; padding:7px 11px;
-      border-radius:8px; opacity:0;
+      background:rgba(15,23,42,.92); color:#fff;
+      font-size:11px; padding:8px 12px;
+      border-radius:10px; opacity:0;
       transition:opacity .12s; white-space:nowrap; z-index:20;
+      box-shadow: 0 4px 12px rgba(0,0,0,.15);
+      backdrop-filter: blur(4px);
     }
   `],
 })
@@ -30,13 +32,17 @@ export class D3HbarComponent extends D3ChartBase<HBarItem> {
   readonly itemSelect = output<HBarItem | null>();
 
   private tracksG!: D3G;
+  private barsG!: D3G;
+  private labelsG!: D3G;
+  private gradId = '';
+  private hasDrawnOnce = false;
 
   constructor(host: ElementRef<HTMLElement>) {
     super(host);
     effect(() => {
       const selId = this.selectedId();
       if (!this.built) return;
-      this.gSel.selectAll<SVGRectElement, HBarItem>('.bar')
+      this.barsG.selectAll<SVGRectElement, HBarItem>('.bar')
         .transition('opacity').duration(220).ease(d3.easeCubicOut)
         .attr('opacity', (d: HBarItem) => selId != null && d.id !== selId ? 0.25 : 1);
     });
@@ -49,143 +55,249 @@ export class D3HbarComponent extends D3ChartBase<HBarItem> {
     const tip = this.tipRef?.nativeElement;
     if (!el || !tip) return;
 
-    const W  = this.lastW || 400;
-    const H  = this.lastH || 260;
-    const lw = Math.min(W * 0.38, 160);
-    const m  = { top: 6, right: 72, bottom: 6, left: lw };
-    const iW = W - m.left - m.right;
-    const iH = H - m.top - m.bottom;
-    const dur = animate ? 550 : 0;
+    if (!data.length) {
+      if (this.built) {
+        this.tracksG.selectAll('*').remove();
+        this.barsG.selectAll('*').remove();
+        this.labelsG.selectAll('*').remove();
+      }
+      return;
+    }
 
-    const y = d3.scaleBand<string>().domain(data.map(d => d.name)).range([0, iH]).padding(0.35);
-    const x = d3.scaleLinear().domain([0, d3.max(data, d => d.value) ?? 1]).range([0, iW]);
+    const W   = this.lastW || 400;
+    const H   = this.lastH || 260;
+    const m   = { top: 8, right: 12, bottom: 8, left: 12 };
+    const iW  = W - m.left - m.right;
+    const iH  = H - m.top - m.bottom;
+    const dur = animate ? 500 : 0;
+    const isUpdate = this.hasDrawnOnce;
+
+    const barH   = Math.min(Math.max(6, iH / data.length * 0.32), 14);
+    const labelH = 13;
+    const rowH   = barH + labelH + 4;
+    const gap    = Math.max(4, (iH - data.length * rowH) / Math.max(data.length, 1));
+
+    const yPos = (i: number) => i * (rowH + gap);
+    const x    = d3.scaleLinear().domain([0, d3.max(data, d => d.value) ?? 1]).range([0, iW]);
 
     const barColor = this.color();
-    const maxVal   = d3.max(data, d => d.value) ?? 1;
     const base     = d3.color(barColor)!.rgb();
-    const lightHex = d3.rgb(base.r + (255-base.r)*0.82, base.g + (255-base.g)*0.82, base.b + (255-base.b)*0.82).formatHex();
-    const colorFor = (v: number) => d3.interpolateRgb(lightHex, barColor)(Math.sqrt(v / maxVal));
-    const selId    = untracked(() => this.selectedId());
+    const lightHex = d3.rgb(
+      base.r + (255 - base.r) * 0.88,
+      base.g + (255 - base.g) * 0.88,
+      base.b + (255 - base.b) * 0.88,
+    ).formatHex();
+    const selId = untracked(() => this.selectedId());
 
+    // Defs for gradient
     if (!this.built) {
       this.svgSel  = d3.select(el);
       this.gSel    = this.svgSel.append('g');
       this.tracksG = this.gSel.append('g');
-      this.built   = true;
+      this.barsG   = this.gSel.append('g');
+      this.labelsG = this.gSel.append('g');
+
+      // Gradient definition
+      const defs = this.svgSel.append('defs');
+      const grad = defs.append('linearGradient').attr('id', `hbar-grad-${this.host.nativeElement.id || Math.random().toString(36).slice(2)}`);
+      grad.append('stop').attr('offset', '0%').attr('stop-color', lightHex);
+      grad.append('stop').attr('offset', '100%').attr('stop-color', barColor);
+      this.gradId = grad.attr('id');
+
+      this.built = true;
     }
+
+    const gradId = this.gradId;
+
+    // Update gradient colors
+    this.svgSel.select(`#${gradId} stop:first-child`).attr('stop-color', lightHex);
+    this.svgSel.select(`#${gradId} stop:last-child`).attr('stop-color', barColor);
 
     this.updateLayout(W, H, m);
 
-    this.tracksG.selectAll<SVGRectElement, HBarItem>('.track')
-      .data(data, (d: HBarItem) => d.name)
-      .join(
-        enter => enter.append('rect').attr('class','track')
-          .attr('rx', 4).attr('fill', '#f1f5f9')
-          .attr('x', 0).attr('width', iW)
-          .attr('y', d => y(d.name)!).attr('height', y.bandwidth()),
-        update => {
-          this.tx(update, 'draw', dur).attr('y', (d: HBarItem) => y(d.name)!)
-            .attr('height', y.bandwidth()).attr('width', iW);
-          return update;
-        },
-        exit => exit.remove()
-      );
+    type Indexed = HBarItem & { _i: number };
+    const indexed: Indexed[] = data.map((d, i) => ({ ...d, _i: i }));
 
-    this.gSel.selectAll<SVGRectElement, HBarItem>('.bar')
-      .data(data, (d: HBarItem) => d.name)
+    // On data updates: enter/exit are instant, only matching names animate
+    const enterDur = isUpdate ? 0 : dur;
+    const exitDur  = isUpdate ? 0 : dur / 2;
+
+    // Track backgrounds
+    this.tracksG.selectAll<SVGRectElement, Indexed>('.track')
+      .data(indexed, d => d.name)
       .join(
-        enter => enter.append('rect').attr('class','bar')
-          .attr('rx', 4).attr('fill', (d: HBarItem) => colorFor(d.value))
-          .attr('x', 0).attr('width', 0)
-          .attr('y', d => y(d.name)!).attr('height', y.bandwidth())
-          .attr('opacity', d => selId != null && d.id !== selId ? 0.25 : 1)
-          .call(e => this.tx(e, 'draw', dur)
-            .attr('y', (d: HBarItem) => y(d.name)!).attr('height', y.bandwidth())
-            .attr('width', (d: HBarItem) => x(d.value))),
+        enter => enter.append('rect').attr('class', 'track')
+          .attr('rx', barH / 2).attr('ry', barH / 2)
+          .attr('fill', lightHex).attr('opacity', 0.4)
+          .attr('x', 0).attr('width', iW)
+          .attr('y', d => yPos(d._i) + labelH).attr('height', barH),
         update => {
           this.tx(update, 'draw', dur)
-            .attr('fill', (d: HBarItem) => colorFor(d.value))
-            .attr('y', (d: HBarItem) => y(d.name)!).attr('height', y.bandwidth())
-            .attr('width', (d: HBarItem) => x(d.value));
+            .attr('y', (d: Indexed) => yPos(d._i) + labelH)
+            .attr('height', barH).attr('width', iW)
+            .attr('rx', barH / 2).attr('ry', barH / 2)
+            .attr('fill', lightHex);
           return update;
         },
-        exit => dur
-          ? exit.transition('draw').duration(dur / 2).attr('width', 0).remove()
+        exit => exitDur
+          ? exit.transition('draw').duration(exitDur).attr('opacity', 0).remove()
           : exit.remove()
       );
 
-    this.gSel.selectAll<SVGTextElement, HBarItem>('.val')
-      .data(data, (d: HBarItem) => d.name)
+    // Bars
+    this.barsG.selectAll<SVGRectElement, Indexed>('.bar')
+      .data(indexed, d => d.name)
       .join(
-        enter => enter.append('text').attr('class','val')
-          .attr('font-size', 11).attr('font-weight', 600).attr('fill', (d: HBarItem) => colorFor(d.value))
-          .attr('dominant-baseline', 'middle').attr('opacity', 0)
-          .attr('y', d => y(d.name)! + y.bandwidth() / 2)
-          .attr('x', d => x(d.value) + 7)
-          .text(d => fmtShort(d.value))
-          .call(e => this.tx(e, 'draw', dur).attr('opacity', 1)),
+        enter => enter.append('rect').attr('class', 'bar')
+          .attr('rx', barH / 2).attr('ry', barH / 2)
+          .attr('fill', `url(#${gradId})`)
+          .attr('x', 0)
+          .attr('y', d => yPos(d._i) + labelH).attr('height', barH)
+          .attr('opacity', d => selId != null && d.id !== selId ? 0.25 : 1)
+          .attr('width', isUpdate ? ((d: Indexed) => Math.max(x(d.value), barH)) as any : 0)
+          .call(e => isUpdate ? e : this.tx(e, 'draw', dur)
+            .attr('width', (d: Indexed) => Math.max(x(d.value), barH))),
         update => {
           this.tx(update, 'draw', dur)
-            .attr('fill', (d: HBarItem) => colorFor(d.value))
-            .attr('y', (d: HBarItem) => y(d.name)! + y.bandwidth() / 2)
-            .attr('x', (d: HBarItem) => x(d.value) + 7);
+            .attr('y', (d: Indexed) => yPos(d._i) + labelH)
+            .attr('height', barH)
+            .attr('rx', barH / 2).attr('ry', barH / 2)
+            .attr('width', (d: Indexed) => Math.max(x(d.value), barH));
+          return update;
+        },
+        exit => exitDur
+          ? exit.transition('draw').duration(exitDur).attr('width', 0).attr('opacity', 0).remove()
+          : exit.remove()
+      );
+
+    // Name labels (above bar)
+    this.labelsG.selectAll<SVGTextElement, Indexed>('.name')
+      .data(indexed, d => d.name)
+      .join(
+        enter => enter.append('text').attr('class', 'name')
+          .attr('text-anchor', 'start').attr('dominant-baseline', 'auto')
+          .attr('font-size', 10.5).attr('fill', 'var(--text-color, #334155)').attr('font-weight', 600)
+          .attr('x', 0).attr('opacity', isUpdate ? 1 : 0)
+          .attr('y', d => yPos(d._i) + labelH - 4)
+          .text(d => d.name.length > 35 ? d.name.slice(0, 35) + '…' : d.name)
+          .call(e => isUpdate ? e : this.tx(e, 'draw', dur).attr('opacity', 1)),
+        update => {
+          this.tx(update, 'draw', dur)
+            .attr('y', (d: Indexed) => yPos(d._i) + labelH - 4);
+          update.text(d => d.name.length > 35 ? d.name.slice(0, 35) + '…' : d.name);
+          return update;
+        },
+        exit => exitDur
+          ? exit.transition().duration(exitDur).attr('opacity', 0).remove()
+          : exit.remove()
+      );
+
+    // Subtitle labels (after name, same line)
+    const hasSubtitles = data.some(d => !!d.subtitle);
+    if (hasSubtitles) {
+      this.labelsG.selectAll<SVGTextElement, Indexed>('.sub')
+        .data(indexed, d => d.name)
+        .join(
+          enter => enter.append('text').attr('class', 'sub')
+            .attr('text-anchor', 'end').attr('dominant-baseline', 'auto')
+            .attr('font-size', 9).attr('fill', 'var(--text-color-secondary, #94a3b8)').attr('font-weight', 400)
+            .attr('x', iW).attr('opacity', isUpdate ? 1 : 0)
+            .attr('y', d => yPos(d._i) + labelH - 4)
+            .text(d => d.subtitle ?? '')
+            .call(e => isUpdate ? e : this.tx(e, 'draw', dur).attr('opacity', 1)),
+          update => {
+            this.tx(update, 'draw', dur)
+              .attr('y', (d: Indexed) => yPos(d._i) + labelH - 4)
+              .attr('x', iW);
+            update.text(d => d.subtitle ?? '');
+            return update;
+          },
+          exit => exitDur
+            ? exit.transition().duration(exitDur).attr('opacity', 0).remove()
+            : exit.remove()
+        );
+    } else {
+      this.labelsG.selectAll('.sub').remove();
+    }
+
+    // Value labels — inside bar (white) when it would overflow, outside (colored) otherwise
+    const valPad = 6;
+    const valTextW = 32;
+    const isInside = (d: Indexed) => Math.max(x(d.value), barH) + valPad + valTextW > iW;
+    const valX = (d: Indexed) => isInside(d)
+      ? Math.max(x(d.value), barH) - valPad
+      : Math.max(x(d.value), barH) + valPad;
+    const valAnchor = (d: Indexed) => isInside(d) ? 'end' : 'start';
+    const valColor  = (d: Indexed) => isInside(d) ? '#fff' : barColor;
+
+    this.labelsG.selectAll<SVGTextElement, Indexed>('.val')
+      .data(indexed, d => d.name)
+      .join(
+        enter => enter.append('text').attr('class', 'val')
+          .attr('font-size', 10).attr('font-weight', 700)
+          .attr('dominant-baseline', 'middle').attr('opacity', isUpdate ? 1 : 0)
+          .attr('y', d => yPos(d._i) + labelH + barH / 2)
+          .attr('x', valX)
+          .attr('text-anchor', valAnchor)
+          .attr('fill', valColor)
+          .text(d => fmtShort(d.value))
+          .call(e => isUpdate ? e : this.tx(e, 'draw', dur).attr('opacity', 1)),
+        update => {
+          this.tx(update, 'draw', dur)
+            .attr('y', (d: Indexed) => yPos(d._i) + labelH + barH / 2)
+            .attr('x', valX)
+            .attr('text-anchor', valAnchor)
+            .attr('fill', valColor);
           update.text(d => fmtShort(d.value));
           return update;
         },
-        exit => dur
-          ? exit.transition().duration(dur / 2).attr('opacity', 0).remove()
+        exit => exitDur
+          ? exit.transition().duration(exitDur).attr('opacity', 0).remove()
           : exit.remove()
       );
 
-    this.svgSel.selectAll<SVGTextElement, HBarItem>('.name')
-      .data(data, (d: HBarItem) => d.name)
+    // Hover zones
+    this.gSel.selectAll<SVGRectElement, Indexed>('.hover-zone')
+      .data(indexed, d => d.name)
       .join(
-        enter => enter.append('text').attr('class','name')
-          .attr('text-anchor', 'end').attr('dominant-baseline', 'middle')
-          .attr('font-size', 11).attr('fill','#475569').attr('font-weight', 500)
-          .attr('x', m.left - 10)
-          .attr('y', d => m.top + y(d.name)! + y.bandwidth() / 2)
-          .text(d => {
-            const parts = d.name.split(' ');
-            const label = parts.slice(0, 3).join(' ') + (parts.length > 3 ? '…' : '');
-            return label;
-          }),
-        update => {
-          this.tx(update, 'draw', dur)
-            .attr('y', (d: HBarItem) => m.top + y(d.name)! + y.bandwidth() / 2);
-          return update;
-        },
-        exit => dur
-          ? exit.transition().duration(dur / 2).attr('opacity', 0).remove()
-          : exit.remove()
-      );
-
-    this.gSel.selectAll<SVGRectElement, HBarItem>('.hover-zone')
-      .data(data, (d: HBarItem) => d.name)
-      .join(
-        enter => enter.append('rect').attr('class','hover-zone')
-          .attr('fill','transparent').style('cursor','pointer')
+        enter => enter.append('rect').attr('class', 'hover-zone')
+          .attr('fill', 'transparent').style('cursor', 'pointer')
           .attr('x', -m.left).attr('width', W)
-          .attr('y', d => y(d.name)!).attr('height', y.bandwidth())
-          .on('mouseover', (_, d) => {
-            tip.innerHTML = `<b>${d.name}</b><br/>${fmtShort(d.value)} ${this.label()}`;
+          .attr('y', d => yPos(d._i)).attr('height', rowH)
+          .on('mouseover', (_: MouseEvent, d: Indexed) => {
+            d3.select(el).selectAll<SVGRectElement, Indexed>('.bar')
+              .filter(b => b.name === d.name)
+              .transition('hover').duration(120)
+              .attr('filter', 'brightness(1.1) drop-shadow(0 1px 3px rgba(0,0,0,.15))');
+            const sub = d.subtitle ? `<br/><span style="opacity:.7">${d.subtitle}</span>` : '';
+            tip.innerHTML = `<b>${d.name}</b>${sub}<br/>${fmtShort(d.value)} ${this.label()}`;
             tip.style.opacity = '1';
           })
           .on('mousemove', (event: MouseEvent) => {
-            Object.assign(tip.style, { left: `${event.offsetX + 10}px`, top: `${event.offsetY - 34}px` });
+            Object.assign(tip.style, {
+              left: `${event.offsetX + 12}px`,
+              top: `${event.offsetY - 38}px`,
+            });
           })
-          .on('mouseout', () => { tip.style.opacity = '0'; })
-          .on('click', (_, d) => {
+          .on('mouseout', () => {
+            d3.select(el).selectAll('.bar')
+              .transition('hover').duration(120)
+              .attr('filter', null);
+            tip.style.opacity = '0';
+          })
+          .on('click', (_: MouseEvent, d: Indexed) => {
             const cur = untracked(() => this.selectedId());
             this.itemSelect.emit(cur === d.id ? null : d);
           }),
         update => {
           this.tx(update, 'draw', dur)
-            .attr('y', (d: HBarItem) => y(d.name)!).attr('height', y.bandwidth())
+            .attr('y', (d: Indexed) => yPos(d._i)).attr('height', rowH)
             .attr('x', -m.left).attr('width', W);
           return update;
         },
         exit => exit.remove()
       );
+
+    this.hasDrawnOnce = true;
   }
 }

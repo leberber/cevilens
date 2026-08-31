@@ -1,6 +1,7 @@
-import { Component, input, signal, computed } from '@angular/core';
+import { Component, input, output, signal, computed } from '@angular/core';
 import { D3DonutComponent, type DonutSlice } from '../../analytics/d3-donut.component';
 import { D3DualAxisComponent, type DualAxisPoint } from '../../analytics/d3-dual-axis.component';
+import { MONTH_SHORT_FR } from '../../../core/constants/app.constants';
 
 const COLORS = [
   '#3b82f6', '#f59e0b', '#8b5cf6', '#10b981',
@@ -49,7 +50,8 @@ const COLORS = [
               [centerUnit]="uniteShort"
               [deltas]="produitDeltas()"
               [secondaryValues]="produitPacks()"
-              [secondaryUnit]="'packs'" />
+              [secondaryUnit]="'packs'"
+              (sliceSelect)="onProductClick($event)" />
           </div>
         </div>
       </div>
@@ -156,6 +158,7 @@ export class ProduitsTabComponent {
   readonly dateTo        = input('');
 
   readonly selectedFamille = signal<string | null>(null);
+  readonly productDrilldown = output<{ code: string; nom: string } | null>();
   readonly uniteShort = 't';
 
   private readonly colorMap = computed(() => {
@@ -232,7 +235,7 @@ export class ProduitsTabComponent {
   });
 
   readonly monthlyData = computed<DualAxisPoint[]>(() => {
-    const MONTH_SHORT = ['Jan', 'Fev', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aou', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const MONTH_SHORT = MONTH_SHORT_FR;
     const hist = this.monthlyHistory();
     if (!hist.length) return [];
 
@@ -269,6 +272,19 @@ export class ProduitsTabComponent {
     }
     return points;
   });
+
+  onProductClick(nom: string | null): void {
+    if (!nom) {
+      this.productDrilldown.emit(null);
+      return;
+    }
+    const sel = this.selectedFamille();
+    const prods = sel
+      ? this.byProduit().filter(p => p.famille === sel)
+      : this.byProduit().slice(0, 8);
+    const found = prods.find(p => p.nom === nom);
+    this.productDrilldown.emit(found ? { code: found.code, nom: found.nom } : null);
+  }
 
   private lighten(hex: string, idx: number): string {
     const factor = 0.15 + (idx * 0.08);
