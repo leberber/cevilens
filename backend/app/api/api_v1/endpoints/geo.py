@@ -9,7 +9,7 @@ from sqlalchemy import text
 from sqlmodel import Session
 
 from app.api.deps import get_current_user, get_current_distributor
-from app.core.tonnage import PRODUITS_JOIN, qty_expr
+from app.core.uom_conversion import PRODUITS_JOIN, PACKS_EXPR, qty_expr
 from app.database import get_session
 from app.models.user import User
 
@@ -536,11 +536,12 @@ def get_commune_analytics(
     curr_p = {**p, "date_from": date_from, "date_to": date_to}
     prev_p = {**p, "prev_ym": prev_ym}
 
-    # 1. by famille
+    # 1. by famille (always join produits for packs normalization)
+    _pj = _pjoin or PRODUITS_JOIN
     fam_rows = session.execute(text(f"""
         SELECT TRIM(v.famille) AS fam, SUM({_qty}) AS total,
-               SUM(v.qte_facturee) AS packs
-        FROM ventes v {_pjoin}
+               SUM({PACKS_EXPR}) AS packs
+        FROM ventes v {_pj}
         WHERE {curr_where} AND v.famille IS NOT NULL
         GROUP BY TRIM(v.famille)
         ORDER BY total DESC
@@ -550,8 +551,9 @@ def get_commune_analytics(
     prod_rows = session.execute(text(f"""
         SELECT v.code_produit, v.description_produit,
                TRIM(v.famille) AS famille, SUM({_qty}) AS total,
-               SUM(v.qte_facturee) AS packs
-        FROM ventes v {_pjoin}
+               SUM({PACKS_EXPR}) AS packs,
+               MAX(v.uom_vente) AS uom_vente
+        FROM ventes v {_pj}
         WHERE {curr_where} AND v.code_produit IS NOT NULL
         GROUP BY v.code_produit, v.description_produit, TRIM(v.famille)
         ORDER BY total DESC
@@ -701,7 +703,8 @@ def get_commune_analytics(
         "by_produit": [
             {"code": r[0] or "", "nom": r[1] or r[0] or "?",
              "famille": r[2] or "", "total": round(float(r[3] or 0), 3),
-             "packs": round(float(r[4] or 0), 0)}
+             "packs": round(float(r[4] or 0), 0),
+             "uom": (r[5] or "").strip().lower()}
             for r in prod_rows
         ],
         "by_produit_prev": [

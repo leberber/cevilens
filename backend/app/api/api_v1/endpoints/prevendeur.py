@@ -14,7 +14,7 @@ from sqlmodel import Session, select
 
 from app.api.deps import get_current_user, get_current_distributor
 from app.core.product_codes import remap_by_vente_code
-from app.core.tonnage import PRODUITS_JOIN, qty_expr
+from app.core.uom_conversion import PRODUITS_JOIN, qty_expr
 from app.database import get_session
 from app.models.user import User, UserRole
 from app.models.vente import Vente

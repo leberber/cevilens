@@ -34,6 +34,7 @@ export class D3DonutComponent extends D3ChartBase<DonutSlice> {
   readonly deltas          = input<Record<string, number | null>>({});
   readonly secondaryValues = input<Record<string, number>>({});
   readonly secondaryUnit   = input('');
+  readonly secondaryUnits  = input<Record<string, string>>({});
   readonly sliceSelect     = output<string | null>();
 
   private arcsG!: d3.Selection<SVGGElement, unknown, null, undefined>;
@@ -135,6 +136,7 @@ export class D3DonutComponent extends D3ChartBase<DonutSlice> {
 
     const secMap  = this.secondaryValues();
     const secUnit = this.secondaryUnit();
+    const secUnits = this.secondaryUnits();
 
     joined
       .on('mouseover', function (_, d) {
@@ -143,7 +145,8 @@ export class D3DonutComponent extends D3ChartBase<DonutSlice> {
         const pct = grand ? Math.round((d.data.value / grand) * 100) : 0;
         let html = `<b>${d.data.nom}</b><br/>${fmtShort(d.data.value)} t (${pct}%)`;
         const sec = secMap[d.data.nom];
-        if (sec != null) html += ` · ${fmtShort(sec)} ${secUnit}`;
+        const unit = secUnits[d.data.nom] || secUnit;
+        if (sec != null && unit) html += ` · ${fmtShort(sec)} ${unit}`;
         tip.innerHTML = html;
         tip.style.opacity = '1';
       })

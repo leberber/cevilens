@@ -34,7 +34,7 @@ const COLORS = [
               [centerUnit]="uniteShort"
               [deltas]="familleDeltas()"
               [secondaryValues]="famillePacks()"
-              [secondaryUnit]="'packs'"
+              [secondaryUnit]="'colis'"
               [selectedNom]="selectedFamille()"
               (sliceSelect)="selectedFamille.set($event)" />
           </div>
@@ -50,7 +50,7 @@ const COLORS = [
               [centerUnit]="uniteShort"
               [deltas]="produitDeltas()"
               [secondaryValues]="produitPacks()"
-              [secondaryUnit]="'packs'"
+              [secondaryUnits]="produitUoms()"
               (sliceSelect)="onProductClick($event)" />
           </div>
         </div>
@@ -151,7 +151,7 @@ const COLORS = [
 export class ProduitsTabComponent {
   readonly byFamille     = input<{ nom: string; total: number; packs?: number }[]>([]);
   readonly byFamillePrev = input<{ nom: string; total: number }[]>([]);
-  readonly byProduit     = input<{ code: string; nom: string; famille: string; total: number; packs?: number }[]>([]);
+  readonly byProduit     = input<{ code: string; nom: string; famille: string; total: number; packs?: number; uom?: string }[]>([]);
   readonly byProduitPrev = input<{ code: string; nom: string; famille: string; total: number }[]>([]);
   readonly monthlyHistory = input<{ month: string; total: number; nb_clients: number; nb_visits?: number }[]>([]);
   readonly clientMode    = input(false);
@@ -206,6 +206,19 @@ export class ProduitsTabComponent {
     const rec: Record<string, number> = {};
     for (const p of prods) {
       if (p.packs != null) rec[p.nom] = p.packs;
+    }
+    return rec;
+  });
+
+  readonly produitUoms = computed<Record<string, string>>(() => {
+    const sel = this.selectedFamille();
+    const prods = sel
+      ? this.byProduit().filter(p => p.famille === sel)
+      : this.byProduit().slice(0, 8);
+    const normalized = new Set(['un', 'plt', 'plt2']);
+    const rec: Record<string, string> = {};
+    for (const p of prods) {
+      if (p.uom) rec[p.nom] = normalized.has(p.uom) ? 'colis' : p.uom;
     }
     return rec;
   });

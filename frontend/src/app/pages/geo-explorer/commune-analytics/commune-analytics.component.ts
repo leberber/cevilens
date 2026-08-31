@@ -23,7 +23,7 @@ export interface CommuneAnalytics {
   kpis: { total: number; total_prev: number; pct_change: number | null; nb_clients: number; total_da: number; nb_fdv: number };
   by_famille:      { nom: string; total: number; packs?: number }[];
   by_famille_prev: { nom: string; total: number }[];
-  by_produit:      { code: string; nom: string; famille: string; total: number; packs?: number }[];
+  by_produit:      { code: string; nom: string; famille: string; total: number; packs?: number; uom?: string }[];
   by_produit_prev: { code: string; nom: string; famille: string; total: number }[];
   by_fdv:      { code: string; nom: string; total: number; nb_clients: number }[];
   monthly_history: { month: string; total: number; nb_clients: number; nb_visits?: number }[];
