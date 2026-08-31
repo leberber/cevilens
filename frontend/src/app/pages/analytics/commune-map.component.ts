@@ -438,9 +438,7 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
     }
 
     if (!this.boundsFitted) {
-      const bounds = this.geoLayer!.getBounds();
-      const zoom   = this.map.getBoundsZoom(bounds, false, L.point(12, 12)) + 0.5;
-      this.map.setView(bounds.getCenter(), zoom, { animate: false });
+      this.map.fitBounds(this.geoLayer!.getBounds(), { padding: [12, 12], animate: false });
       this.boundsFitted = true;
     }
   }
@@ -468,6 +466,8 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
       onEachFeature: (feature: any, layer: L.Layer) => {
         const code = feature.properties?.['code'] != null ? Number(feature.properties['code']) : undefined;
         const name = feature.properties?.['name'] as string | undefined;
+        const row  = code != null ? dataMap.get(code) : undefined;
+        const hasSales = row != null && row.total > 0;
 
         const baseStyle = () => {
           const isTop1 = code === this.top1Code;
@@ -480,13 +480,13 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
         };
 
         layer.on('mouseover', (e: L.LeafletMouseEvent) => {
-          (layer as L.Path).setStyle({ weight: 2, color: '#1d4ed8' });
-          this.showTooltip(e, this.tooltipService.buildCard(name, dataMap.get(code!), totalAll, rankMap.get(code!)));
+          if (hasSales) (layer as L.Path).setStyle({ weight: 2, color: '#1d4ed8' });
+          this.showTooltip(e, this.tooltipService.buildCard(name, row, totalAll, rankMap.get(code!)));
         });
         layer.on('mousemove', (e: L.LeafletMouseEvent) => { this.moveTooltip(e); });
         layer.on('mouseout', () => { (layer as L.Path).setStyle(baseStyle()); this.tooltipService.hideCard(this.cardEl); });
         layer.on('click', () => {
-          if (code == null) return;
+          if (code == null || !hasSales) return;
           this.communeSelect.emit(this.selectedCode() === code ? null : { code, name: name ?? '' });
         });
       },
@@ -545,8 +545,10 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
       (marker as any).communeCode = code;
       (marker as any).communeName = name;
 
+      const hasSales = row != null && row.total > 0;
+
       marker.on('mouseover', (e: L.LeafletMouseEvent) => {
-        marker.setStyle({ color: '#1d4ed8', weight: 2 });
+        if (hasSales) marker.setStyle({ color: '#1d4ed8', weight: 2 });
         this.showTooltip(e, this.tooltipService.buildCard(name, row, totalAll, rank));
       });
       marker.on('mousemove', (e: L.LeafletMouseEvent) => { this.moveTooltip(e); });
@@ -556,6 +558,7 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
         this.tooltipService.hideCard(this.cardEl);
       });
       marker.on('click', () => {
+        if (!hasSales) return;
         this.communeSelect.emit(this.selectedCode() === code ? null : { code, name: name ?? '' });
       });
 
