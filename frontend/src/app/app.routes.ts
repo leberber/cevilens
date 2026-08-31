@@ -11,7 +11,7 @@ export const routes: Routes = [
     children: [
       { path: '', canActivate: [rootGuard], children: [] },
       { path: 'dashboard',         canActivate: [notPrevenderGuard], loadComponent: () => import('./pages/dashboard/dashboard.component').then(m => m.DashboardComponent) },
-      { path: 'analytics',         canActivate: [notPrevenderGuard], loadComponent: () => import('./pages/analytics/analytics.component').then(m => m.AnalyticsComponent) },
+
       { path: 'carte/commune',     canActivate: [notPrevenderGuard], loadComponent: () => import('./pages/geo-explorer/commune-analytics/commune-analytics.component').then(m => m.CommuneAnalyticsComponent) },
       { path: 'carte',             canActivate: [notPrevenderGuard], loadComponent: () => import('./pages/geo-explorer/geo-explorer.component').then(m => m.GeoExplorerComponent) },
       { path: 'admin',             canActivate: [platformAdminGuard], loadComponent: () => import('./pages/admin-dashboard/admin-dashboard.component').then(m => m.AdminDashboardComponent) },
