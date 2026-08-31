@@ -14,11 +14,14 @@ import {
 import { type DateRange } from '../../shared/components/date-range-picker/date-range-picker.component';
 import { type CanalFilter, CANAL_FILTER_OPTIONS } from '../../core/constants/canal.constants';
 
+interface LocationFamilyDatum { nom: string; total: number; prev: number; }
+
 interface LocationDatum {
   code: number;
   name: string;
   wilaya: string;
   total: number;
+  families?: LocationFamilyDatum[];
 }
 
 @Component({
@@ -55,7 +58,7 @@ export class GeoExplorerComponent implements OnInit {
   readonly canals = CANAL_FILTER_OPTIONS;
 
   readonly mapData = computed<CommuneDatum[]>(() =>
-    this.mapLocations().map(r => ({ code: r.code, total: r.total }))
+    this.mapLocations().map(r => ({ code: r.code, total: r.total, families: r.families }))
   );
 
   readonly activeCommuneCount = computed(() =>
@@ -98,6 +101,7 @@ export class GeoExplorerComponent implements OnInit {
 
     if (this.roleService.isPlatformAdmin() && !this.distContext.selectedDistributorId()) return;
     this.load();
+    this.loadPeriodes();
   }
 
   setCanal(c: string): void {

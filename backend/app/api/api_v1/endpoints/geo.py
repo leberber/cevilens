@@ -134,15 +134,75 @@ def get_by_location(
     """
 
     rows = session.execute(text(sql), params).all()
-    return [
-        {
+    commune_map = {
+        row[0]: {
             "code": row[0],
             "name": row[1],
             "wilaya": row[2],
             "total": round(float(row[3] or 0), 3),
         }
         for row in rows
+    }
+
+    # ── Family breakdown per commune (current + previous period) ──────
+    d_from = date.fromisoformat(date_from)
+    d_to = date.fromisoformat(date_to)
+    duration = (d_to - d_from).days + 1
+    prev_to = d_from - timedelta(days=1)
+    prev_from = prev_to - timedelta(days=duration - 1)
+
+    # Family breakdown: use core filters only (no product/famille/sous_famille)
+    # with a broader date window covering both current and previous period
+    fam_core = [
+        "v.statut_commande = 'Facturé'",
+        "v.wilaya IS NOT NULL",
+        "v.commune IS NOT NULL",
+        "v.famille IS NOT NULL",
+        "v.date_commande BETWEEN :prev_from AND :date_to",
     ]
+    if current_distributor:
+        fam_core.append("v.distributor_id = :distributor_id")
+    if canal:
+        fam_core.append("v.canal = :canal")
+    if fdv:
+        fam_core.append("v.code_fdv = :fdv")
+    fam_conditions = fam_core
+    fam_where = " AND ".join(fam_conditions)
+    fam_params = {**params, "prev_from": prev_from.isoformat(), "prev_to": prev_to.isoformat()}
+
+    fam_sql = f"""
+        SELECT lc.commune_code,
+               TRIM(v.famille) AS famille,
+               COALESCE(SUM(CASE WHEN v.date_commande BETWEEN :date_from AND :date_to
+                            THEN {_qty} ELSE 0 END), 0) AS cur,
+               COALESCE(SUM(CASE WHEN v.date_commande BETWEEN :prev_from AND :prev_to
+                            THEN {_qty} ELSE 0 END), 0) AS prev
+        FROM ventes v
+        {_pjoin}
+        JOIN location_communes lc
+          ON LOWER(v.commune) = LOWER(lc.commune_name)
+         AND LOWER(v.wilaya)  = LOWER(lc.wilaya_name)
+        WHERE {fam_where}
+        GROUP BY lc.commune_code, TRIM(v.famille)
+        ORDER BY lc.commune_code, cur DESC
+    """
+    fam_rows = session.execute(text(fam_sql), fam_params).all()
+
+    fam_by_commune: dict = defaultdict(list)
+    for code, fam, cur, prev in fam_rows:
+        fam_by_commune[code].append({
+            "nom": fam,
+            "total": round(float(cur or 0), 3),
+            "prev": round(float(prev or 0), 3),
+        })
+
+    result = []
+    for c in commune_map.values():
+        c["families"] = fam_by_commune.get(c["code"], [])
+        result.append(c)
+
+    result.sort(key=lambda x: x["total"], reverse=True)
+    return result
 
 
 @router.get("/distributor-communes")

@@ -6,13 +6,13 @@ import * as L from 'leaflet';
 import { HttpClient } from '@angular/common/http';
 import { CommuneMapStyleService } from './services/commune-map-style.service';
 import { CommuneMapTooltipService } from './services/commune-map-tooltip.service';
+import { DateHelper } from '../../core/services/date.helper';
+import { MONTH_SHORT_FR } from '../../core/constants/app.constants';
 import { environment } from '../../../environments/environment';
-import {
-  DateRangePickerComponent,
-  type DateRange,
-} from '../../shared/components/date-range-picker/date-range-picker.component';
+import { type DateRange } from '../../shared/components/date-range-picker/date-range-picker.component';
 
-export interface CommuneDatum { code: number; total: number; }
+export interface CommuneFamilyDatum { nom: string; total: number; prev: number; }
+export interface CommuneDatum { code: number; total: number; families?: CommuneFamilyDatum[]; }
 
 type MapMode = 'choropleth' | 'bubbles';
 
@@ -24,7 +24,7 @@ interface GeoFeatureCollection {
 @Component({
   selector: 'app-commune-map',
   standalone: true,
-  imports: [DateRangePickerComponent],
+  imports: [],
   template: `
     <div #mapEl style="width:100%;height:100%;"></div>
     <div #cardEl class="map-card"></div>
@@ -70,13 +70,18 @@ interface GeoFeatureCollection {
         </div>
       }
 
-      @if (periodes().length) {
-        <app-date-range-picker
-          [compact]="true"
-          [periodes]="periodes()"
-          [dateFrom]="dateFrom()"
-          [dateTo]="dateTo()"
-          (rangeChange)="rangeChange.emit($event)" />
+      @if (monthChips().length) {
+        <div class="map-month-chips">
+          @for (chip of monthChips(); track chip.period) {
+            <button class="map-month-chip"
+                    [class.map-month-chip--active]="activeMonth() === chip.period"
+                    [class.map-month-chip--disabled]="!chip.hasData"
+                    [disabled]="!chip.hasData"
+                    (click)="pickMonth(chip.period)">
+              {{ chip.label }}
+            </button>
+          }
+        </div>
       }
     </div>
 
@@ -106,7 +111,7 @@ interface GeoFeatureCollection {
 
     .map-card {
       position:absolute; top:0; left:0; z-index:500;
-      width:210px;
+      width:290px;
       background:rgba(255,255,255,.94);
       border:1px solid rgba(226,232,240,.9);
       border-radius:14px; padding:12px 14px;
@@ -191,6 +196,26 @@ interface GeoFeatureCollection {
       &.active { background:#2563eb; color:#fff; border-color:#2563eb; }
     }
 
+    .map-month-chips {
+      display:flex; border-radius:8px; overflow:hidden;
+      border:1px solid #e2e8f0;
+      box-shadow:0 1px 4px rgba(0,0,0,.08);
+    }
+
+    .map-month-chip {
+      display:flex; align-items:center; justify-content:center;
+      height:30px; padding:0 9px;
+      background:rgba(255,255,255,.92);
+      color:#64748b; border:none; cursor:pointer;
+      font-size:11px; font-weight:600;
+      transition:background .15s, color .15s;
+
+      &:not(:last-child) { border-right:1px solid #e2e8f0; }
+      &:hover:not(:disabled) { background:#f1f5f9; color:#1e293b; }
+      &--active { background:#2563eb !important; color:#fff !important; }
+      &--disabled { opacity:0.35; cursor:default; }
+    }
+
     :host:fullscreen { border-radius:0; }
 
     .map-sk {
@@ -227,8 +252,31 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
     return total ? this.styleService.fmtVal(total) : '—';
   });
 
+  readonly activeMonth = computed(() => {
+    const df = this.dateFrom();
+    return df ? df.substring(0, 7) : '';
+  });
+
+  readonly monthChips = computed(() => {
+    const available = new Set(this.periodes());
+    if (!available.size) return [];
+    const now = new Date();
+    const chips: { period: string; label: string; hasData: boolean }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const period = this.dateHelper.getPeriodFromDate(d);
+      chips.push({
+        period,
+        label: MONTH_SHORT_FR[d.getMonth()],
+        hasData: available.has(period),
+      });
+    }
+    return chips;
+  });
+
   private readonly http           = inject(HttpClient);
   private readonly el             = inject(ElementRef<HTMLElement>);
+  private readonly dateHelper     = inject(DateHelper);
   private readonly styleService   = inject(CommuneMapStyleService);
   private readonly tooltipService = inject(CommuneMapTooltipService);
   private geoData        = signal<GeoFeatureCollection | null>(null);
@@ -236,6 +284,7 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
   private map: L.Map | null = null;
   private geoLayer: L.FeatureGroup | null = null;
   private top1Marker: L.Marker | null = null;
+  private trendMarkers: L.Marker[] = [];
   private cleanupTimers: ReturnType<typeof setTimeout>[] = [];
 
   private top1Code: number | undefined;
@@ -243,6 +292,13 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
   private lastCodeSet = '';
 
   setMapMode(m: MapMode): void { this.mapMode.set(m); }
+
+  pickMonth(period: string): void {
+    this.rangeChange.emit({
+      from: this.dateHelper.getFirstDayOfMonth(period),
+      to:   this.dateHelper.getLastDayOfMonth(period),
+    });
+  }
 
   toggleFullscreen(): void {
     if (!document.fullscreenElement) {
@@ -333,6 +389,7 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.cleanupTimers.forEach(clearTimeout);
+    this.clearTrendMarkers();
     this.map?.remove(); this.map = null;
   }
 
@@ -360,6 +417,56 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
     let found: L.Layer | undefined;
     this.geoLayer?.eachLayer(l => { if (this.layerCode(l) === code) found = l; });
     return found;
+  }
+
+  // ── Trend markers ────────────────────────────────────────────────────────
+
+  private clearTrendMarkers(): void {
+    this.trendMarkers.forEach(m => m.remove());
+    this.trendMarkers = [];
+  }
+
+  private placeTrendMarkers(dataMap: Map<number, CommuneDatum>): void {
+    if (!this.map || !this.geoLayer) return;
+    this.clearTrendMarkers();
+
+    this.geoLayer.eachLayer(layer => {
+      const code = this.layerCode(layer);
+      if (code == null) return;
+      const row = dataMap.get(code);
+      if (!row || !row.families?.length) return;
+
+      const cur  = row.families.reduce((s, f) => s + f.total, 0);
+      const prev = row.families.reduce((s, f) => s + f.prev, 0);
+      if (!cur && !prev) return;
+
+      let arrow: string, color: string, bg: string;
+      if (!prev && cur) {
+        arrow = '★'; color = '#16a34a'; bg = 'rgba(22,163,106,.12)';
+      } else if (!prev) {
+        return;
+      } else {
+        const pct = Math.round(((cur - prev) / prev) * 100);
+        if (pct === 0) return;
+        arrow = pct > 0 ? '▲' : '▼';
+        color = pct > 0 ? '#16a34a' : '#dc2626';
+        bg    = pct > 0 ? 'rgba(22,163,106,.12)' : 'rgba(220,38,38,.12)';
+      }
+
+      const center = this.mapMode() === 'bubbles'
+        ? (layer as L.CircleMarker).getLatLng()
+        : (layer as L.Polygon).getBounds().getCenter();
+
+      const icon = L.divIcon({
+        html: `<div style="font-size:9px;font-weight:800;color:${color};
+                background:${bg};border-radius:4px;padding:1px 3px;
+                line-height:1;pointer-events:none;white-space:nowrap">${arrow}</div>`,
+        className: '', iconSize: [16, 14] as any, iconAnchor: [8, 14] as any,
+      });
+
+      const marker = L.marker(center, { icon, interactive: false }).addTo(this.map!);
+      this.trendMarkers.push(marker);
+    });
   }
 
   // ── #1 marker ─────────────────────────────────────────────────────────────
@@ -419,6 +526,7 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
     this.cleanupTimers = [];
     this.top1Marker?.remove();
     this.top1Marker = null;
+    this.clearTrendMarkers();
 
     const dataMap  = new Map(data.map(d => [d.code, d]));
     const maxTotal = Math.max(...data.map(d => d.total), 1);
@@ -436,6 +544,8 @@ export class CommuneMapComponent implements AfterViewInit, OnDestroy {
     } else {
       this.renderChoropleth(geo, dataMap, maxTotal, totalAll, rankMap);
     }
+
+    this.placeTrendMarkers(dataMap);
 
     if (!this.boundsFitted) {
       this.map.fitBounds(this.geoLayer!.getBounds(), { padding: [12, 12], animate: false });
