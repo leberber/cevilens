@@ -3,6 +3,7 @@ import { FdvPerfStateService } from '../services/fdv-perf-state.service';
 import { FdvPerfFormatterService } from '../services/fdv-perf-formatter.service';
 import { FdvPerfCalculationService } from '../services/fdv-perf-calculation.service';
 import { getFamilyColor, getFamilyBg } from '../../../core/constants/colors';
+import { achievementColor } from '../../../core/constants/app.constants';
 import type { DrilldownFamille } from '../../../core/services/prevendeur.service';
 
 @Component({
@@ -72,4 +73,7 @@ export class FdvPerfOverviewComponent {
     return getFamilyBg(nom);
   }
 
+  objColor(pct: number): string {
+    return achievementColor(pct);
+  }
 }

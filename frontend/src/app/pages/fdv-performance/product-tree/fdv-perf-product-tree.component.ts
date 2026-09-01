@@ -3,7 +3,8 @@ import { NgTemplateOutlet } from '@angular/common';
 import { FdvPerfStateService } from '../services/fdv-perf-state.service';
 import { FdvPerfFormatterService } from '../services/fdv-perf-formatter.service';
 import { FdvPerfCalculationService } from '../services/fdv-perf-calculation.service';
-import { CHART_COLORS, getFamilyColor, getFamilyBg } from '../../../core/constants/colors';
+import { getFamilyColor, getFamilyBg } from '../../../core/constants/colors';
+import { achievementColor } from '../../../core/constants/app.constants';
 import { calculatePercentage } from '../../../core/utils/math.util';
 import type { DrilldownProduit, DrilldownSousFamille } from '../../../core/services/prevendeur.service';
 
@@ -25,7 +26,6 @@ export class FdvPerfProductTreeComponent {
   productSelect = output<DrilldownProduit>();
 
   readonly skeletonRows = Array(5).fill(0);
-  readonly CHART_COLORS = CHART_COLORS;
 
   // Getters for template
   get loading() { return this.state.loading(); }
@@ -82,8 +82,11 @@ export class FdvPerfProductTreeComponent {
     return (p.total / max) * 100;
   }
 
-  prodColor(i: number): string {
-    return CHART_COLORS[i % CHART_COLORS.length];
+  prodBarColor(p: DrilldownProduit): string {
+    if (p.objectif_tonne || p.objectif_packs) {
+      return achievementColor(this.prodObjPct(p));
+    }
+    return 'var(--surface-400)';
   }
 
   familyColor(nom: string): string {

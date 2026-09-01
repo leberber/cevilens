@@ -55,12 +55,12 @@
           <div class="db-kpi-card__footer">
             <div class="db-kpi-card__footer-label">
               <span>Obj. {{ formatObj(f) }} t</span>
-              <span [style.color]="familyColor(f.nom)">{{ pct }}%</span>
+              <span [style.color]="objColor(pct)">{{ pct }}%</span>
             </div>
             <div class="db-kpi-obj__bar-track">
               <div class="db-kpi-obj__bar-fill"
                    [style.width.%]="Math.min(pct, 100)"
-                   [style.background]="familyColor(f.nom)"></div>
+                   [style.background]="objColor(pct)"></div>
             </div>
           </div>
         }
