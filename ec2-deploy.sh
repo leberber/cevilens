@@ -88,23 +88,6 @@ verify_images() {
     print_success "Images verified"
 }
 
-create_env_file() {
-    print_step "Creating .env file..."
-    cat > ~/.env << 'EOF'
-# Database
-DATABASE_URL=postgresql://postgres:it is me@localhost:5432/cevital
-
-# Security — change this in production
-SECRET_KEY=change-this-to-a-random-secret-key-in-production
-
-# Admin account — auto-created on first startup
-ADMIN_PHONE=0770122472
-ADMIN_PASSWORD=Cevital2030
-ADMIN_FULL_NAME=Ali Nait Belkacem
-EOF
-    print_success ".env file created"
-}
-
 start_services() {
     print_step "Starting containers..."
     sudo docker-compose up -d
@@ -200,7 +183,6 @@ main() {
     load_images
     cleanup_old_images
     verify_images
-    create_env_file
     start_services
     check_status
     cleanup_files

@@ -272,8 +272,6 @@ export class CommuneAnalyticsComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    this.loadPeriodes();
-
     const qp = this.route.snapshot.queryParams;
     const commune = qp['commune'] ?? '';
     const from    = qp['from'] ?? '';
@@ -282,21 +280,28 @@ export class CommuneAnalyticsComponent implements OnInit {
 
     this.canal.set(canal);
 
-    if (from && to) {
-      this.dateFrom.set(from);
-      this.dateTo.set(to);
-    } else {
-      const currentPeriod = this.dateHelper.getPeriodFromDate(new Date());
-      this.dateFrom.set(this.dateHelper.getFirstDayOfMonth(currentPeriod));
-      this.dateTo.set(this.dateHelper.getLastDayOfMonth(currentPeriod));
-    }
-
-    this.loadCommunes();
-
     if (commune) {
       this.communeName.set(commune);
     }
-    this.load();
+
+    if (from && to) {
+      this.dateFrom.set(from);
+      this.dateTo.set(to);
+      this.loadPeriodes();
+      this.loadCommunes();
+      this.load();
+    } else {
+      this.ventesService.getPeriodes()
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe(periodes => {
+          this.periodes.set(periodes);
+          const latest = periodes.length ? periodes[0] : this.dateHelper.getPeriodFromDate(new Date());
+          this.dateFrom.set(this.dateHelper.getFirstDayOfMonth(latest));
+          this.dateTo.set(this.dateHelper.getLastDayOfMonth(latest));
+          this.loadCommunes();
+          this.load();
+        });
+    }
   }
 
   setCanal(c: CanalFilter): void {
