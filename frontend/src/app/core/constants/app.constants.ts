@@ -57,3 +57,15 @@ export const SCROLL_THRESHOLD = 300;
 
 // Short French month labels (0-indexed)
 export const MONTH_SHORT_FR = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'] as const;
+
+// Achievement thresholds and colors — single source of truth
+export const ACHIEVEMENT = {
+  HIGH: 90,
+  LOW: 60,
+} as const;
+
+export function achievementColor(pct: number): string {
+  if (pct >= ACHIEVEMENT.HIGH) return 'var(--color-success)';
+  if (pct >= ACHIEVEMENT.LOW)  return 'var(--color-warning)';
+  return 'var(--color-error)';
+}

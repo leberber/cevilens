@@ -1,5 +1,6 @@
 import { Component, input, output, effect, signal, computed } from '@angular/core';
 import { DecimalPipe } from '@angular/common';
+import { ACHIEVEMENT } from '../../../core/constants/app.constants';
 
 // ── Types (exported so geo-explorer can import them) ─────────────────────────
 
@@ -153,16 +154,16 @@ export class ProductTreeComponent {
   }
 
   pctClass(p: number): string {
-    if (p >= 90) return 'prod-tree__pct--success';
-    if (p >= 60) return 'prod-tree__pct--warning';
+    if (p >= ACHIEVEMENT.HIGH) return 'prod-tree__pct--success';
+    if (p >= ACHIEVEMENT.LOW)  return 'prod-tree__pct--warning';
     return 'prod-tree__pct--danger';
   }
 
   barFillClass(total: number, objectif: number | null): string {
     const p = this.pct(total, objectif);
     if (p === null) return '';
-    if (p >= 90) return 'prod-tree__bar-fill--success';
-    if (p >= 60) return 'prod-tree__bar-fill--warning';
+    if (p >= ACHIEVEMENT.HIGH) return 'prod-tree__bar-fill--success';
+    if (p >= ACHIEVEMENT.LOW)  return 'prod-tree__bar-fill--warning';
     return 'prod-tree__bar-fill--danger';
   }
 }

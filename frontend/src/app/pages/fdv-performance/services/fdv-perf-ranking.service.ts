@@ -68,16 +68,6 @@ export class FdvPerfRankingService {
   }
 
   /**
-   * CSS class for FDV objective tier
-   * 90%+ = green, 70%+ = amber, 50%+ = orange, <50% = red
-   */
-  pvObjClass(pct: number): string {
-    if (pct >= 95) return 'pv-obj--green';
-    if (pct >= 60) return 'pv-obj--orange';
-    return 'pv-obj--red';
-  }
-
-  /**
    * Calculate total percentage across multiple rates
    * Used for FDV tooltip average rate
    */

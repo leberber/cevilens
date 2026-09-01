@@ -8,6 +8,7 @@ import { LoadingManager } from '../../core/services/loading-manager.service';
 import { PeriodService } from '../../core/services/period.service';
 import { toggleInSet } from '../../core/utils/set-toggle.util';
 import { groupBy, calculatePercentage } from '../../core/utils/data-transform.util';
+import { ACHIEVEMENT } from '../../core/constants/app.constants';
 
 @Component({
   selector: 'app-prevendeur',
@@ -198,6 +199,12 @@ export class PrevendeurComponent implements OnInit {
 
   toggleFamille(famille: string) {
     toggleInSet(this.collapsedFamilles, famille);
+  }
+
+  pctTier(pct: number): 'red' | 'orange' | 'green' {
+    if (pct >= ACHIEVEMENT.HIGH) return 'green';
+    if (pct >= ACHIEVEMENT.LOW) return 'orange';
+    return 'red';
   }
 
   readonly skeletonRows = Array(6).fill(0);

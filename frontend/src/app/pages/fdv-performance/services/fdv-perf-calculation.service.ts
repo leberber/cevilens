@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { calculatePercentage } from '../../../core/utils/math.util';
 import { FdvPerfFormatterService } from './fdv-perf-formatter.service';
+import { ACHIEVEMENT, achievementColor } from '../../../core/constants/app.constants';
 
 /**
  * Pure calculation functions for the FDV Performance page.
@@ -37,11 +38,7 @@ export class FdvPerfCalculationService {
    * Color for product objective achievement percentage
    */
   prodObjColor(p: { total: number; objectif_tonne: number | null }): string {
-    const pct = calculatePercentage(p.total, p.objectif_tonne);
-    if (pct >= 90) return 'var(--color-success)';
-    if (pct >= 70) return 'var(--color-warning)';
-    if (pct >= 50) return '#f97316';
-    return 'var(--color-error)';
+    return achievementColor(calculatePercentage(p.total, p.objectif_tonne));
   }
 
   /**
@@ -105,18 +102,15 @@ export class FdvPerfCalculationService {
    * Rate color (tooltip FDV product breakdown)
    */
   rateColor(pct: number): string {
-    if (pct >= 90) return 'var(--color-success)';
-    if (pct >= 70) return 'var(--color-warning)';
-    if (pct >= 50) return '#f97316';
-    return 'var(--color-error)';
+    return achievementColor(pct);
   }
 
   /**
    * CSS class for objective achievement tier
    */
   pvObjClass(pct: number): string {
-    if (pct >= 95) return 'pv-obj--green';
-    if (pct >= 60) return 'pv-obj--orange';
+    if (pct >= ACHIEVEMENT.HIGH) return 'pv-obj--green';
+    if (pct >= ACHIEVEMENT.LOW)  return 'pv-obj--orange';
     return 'pv-obj--red';
   }
 }

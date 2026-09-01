@@ -217,7 +217,7 @@
 
   // Progress colour tiers
   .pv-obj--green  { .db-sidebar__card-bar-fill { background: var(--color-success); } .db-sidebar__card-pct { color: var(--color-success); } }
-  .pv-obj--orange { .db-sidebar__card-bar-fill { background: #f97316; } .db-sidebar__card-pct { color: #f97316; } }
+  .pv-obj--orange { .db-sidebar__card-bar-fill { background: var(--color-warning); } .db-sidebar__card-pct { color: var(--color-warning); } }
   .pv-obj--red    { .db-sidebar__card-bar-fill { background: var(--color-error);   } .db-sidebar__card-pct { color: var(--color-error);   } }
 
   // ── Medal badge ──

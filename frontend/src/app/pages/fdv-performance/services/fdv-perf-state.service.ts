@@ -2,6 +2,7 @@ import { Injectable, signal, computed, inject } from '@angular/core';
 import type { DrilldownData, DrilldownFamille, DrilldownProduit, FdvItem } from '../../../core/services/prevendeur.service';
 import { calculatePercentage } from '../../../core/utils/math.util';
 import { FdvPerfFormatterService } from './fdv-perf-formatter.service';
+import { achievementColor } from '../../../core/constants/app.constants';
 
 /**
  * Centralized state management for FDV Performance page using Angular signals.
@@ -105,12 +106,7 @@ export class FdvPerfStateService {
     return val ? val.toLocaleString('fr-FR', { maximumFractionDigits: 2 }) : '0';
   });
 
-  totalObjColor = computed(() => {
-    const pct = this.totalObjPct();
-    if (pct >= 95) return '#16a34a';
-    if (pct >= 60) return '#f97316';
-    return '#dc2626';
-  });
+  totalObjColor = computed(() => achievementColor(this.totalObjPct()));
 
   // ==========================================================================
   // METHODS (for container component to call)

@@ -13,6 +13,7 @@ import {
 } from '../../shared/components/product-tree/product-tree.component';
 import { type DateRange } from '../../shared/components/date-range-picker/date-range-picker.component';
 import { type CanalFilter, CANAL_FILTER_OPTIONS } from '../../core/constants/canal.constants';
+import { achievementColor } from '../../core/constants/app.constants';
 
 interface GeoSummary {
   vd: number; vh: number; total: number;
@@ -75,11 +76,8 @@ export class GeoExplorerComponent implements OnInit {
   }
 
   pctColor(ventes: number, obj: number): string {
-    if (obj <= 0) return '#cbd5e1';
-    const p = (ventes / obj) * 100;
-    if (p >= 100) return '#16a34a';
-    if (p >= 90) return '#f97316';
-    return '#2563eb';
+    if (obj <= 0) return 'var(--surface-400)';
+    return achievementColor(this.pct(ventes, obj));
   }
 
   readonly selectionLabel = computed(() => {
