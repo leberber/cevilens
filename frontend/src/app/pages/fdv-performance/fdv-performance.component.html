@@ -12,7 +12,23 @@
   <div class="db-body">
 
     <!-- Left sidebar: prevendeur cards -->
-    @if (state.data()?.prevendeurs?.length) {
+    @if (state.loading() && !state.data()) {
+      <aside class="db-sidebar">
+        <div class="db-sidebar__header">
+          <i class="pi pi-users"></i>
+          <span class="db-sidebar__title">Prévendeurs</span>
+        </div>
+        @for (_ of [1,2,3,4,5,6]; track $index; let i = $index) {
+          <div class="db-sidebar__card-sk" [style.animation-delay]="i * 80 + 'ms'">
+            <div class="db-sidebar__card-sk-avatar"></div>
+            <div class="db-sidebar__card-sk-body">
+              <div class="db-sidebar__card-sk-name"></div>
+              <div class="db-sidebar__card-sk-bar"></div>
+            </div>
+          </div>
+        }
+      </aside>
+    } @else if (state.data()?.prevendeurs?.length) {
       <aside class="db-sidebar">
         <div class="db-sidebar__header">
           <i class="pi pi-users"></i>
@@ -75,7 +91,19 @@
     <!-- Main content -->
     <div class="db-main">
       <!-- KPI strip -->
-      @if (state.data() && !state.loading()) {
+      @if (state.loading() && !state.data()) {
+        <div class="db-kpi-strip">
+          @for (_ of [1,2,3,4]; track $index; let i = $index) {
+            <div class="db-kpi-strip-sk" [style.animation-delay]="i * 80 + 'ms'">
+              <div class="db-kpi-strip-sk__icon"></div>
+              <div class="db-kpi-strip-sk__body">
+                <div class="db-kpi-strip-sk__value"></div>
+                <div class="db-kpi-strip-sk__label"></div>
+              </div>
+            </div>
+          }
+        </div>
+      } @else if (state.data() && !state.loading()) {
         <div class="db-kpi-strip">
           <div class="stat-card">
             <div class="stat-card__icon stat-card__icon--primary">

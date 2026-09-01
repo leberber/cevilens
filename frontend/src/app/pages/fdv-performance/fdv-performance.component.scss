@@ -220,6 +220,47 @@
   .pv-obj--orange { .db-sidebar__card-bar-fill { background: var(--color-warning); } .db-sidebar__card-pct { color: var(--color-warning); } }
   .pv-obj--red    { .db-sidebar__card-bar-fill { background: var(--color-error);   } .db-sidebar__card-pct { color: var(--color-error);   } }
 
+  // ── Sidebar skeleton cards ──
+  &__card-sk {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.85rem 0.9rem;
+    border-radius: 0.65rem;
+    border: 1.5px solid var(--surface-border);
+    background: var(--surface-card);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  &__card-sk-avatar {
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 50%;
+    background: var(--surface-200);
+    flex-shrink: 0;
+  }
+
+  &__card-sk-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  &__card-sk-name {
+    height: 0.6rem;
+    width: 60%;
+    background: var(--surface-200);
+    border-radius: 3px;
+  }
+
+  &__card-sk-bar {
+    height: 4px;
+    width: 80%;
+    background: var(--surface-200);
+    border-radius: 2px;
+  }
+
   // ── Medal badge ──
   &__card-medal {
     display: flex;
@@ -268,6 +309,50 @@
   padding: 0.6rem 1rem 0.75rem;
   border-bottom: 1px solid var(--surface-border);
   margin-bottom: 0.25rem;
+}
+
+// =============================================================================
+// KPI Strip Skeleton
+// =============================================================================
+
+.db-kpi-strip-sk {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--surface-border);
+  background: var(--surface-card);
+  animation: pulse 1.5s ease-in-out infinite;
+
+  &__icon {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 0.6rem;
+    background: var(--surface-200);
+    flex-shrink: 0;
+  }
+
+  &__body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  &__value {
+    height: 1.2rem;
+    width: 50%;
+    background: var(--surface-200);
+    border-radius: 4px;
+  }
+
+  &__label {
+    height: 0.6rem;
+    width: 70%;
+    background: var(--surface-200);
+    border-radius: 3px;
+  }
 }
 
 // =============================================================================
