@@ -59,6 +59,11 @@ export class DashboardOverviewComponent {
     return this.calc.displayObjPct(f.total, f.objectif_tonne, f.objectif_packs);
   }
 
+  formatObj(f: DrilldownFamille): string {
+    const val = f.objectif_tonne ?? f.objectif_packs ?? 0;
+    return val.toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+  }
+
   familyColor(nom: string): string {
     return getFamilyColor(nom);
   }

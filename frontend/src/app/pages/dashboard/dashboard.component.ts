@@ -117,10 +117,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
       .map(f => ({ ...f, sous_familles: [...f.sous_familles].sort((a, b) => a.nom.localeCompare(b.nom)) })));
 
     // Global totals (already in tonnes from backend)
-    // Derive objectives from family totals so they match the scope of actual sales data
     this.state.globalTotal.set(d.familles.reduce((s, f) => s + f.total, 0));
-    this.state.globalObjectif.set(d.familles.reduce((s, f) => s + (f.objectif_packs ?? 0), 0));
-    this.state.globalObjectifTonne.set(d.familles.reduce((s, f) => s + (f.objectif_tonne ?? 0), 0));
+    this.state.globalObjectif.set(d.global_objectif_packs ?? 0);
+    this.state.globalObjectifTonne.set(d.global_objectif_tonne ?? 0);
     this.state.globalCa.set(d.global_ca ?? 0);
 
     // Initialize overview collapse on FDV selection

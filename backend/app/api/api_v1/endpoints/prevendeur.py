@@ -13,7 +13,7 @@ from sqlalchemy import func, case as sa_case, text
 from sqlmodel import Session, select
 
 from app.api.deps import get_current_user, get_current_distributor
-from app.core.product_codes import remap_by_vente_code
+from app.core.product_codes import build_produit_map, load_obj_to_vente_map, obj_val, remap_by_vente_code, remap_dict
 from app.core.uom_conversion import PRODUITS_JOIN, qty_expr
 from app.database import get_session
 from app.models.user import User, UserRole
@@ -381,12 +381,14 @@ def prevendeur_admin_drilldown(
         _rq = round
 
     def _produit_join(q):
-        """Add LEFT JOIN with produits when converting to tonnes."""
-        if unite == "tonnes":
-            return q.join(Produit, Vente.code_produit == Produit.code_produit, isouter=True)
-        return q
+        """LEFT JOIN Vente with Produit on code_produit."""
+        return q.join(Produit, Vente.code_produit == Produit.code_produit, isouter=True)
 
-    fdv_totals_q = _produit_join(
+    def _tonnes_join(q):
+        """Add Produit JOIN only when converting to tonnes."""
+        return _produit_join(q) if unite == "tonnes" else q
+
+    fdv_totals_q = _tonnes_join(
         select(Vente.code_fdv, func.sum(_norm))
         .where(Vente.annee_mois == annee_mois)
         .where(Vente.statut_commande == 'Facturé')
@@ -422,6 +424,8 @@ def prevendeur_admin_drilldown(
             Vente.code_fdv,
             Vente.nom_fdv,
             Vente.source,
+            Produit.famille.label('produit_famille'),
+            Produit.sous_famille.label('produit_sous_famille'),
         )).where(
             Vente.annee_mois == periode, Vente.statut_commande == 'Facturé'
         )
@@ -440,7 +444,7 @@ def prevendeur_admin_drilldown(
 
     period_totals: dict = defaultdict(float)
     if trend_periods:
-        q6 = _produit_join(
+        q6 = _tonnes_join(
             select(Vente.annee_mois, func.sum(_norm))
             .where(Vente.annee_mois.in_(trend_periods))
             .where(Vente.statut_commande == 'Facturé')
@@ -463,6 +467,9 @@ def prevendeur_admin_drilldown(
     # Product label resolution — Produit model removed, use description_produit from Vente
     codes = {r.code_produit for r in rows if r.code_produit}
     code_to_produit = {}  # No Produit model available
+
+    def _norm_fam(val) -> str:
+        return (val or '').strip().lower()
 
     def week_idx(d) -> int:
         if d is None:
@@ -489,8 +496,8 @@ def prevendeur_admin_drilldown(
     for r in rows:
         if not r.date_commande or not r.qty_norm:
             continue
-        famille = (r.famille or "").strip().lower()
-        sf = (r.sous_famille or "Autres").strip()
+        famille = _norm_fam(r.produit_famille or r.famille)
+        sf = (r.produit_sous_famille or r.sous_famille or "Autres").strip()
         prod = product_label(r)
         w = week_idx(r.date_commande)
         hier[famille][sf][prod][w] += r.qty_norm
@@ -506,14 +513,14 @@ def prevendeur_admin_drilldown(
     for r in prev_rows:
         if not r.qty_norm:
             continue
-        famille = (r.famille or "").strip().lower()
+        famille = _norm_fam(r.produit_famille or r.famille)
         prev_famille_total[famille] += r.qty_norm
 
     # Objective aggregation for this period
     annee_int, mois_int = int(annee_mois.split('-')[0]), int(annee_mois.split('-')[1])
 
     # Per-product objectives (total + per-tournée)
-    obj_prod_rows = session.exec(
+    obj_q = (
         select(
             Objectif.code_produit,
             Objectif.objectif_packs_vd, Objectif.objectif_packs_vh,
@@ -521,38 +528,49 @@ def prevendeur_admin_drilldown(
             Objectif.objectif_tonne_vd, Objectif.objectif_tonne_vh,
         )
         .where(Objectif.mois == mois_int, Objectif.annee == annee_int)
-    ).all()
-    if canal == 'VD':
-        obj_by_prod       = {r.code_produit: r.objectif_packs_vd_tournee for r in obj_prod_rows}
-        obj_by_prod_total = {r.code_produit: r.objectif_packs_vd for r in obj_prod_rows}
-        obj_tonne_by_prod = {r.code_produit: r.objectif_tonne_vd for r in obj_prod_rows}
-    elif canal == 'VH':
-        obj_by_prod       = {r.code_produit: r.objectif_packs_vh_tournee for r in obj_prod_rows}
-        obj_by_prod_total = {r.code_produit: r.objectif_packs_vh for r in obj_prod_rows}
-        obj_tonne_by_prod = {r.code_produit: r.objectif_tonne_vh for r in obj_prod_rows}
-    else:
-        obj_by_prod       = {r.code_produit: (r.objectif_packs_vd_tournee or 0) + (r.objectif_packs_vh_tournee or 0) for r in obj_prod_rows}
-        obj_by_prod_total = {r.code_produit: (r.objectif_packs_vd or 0) + (r.objectif_packs_vh or 0) for r in obj_prod_rows}
-        obj_tonne_by_prod = {r.code_produit: (r.objectif_tonne_vd or 0) + (r.objectif_tonne_vh or 0) for r in obj_prod_rows}
+    )
+    if current_distributor:
+        obj_q = obj_q.where(Objectif.distributor_id == current_distributor.id)
+    obj_prod_rows = session.exec(obj_q).all()
+
+    obj_by_prod       = {r.code_produit: obj_val(r, 'objectif_packs', canal, '_tournee') for r in obj_prod_rows}
+    obj_by_prod_total = {r.code_produit: obj_val(r, 'objectif_packs', canal) for r in obj_prod_rows}
+    obj_tonne_by_prod = {r.code_produit: obj_val(r, 'objectif_tonne', canal) for r in obj_prod_rows}
 
     # Remap objective codes (may be code_dd) → vente codes so sales lookups match
-    obj_by_prod       = remap_by_vente_code(obj_by_prod, session)
-    obj_by_prod_total = remap_by_vente_code(obj_by_prod_total, session)
-    obj_tonne_by_prod = remap_by_vente_code(obj_tonne_by_prod, session)
+    obj_to_vente = load_obj_to_vente_map(session)
+    obj_by_prod       = remap_dict(obj_by_prod, obj_to_vente)
+    obj_by_prod_total = remap_dict(obj_by_prod_total, obj_to_vente)
+    obj_tonne_by_prod = remap_dict(obj_tonne_by_prod, obj_to_vente)
+
+    # Canonical famille objectives via Produit mapping (includes zero-sale products)
+    _produit_map = build_produit_map({r.code_produit for r in obj_prod_rows}, session)
+
+    obj_tonne_by_famille: dict = defaultdict(float)
+    obj_packs_by_famille: dict = defaultdict(float)
+    obj_tonne_by_sf: dict = defaultdict(float)
+    obj_packs_by_sf: dict = defaultdict(float)
+    for r in obj_prod_rows:
+        p = _produit_map.get(r.code_produit)
+        fam = _norm_fam(p.famille) if p else ''
+        sf = (p.sous_famille or 'Autres').strip() if p else 'Autres'
+        fam_sf_key = f"{fam}||{sf}"
+        tonne = obj_val(r, 'objectif_tonne', canal)
+        packs = obj_val(r, 'objectif_packs', canal)
+        obj_tonne_by_famille[fam] += tonne
+        obj_packs_by_famille[fam] += packs
+        obj_tonne_by_sf[fam_sf_key] += tonne
+        obj_packs_by_sf[fam_sf_key] += packs
 
     # When a single FDV is selected, display per-route targets instead of global totals
     if code_fdv:
         obj_by_prod_total = obj_by_prod
 
-    # Zero-sale objective products — Produit model removed, skip supplementation
-    # Only include products that appear in the sales data (via ventes)
-    codes_in_hier = set(prod_label_to_code.values())
-
     # Per-route total: sum of all tournée targets (derived from obj_by_prod, no extra query)
     objectif_per_route = round(sum(v for v in obj_by_prod.values() if v))
 
     # Per-fdv per-product sales — queried without code_fdv filter so all pills stay accurate
-    _fdv_prod_q = _produit_join(
+    _fdv_prod_q = _tonnes_join(
         select(Vente.code_fdv, Vente.code_produit, func.sum(_norm))
         .where(Vente.annee_mois == annee_mois, Vente.statut_commande == 'Facturé', Vente.code_fdv.isnot(None), Vente.code_produit.isnot(None))
     )
@@ -594,36 +612,24 @@ def prevendeur_admin_drilldown(
     )
 
     # CA (chiffre d'affaires) per famille — SUM(qte_facturee * prix_unitaire)
-    _ca_q = (
-        select(Vente.famille, func.sum(Vente.qte_facturee * Vente.prix_unitaire))
-        .where(Vente.annee_mois == annee_mois, Vente.statut_commande == 'Facturé')
-        .where(Vente.prix_unitaire.isnot(None))
-        .group_by(Vente.famille)
-    )
-    if current_distributor:
-        _ca_q = _ca_q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
-    if code_fdv:
-        _ca_q = _ca_q.where(Vente.code_fdv == code_fdv)
-    if canal:
-        _ca_q = _ca_q.where(Vente.canal == canal)
-    ca_by_famille = {(r[0] or '').strip().lower(): round(r[1] or 0) for r in session.exec(_ca_q).all()}
+    _ca_famille = func.coalesce(Produit.famille, Vente.famille)
 
-    if prev_periode:
-        _ca_prev_q = (
-            select(Vente.famille, func.sum(Vente.qte_facturee * Vente.prix_unitaire))
-            .where(Vente.annee_mois == prev_periode, Vente.statut_commande == 'Facturé')
+    def _ca_by_periode(periode: str) -> dict:
+        q = _produit_join(
+            select(_ca_famille, func.sum(Vente.qte_facturee * Vente.prix_unitaire))
+            .where(Vente.annee_mois == periode, Vente.statut_commande == 'Facturé')
             .where(Vente.prix_unitaire.isnot(None))
-            .group_by(Vente.famille)
-        )
+        ).group_by(_ca_famille)
         if current_distributor:
-            _ca_prev_q = _ca_prev_q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
+            q = q.where((Vente.distributor_id == current_distributor.id) | (Vente.distributor_id == None))
         if code_fdv:
-            _ca_prev_q = _ca_prev_q.where(Vente.code_fdv == code_fdv)
+            q = q.where(Vente.code_fdv == code_fdv)
         if canal:
-            _ca_prev_q = _ca_prev_q.where(Vente.canal == canal)
-        ca_prev_by_famille = {(r[0] or '').strip().lower(): round(r[1] or 0) for r in session.exec(_ca_prev_q).all()}
-    else:
-        ca_prev_by_famille = {}
+            q = q.where(Vente.canal == canal)
+        return {_norm_fam(r[0]): round(r[1] or 0) for r in session.exec(q).all()}
+
+    ca_by_famille = _ca_by_periode(annee_mois)
+    ca_prev_by_famille = _ca_by_periode(prev_periode) if prev_periode else {}
 
     familles_out = []
     for famille, sf_map in sorted(hier.items()):
@@ -655,27 +661,16 @@ def prevendeur_admin_drilldown(
                 })
             for i in range(4):
                 f_weeks[i] += sf_weeks[i]
-            sf_obj_vals = [
-                obj_by_prod_total[prod_label_to_code[p["nom"]]]
-                for p in prods_out
-                if p["nom"] in prod_label_to_code and prod_label_to_code[p["nom"]] in obj_by_prod_total
-                and obj_by_prod_total[prod_label_to_code[p["nom"]]]
-            ]
-            sf_obj = round(sum(sf_obj_vals)) if sf_obj_vals else None
-            sf_tonne_vals = [
-                obj_tonne_by_prod[prod_label_to_code[p["nom"]]]
-                for p in prods_out
-                if p["nom"] in prod_label_to_code and prod_label_to_code[p["nom"]] in obj_tonne_by_prod
-                and obj_tonne_by_prod[prod_label_to_code[p["nom"]]]
-            ]
-            sf_tonne = round(sum(sf_tonne_vals), 3) if sf_tonne_vals else None
+            sf_key = f"{famille}||{sf}"
+            sf_tonne_canon = obj_tonne_by_sf.get(sf_key)
+            sf_packs_canon = obj_packs_by_sf.get(sf_key)
             sfs_out.append({
                 "nom": sf,
                 "total": _rq(sum(sf_weeks)),
                 "weeks": [_rq(v) for v in sf_weeks],
                 "produits": sorted(prods_out, key=lambda x: -x["total"]),
-                "objectif_packs": sf_obj,
-                "objectif_tonne": sf_tonne,
+                "objectif_packs": round(sf_packs_canon) if sf_packs_canon else None,
+                "objectif_tonne": round(sf_tonne_canon, 3) if sf_tonne_canon else None,
             })
 
         f_total = _rq(sum(f_weeks))
@@ -687,11 +682,11 @@ def prevendeur_admin_drilldown(
             key=lambda x: -x["total"]
         )
 
-        # Derive family objective from SF objectives so hierarchy is consistent
-        f_obj_vals = [sf["objectif_packs"] for sf in sfs_out if sf["objectif_packs"]]
-        f_obj = round(sum(f_obj_vals)) if f_obj_vals else None
-        f_tonne_vals = [sf["objectif_tonne"] for sf in sfs_out if sf["objectif_tonne"]]
-        f_tonne = round(sum(f_tonne_vals), 3) if f_tonne_vals else None
+        # Family objective from canonical Produit mapping (includes zero-sale products)
+        f_tonne_canon = obj_tonne_by_famille.get(famille)
+        f_packs_canon = obj_packs_by_famille.get(famille)
+        f_obj = round(f_packs_canon) if f_packs_canon else None
+        f_tonne = round(f_tonne_canon, 3) if f_tonne_canon else None
 
         familles_out.append({
             "nom": famille,
@@ -707,16 +702,9 @@ def prevendeur_admin_drilldown(
             "ca_prev": ca_prev_by_famille.get(famille) or None,
         })
 
-    # True global objective totals — summed directly from the objectifs table
-    if canal == 'VD':
-        global_obj_tonne = sum(r.objectif_tonne_vd or 0 for r in obj_prod_rows)
-        global_obj_packs = sum(r.objectif_packs_vd or 0 for r in obj_prod_rows)
-    elif canal == 'VH':
-        global_obj_tonne = sum(r.objectif_tonne_vh or 0 for r in obj_prod_rows)
-        global_obj_packs = sum(r.objectif_packs_vh or 0 for r in obj_prod_rows)
-    else:
-        global_obj_tonne = sum((r.objectif_tonne_vd or 0) + (r.objectif_tonne_vh or 0) for r in obj_prod_rows)
-        global_obj_packs = sum((r.objectif_packs_vd or 0) + (r.objectif_packs_vh or 0) for r in obj_prod_rows)
+    # Global objective totals — summed directly from the objectifs table
+    global_obj_tonne = sum(obj_val(r, 'objectif_tonne', canal) for r in obj_prod_rows)
+    global_obj_packs = sum(obj_val(r, 'objectif_packs', canal) for r in obj_prod_rows)
 
     # Per-route objective in tonnes (derived from packs ratio)
     if objectif_per_route and global_obj_packs and global_obj_tonne:

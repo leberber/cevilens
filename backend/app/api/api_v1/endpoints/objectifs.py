@@ -6,10 +6,11 @@ import logging
 
 from fastapi import APIRouter, Body, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, distinct, or_
+from sqlalchemy import func, distinct
 from sqlmodel import Session, select
 
 from app.api.deps import get_current_user, get_current_distributor
+from app.core.product_codes import build_produit_map
 from app.database import get_session
 from app.models.distributor import Distributor
 from app.models.objectif import Objectif
@@ -179,18 +180,7 @@ def list_objectifs(
     rows = session.exec(q).all()
 
     # Join with produits to get famille / sous_famille (also resolve code_dd aliases)
-    codes = {obj.code_produit for obj in rows}
-    produit_map: dict = {}
-    if codes:
-        produits = session.exec(
-            select(Produit).where(
-                or_(Produit.code_produit.in_(codes), Produit.code_dd.in_(codes))
-            )
-        ).all()
-        for p in produits:
-            produit_map[p.code_produit] = p
-            if p.code_dd:
-                produit_map[p.code_dd] = p
+    produit_map = build_produit_map({obj.code_produit for obj in rows}, session)
 
     user_ids = {obj.updated_by_id for obj in rows if obj.updated_by_id}
     users_map: dict = {}

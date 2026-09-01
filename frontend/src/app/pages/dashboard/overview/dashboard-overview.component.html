@@ -54,7 +54,7 @@
         @if (f.objectif_tonne || f.objectif_packs) {
           <div class="db-kpi-card__footer">
             <div class="db-kpi-card__footer-label">
-              <span>Réalisé</span>
+              <span>Obj. {{ formatObj(f) }} t</span>
               <span [style.color]="familyColor(f.nom)">{{ pct }}%</span>
             </div>
             <div class="db-kpi-obj__bar-track">
