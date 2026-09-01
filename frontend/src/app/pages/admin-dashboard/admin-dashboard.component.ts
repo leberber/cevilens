@@ -84,7 +84,7 @@ export class AdminDashboardComponent implements OnInit {
 
   ngOnInit() {
     if (!this.roleService.isPlatformAdmin()) {
-      this.router.navigate(['/dashboard']);
+      this.router.navigate(['/fdv-performance']);
       return;
     }
     this.load();

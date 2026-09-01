@@ -1,21 +1,21 @@
 import { Component, inject, output } from '@angular/core';
-import { DashboardStateService } from '../services/dashboard-state.service';
-import { DashboardFormatterService } from '../services/dashboard-formatter.service';
-import { DashboardCalculationService } from '../services/dashboard-calculation.service';
+import { FdvPerfStateService } from '../services/fdv-perf-state.service';
+import { FdvPerfFormatterService } from '../services/fdv-perf-formatter.service';
+import { FdvPerfCalculationService } from '../services/fdv-perf-calculation.service';
 import { getFamilyColor, getFamilyBg } from '../../../core/constants/colors';
 import type { DrilldownFamille } from '../../../core/services/prevendeur.service';
 
 @Component({
-  selector: 'app-dashboard-overview',
+  selector: 'app-fdv-perf-overview',
   standalone: true,
   imports: [],
-  templateUrl: './dashboard-overview.component.html',
-  styleUrl: './dashboard-overview.component.scss',
+  templateUrl: './fdv-perf-overview.component.html',
+  styleUrl: './fdv-perf-overview.component.scss',
 })
-export class DashboardOverviewComponent {
-  state = inject(DashboardStateService);
-  formatter = inject(DashboardFormatterService);
-  calc = inject(DashboardCalculationService);
+export class FdvPerfOverviewComponent {
+  state = inject(FdvPerfStateService);
+  formatter = inject(FdvPerfFormatterService);
+  calc = inject(FdvPerfCalculationService);
 
   // Outputs
   familleSelect = output<DrilldownFamille>();

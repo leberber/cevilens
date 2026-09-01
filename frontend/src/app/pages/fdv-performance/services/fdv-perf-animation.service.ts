@@ -6,7 +6,7 @@ import type { DrilldownFamille } from '../../../core/services/prevendeur.service
  * Returns a cancel function that caller must store and invoke on component destroy.
  */
 @Injectable({ providedIn: 'root' })
-export class DashboardAnimationService {
+export class FdvPerfAnimationService {
 
   /**
    * Animate counters with easeOutCubic easing over 900ms

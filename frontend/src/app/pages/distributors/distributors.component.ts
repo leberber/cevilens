@@ -46,7 +46,7 @@ export class DistributorsComponent implements OnInit {
 
   ngOnInit() {
     if (this.authService.currentUser()?.role !== 'platform_admin') {
-      this.router.navigate(['/dashboard']);
+      this.router.navigate(['/fdv-performance']);
       return;
     }
     this.load();

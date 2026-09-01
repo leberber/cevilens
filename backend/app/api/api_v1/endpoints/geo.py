@@ -8,9 +8,12 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy import text
 from sqlmodel import Session
 
+from sqlmodel import select as sm_select
+
 from app.api.deps import get_current_user, get_current_distributor
 from app.core.uom_conversion import PRODUITS_JOIN, PACKS_EXPR, qty_expr
 from app.database import get_session
+from app.models.objectif import Objectif
 from app.models.user import User
 
 router = APIRouter()
@@ -203,6 +206,69 @@ def get_by_location(
 
     result.sort(key=lambda x: x["total"], reverse=True)
     return result
+
+
+@router.get("/summary")
+def get_geo_summary(
+    date_from: str = Query(...),
+    date_to: str = Query(...),
+    current_user: User = Depends(get_current_user),
+    current_distributor=Depends(get_current_distributor),
+    session: Session = Depends(get_session),
+) -> Any:
+    """VD / VH / total sales + objectives for the geo page KPI strip."""
+    conds = [
+        "v.date_commande BETWEEN :date_from AND :date_to",
+        "v.statut_commande = 'Facturé'",
+    ]
+    params: dict = {"date_from": date_from, "date_to": date_to}
+    if current_distributor:
+        conds.append("v.distributor_id = :distributor_id")
+        params["distributor_id"] = current_distributor.id
+
+    _qty = qty_expr("tonnes")
+    where = " AND ".join(conds)
+
+    sql = f"""
+        SELECT v.canal, COALESCE(SUM({_qty}), 0) AS total
+        FROM ventes v {PRODUITS_JOIN}
+        WHERE {where}
+        GROUP BY v.canal
+    """
+    rows = session.execute(text(sql), params).all()
+    vd_total = vh_total = 0.0
+    for canal_val, total in rows:
+        t = round(float(total or 0), 3)
+        if canal_val == 'VD':
+            vd_total = t
+        elif canal_val == 'VH':
+            vh_total = t
+
+    # Objectives
+    obj_vd = obj_vh = 0.0
+    try:
+        d = date.fromisoformat(date_from)
+        annee, mois = d.year, d.month
+        obj_q = sm_select(
+            Objectif.objectif_tonne_vd,
+            Objectif.objectif_tonne_vh,
+        ).where(Objectif.mois == mois, Objectif.annee == annee)
+        if current_distributor:
+            obj_q = obj_q.where(Objectif.distributor_id == current_distributor.id)
+        for r in session.exec(obj_q).all():
+            obj_vd += float(r.objectif_tonne_vd or 0)
+            obj_vh += float(r.objectif_tonne_vh or 0)
+    except (ValueError, TypeError):
+        pass
+
+    return {
+        "vd": round(vd_total, 3),
+        "vh": round(vh_total, 3),
+        "total": round(vd_total + vh_total, 3),
+        "objectif_vd": round(obj_vd, 3),
+        "objectif_vh": round(obj_vh, 3),
+        "objectif_total": round(obj_vd + obj_vh, 3),
+    }
 
 
 @router.get("/distributor-communes")

@@ -1,18 +1,18 @@
 import { Component, inject, output } from '@angular/core';
-import { DashboardStateService } from '../services/dashboard-state.service';
-import { DashboardFormatterService } from '../services/dashboard-formatter.service';
+import { FdvPerfStateService } from '../services/fdv-perf-state.service';
+import { FdvPerfFormatterService } from '../services/fdv-perf-formatter.service';
 import { calculatePercentage } from '../../../core/utils/math.util';
 
 @Component({
-  selector: 'app-dashboard-fdv-performance',
+  selector: 'app-fdv-perf-fdv-list',
   standalone: true,
   imports: [],
-  templateUrl: './dashboard-fdv-performance.component.html',
-  styleUrl: './dashboard-fdv-performance.component.scss',
+  templateUrl: './fdv-perf-fdv-list.component.html',
+  styleUrl: './fdv-perf-fdv-list.component.scss',
 })
-export class DashboardFdvPerformanceComponent {
-  state = inject(DashboardStateService);
-  formatter = inject(DashboardFormatterService);
+export class FdvPerfFdvListComponent {
+  state = inject(FdvPerfStateService);
+  formatter = inject(FdvPerfFormatterService);
 
   // Outputs
   fdvSelect = output<string>();

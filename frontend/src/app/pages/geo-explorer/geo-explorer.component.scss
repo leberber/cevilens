@@ -155,6 +155,53 @@
   }
 }
 
+// ── KPI table (VD/VH/Total rows) ─────────────────────────────────────────────
+.geo-kpi-table {
+  padding: 0.4rem 0.85rem;
+
+  &__header {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-color-secondary);
+    margin-bottom: 0.25rem;
+  }
+
+  &__row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 0.15rem 0;
+    font-size: 0.8rem;
+
+    &--total {
+      border-top: 1px solid var(--surface-border);
+      margin-top: 0.15rem;
+      padding-top: 0.25rem;
+      font-weight: 800;
+    }
+  }
+
+  &__label {
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-color-secondary);
+    font-size: 0.7rem;
+  }
+
+  &__val {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  & + & {
+    border-top: 1px solid var(--surface-border);
+    margin-top: 0.15rem;
+    padding-top: 0.55rem;
+  }
+}
+
 // ── Mobile ────────────────────────────────────────────────────────────────────
 @include mobile-only {
   :host        { margin: 0; height: auto; }

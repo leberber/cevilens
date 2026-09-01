@@ -1,12 +1,12 @@
 <div class="db-root">
 
   <!-- Header: breadcrumb, period nav, canal/mode toggles -->
-  <app-dashboard-header
+  <app-fdv-perf-header
     (prevPeriod)="onPrevPeriod()"
     (nextPeriod)="onNextPeriod()"
     (canalChange)="onCanalChange($event)"
     (drillToRoot)="onDrillToRoot()">
-  </app-dashboard-header>
+  </app-fdv-perf-header>
 
   <!-- Body: sidebar + main content -->
   <div class="db-body">
@@ -117,21 +117,21 @@
       }
 
       <!-- Famille cards -->
-      <app-dashboard-overview
+      <app-fdv-perf-overview
         (familleSelect)="onFamilleSelect($event)">
-      </app-dashboard-overview>
+      </app-fdv-perf-overview>
 
       <!-- Bottom: product tree (left) + FDV performance (right) -->
       <div class="db-middle" [class.db-middle--loading]="state.loading()">
-        <app-dashboard-product-tree
+        <app-fdv-perf-product-tree
           (sfCollapseToggle)="onSfCollapseToggle($event)"
           (overviewFamilleToggle)="onOverviewFamilleToggle($event)"
           (productSelect)="onProductSelect($event)">
-        </app-dashboard-product-tree>
+        </app-fdv-perf-product-tree>
 
-        <app-dashboard-fdv-performance
+        <app-fdv-perf-fdv-list
           (fdvSelect)="onFdvSelectFromPerf($event)">
-        </app-dashboard-fdv-performance>
+        </app-fdv-perf-fdv-list>
       </div>
     </div>
 

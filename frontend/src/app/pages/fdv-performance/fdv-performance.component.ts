@@ -1,43 +1,43 @@
 import { Component, OnInit, OnDestroy, inject, ChangeDetectionStrategy, effect, untracked } from '@angular/core';
 import { NgClass } from '@angular/common';
-import { DashboardHeaderComponent } from './header/dashboard-header.component';
-import { DashboardOverviewComponent } from './overview/dashboard-overview.component';
-import { DashboardProductTreeComponent } from './product-tree/dashboard-product-tree.component';
-import { DashboardFdvPerformanceComponent } from './fdv-performance/dashboard-fdv-performance.component';
-import { DashboardStateService } from './services/dashboard-state.service';
-import { DashboardAnimationService } from './services/dashboard-animation.service';
-import { DashboardFormatterService } from './services/dashboard-formatter.service';
-import { DashboardCalculationService } from './services/dashboard-calculation.service';
-import { DashboardFdvRankingService } from './services/dashboard-fdv-ranking.service';
+import { FdvPerfHeaderComponent } from './header/fdv-perf-header.component';
+import { FdvPerfOverviewComponent } from './overview/fdv-perf-overview.component';
+import { FdvPerfProductTreeComponent } from './product-tree/fdv-perf-product-tree.component';
+import { FdvPerfFdvListComponent } from './fdv-performance/fdv-perf-fdv-list.component';
+import { FdvPerfStateService } from './services/fdv-perf-state.service';
+import { FdvPerfAnimationService } from './services/fdv-perf-animation.service';
+import { FdvPerfFormatterService } from './services/fdv-perf-formatter.service';
+import { FdvPerfCalculationService } from './services/fdv-perf-calculation.service';
+import { FdvPerfRankingService } from './services/fdv-perf-ranking.service';
 import { PrevendeurService, DrilldownData, DrilldownFamille } from '../../core/services/prevendeur.service';
 import { RoleService } from '../../core/services/role.service';
 import { DistributorContextService } from '../../core/services/distributor-context.service';
 
 
 @Component({
-  selector: 'app-dashboard',
+  selector: 'app-fdv-performance',
   standalone: true,
   imports: [
     NgClass,
-    DashboardHeaderComponent,
-    DashboardOverviewComponent,
-    DashboardProductTreeComponent,
-    DashboardFdvPerformanceComponent,
+    FdvPerfHeaderComponent,
+    FdvPerfOverviewComponent,
+    FdvPerfProductTreeComponent,
+    FdvPerfFdvListComponent,
   ],
-  templateUrl: './dashboard.component.html',
-  styleUrl: './dashboard.component.scss',
+  templateUrl: './fdv-performance.component.html',
+  styleUrl: './fdv-performance.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class DashboardComponent implements OnInit, OnDestroy {
+export class FdvPerformanceComponent implements OnInit, OnDestroy {
   private readonly prevendeurSvc = inject(PrevendeurService);
   private readonly roleService   = inject(RoleService);
-  private readonly animationSvc  = inject(DashboardAnimationService);
-  private readonly fdvRankingSvc = inject(DashboardFdvRankingService);
+  private readonly animationSvc  = inject(FdvPerfAnimationService);
+  private readonly fdvRankingSvc = inject(FdvPerfRankingService);
   private readonly distContext   = inject(DistributorContextService);
-  readonly formatter = inject(DashboardFormatterService);
-  readonly calc = inject(DashboardCalculationService);
+  readonly formatter = inject(FdvPerfFormatterService);
+  readonly calc = inject(FdvPerfCalculationService);
 
-  readonly state = inject(DashboardStateService);
+  readonly state = inject(FdvPerfStateService);
 
   private animCancelFn: (() => void) | null = null;
 

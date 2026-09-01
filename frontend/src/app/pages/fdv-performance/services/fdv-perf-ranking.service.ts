@@ -14,7 +14,7 @@ export interface FdvRateEntry {
  * Encapsulates FDV performance, ranking, and rate calculations.
  */
 @Injectable({ providedIn: 'root' })
-export class DashboardFdvRankingService {
+export class FdvPerfRankingService {
 
   /**
    * Build detailed product-level rates for a given FDV (for tooltip grid)

@@ -16,30 +16,46 @@
       </div>
 
       <div class="geo-sidebar__kpis">
-        <div class="geo-kpi">
-          <div class="geo-kpi__icon geo-kpi__icon--blue"><i class="pi pi-chart-bar"></i></div>
-          <div class="geo-kpi__body">
-            <div class="geo-kpi__label">Total ventes ({{ uniteLabel }})</div>
-            @if (loading()) {
-              <div class="geo-kpi__sk"></div>
-            } @else {
-              <div class="geo-kpi__val">{{ totalVentes() | number:'1.0-0' }}</div>
-            }
+        @if (loading() || !summary()) {
+          <div class="geo-kpi">
+            <div class="geo-kpi__body"><div class="geo-kpi__sk"></div></div>
           </div>
-        </div>
-
-        <div class="geo-kpi">
-          <div class="geo-kpi__icon geo-kpi__icon--green"><i class="pi pi-map-marker"></i></div>
-          <div class="geo-kpi__body">
-            <div class="geo-kpi__label">Communes actives</div>
-            @if (loading()) {
-              <div class="geo-kpi__sk"></div>
-            } @else {
-              <div class="geo-kpi__val">{{ activeCommuneCount() }}</div>
-            }
+        } @else {
+          @let s = summary()!;
+          <div class="geo-kpi-table">
+            <div class="geo-kpi-table__header">Ventes (tonnes)</div>
+            <div class="geo-kpi-table__row">
+              <span class="geo-kpi-table__label">VD</span>
+              <span class="geo-kpi-table__val">{{ fmt.toLocaleString(s.vd, 0) }}</span>
+            </div>
+            <div class="geo-kpi-table__row">
+              <span class="geo-kpi-table__label">VH</span>
+              <span class="geo-kpi-table__val">{{ fmt.toLocaleString(s.vh, 0) }}</span>
+            </div>
+            <div class="geo-kpi-table__row geo-kpi-table__row--total">
+              <span class="geo-kpi-table__label">Total</span>
+              <span class="geo-kpi-table__val">{{ fmt.toLocaleString(s.total, 0) }}</span>
+            </div>
           </div>
-        </div>
 
+          @if (s.objectif_total > 0) {
+            <div class="geo-kpi-table">
+              <div class="geo-kpi-table__header">Objectifs (tonnes)</div>
+              <div class="geo-kpi-table__row">
+                <span class="geo-kpi-table__label">VD</span>
+                <span class="geo-kpi-table__val">{{ fmt.toLocaleString(s.objectif_vd, 0) }}</span>
+              </div>
+              <div class="geo-kpi-table__row">
+                <span class="geo-kpi-table__label">VH</span>
+                <span class="geo-kpi-table__val">{{ fmt.toLocaleString(s.objectif_vh, 0) }}</span>
+              </div>
+              <div class="geo-kpi-table__row geo-kpi-table__row--total">
+                <span class="geo-kpi-table__label">Total</span>
+                <span class="geo-kpi-table__val">{{ fmt.toLocaleString(s.objectif_total, 0) }}</span>
+              </div>
+            </div>
+          }
+        }
       </div>
     }
   </aside>

@@ -1,23 +1,23 @@
 import { Component, inject, output } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
-import { DashboardStateService } from '../services/dashboard-state.service';
-import { DashboardFormatterService } from '../services/dashboard-formatter.service';
-import { DashboardCalculationService } from '../services/dashboard-calculation.service';
+import { FdvPerfStateService } from '../services/fdv-perf-state.service';
+import { FdvPerfFormatterService } from '../services/fdv-perf-formatter.service';
+import { FdvPerfCalculationService } from '../services/fdv-perf-calculation.service';
 import { CHART_COLORS, getFamilyColor, getFamilyBg } from '../../../core/constants/colors';
 import { calculatePercentage } from '../../../core/utils/math.util';
 import type { DrilldownProduit, DrilldownSousFamille } from '../../../core/services/prevendeur.service';
 
 @Component({
-  selector: 'app-dashboard-product-tree',
+  selector: 'app-fdv-perf-product-tree',
   standalone: true,
   imports: [NgTemplateOutlet],
-  templateUrl: './dashboard-product-tree.component.html',
-  styleUrl: './dashboard-product-tree.component.scss',
+  templateUrl: './fdv-perf-product-tree.component.html',
+  styleUrl: './fdv-perf-product-tree.component.scss',
 })
-export class DashboardProductTreeComponent {
-  state = inject(DashboardStateService);
-  formatter = inject(DashboardFormatterService);
-  calc = inject(DashboardCalculationService);
+export class FdvPerfProductTreeComponent {
+  state = inject(FdvPerfStateService);
+  formatter = inject(FdvPerfFormatterService);
+  calc = inject(FdvPerfCalculationService);
 
   // Outputs
   sfCollapseToggle = output<string>();

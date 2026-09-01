@@ -49,7 +49,7 @@ export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
       // Handle specific error types
       switch (categorized.category) {
         case 'forbidden':
-          router.navigate(['/dashboard']);
+          router.navigate(['/fdv-performance']);
           notifications.warn(categorized.userMessage);
           break;
 

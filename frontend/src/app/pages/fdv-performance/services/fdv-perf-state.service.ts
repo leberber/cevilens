@@ -1,16 +1,16 @@
 import { Injectable, signal, computed, inject } from '@angular/core';
 import type { DrilldownData, DrilldownFamille, DrilldownProduit, FdvItem } from '../../../core/services/prevendeur.service';
 import { calculatePercentage } from '../../../core/utils/math.util';
-import { DashboardFormatterService } from './dashboard-formatter.service';
+import { FdvPerfFormatterService } from './fdv-perf-formatter.service';
 
 /**
- * Centralized state management for Dashboard using Angular signals.
+ * Centralized state management for FDV Performance page using Angular signals.
  * Sub-components inject this service to read state directly, eliminating the need
  * for long @Input chains from the container component.
  */
 @Injectable({ providedIn: 'root' })
-export class DashboardStateService {
-  private formatter = inject(DashboardFormatterService);
+export class FdvPerfStateService {
+  private formatter = inject(FdvPerfFormatterService);
 
   // ==========================================================================
   // WRITABLE SIGNALS (set by container component)

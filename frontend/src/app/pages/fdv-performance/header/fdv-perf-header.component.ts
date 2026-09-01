@@ -1,17 +1,17 @@
 import { Component, inject, output } from '@angular/core';
-import { DashboardStateService } from '../services/dashboard-state.service';
-import { DashboardFormatterService } from '../services/dashboard-formatter.service';
+import { FdvPerfStateService } from '../services/fdv-perf-state.service';
+import { FdvPerfFormatterService } from '../services/fdv-perf-formatter.service';
 
 @Component({
-  selector: 'app-dashboard-header',
+  selector: 'app-fdv-perf-header',
   standalone: true,
   imports: [],
-  templateUrl: './dashboard-header.component.html',
-  styleUrl: './dashboard-header.component.scss',
+  templateUrl: './fdv-perf-header.component.html',
+  styleUrl: './fdv-perf-header.component.scss',
 })
-export class DashboardHeaderComponent {
-  state = inject(DashboardStateService);
-  formatter = inject(DashboardFormatterService);
+export class FdvPerfHeaderComponent {
+  state = inject(FdvPerfStateService);
+  formatter = inject(FdvPerfFormatterService);
 
   // Outputs
   prevPeriod = output<void>();

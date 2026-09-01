@@ -3,6 +3,7 @@ import { DecimalPipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { DistributorContextService } from '../../core/services/distributor-context.service';
+import { FormatService } from '../../core/services/format.service';
 import { RoleService } from '../../core/services/role.service';
 import { DateHelper } from '../../core/services/date.helper';
 import { CommuneMapComponent, type CommuneDatum } from '../analytics/commune-map.component';
@@ -13,6 +14,11 @@ import {
 } from '../../shared/components/product-tree/product-tree.component';
 import { type DateRange } from '../../shared/components/date-range-picker/date-range-picker.component';
 import { type CanalFilter, CANAL_FILTER_OPTIONS } from '../../core/constants/canal.constants';
+
+interface GeoSummary {
+  vd: number; vh: number; total: number;
+  objectif_vd: number; objectif_vh: number; objectif_total: number;
+}
 
 interface LocationFamilyDatum { nom: string; total: number; prev: number; }
 
@@ -37,10 +43,12 @@ export class GeoExplorerComponent implements OnInit {
   private readonly distContext = inject(DistributorContextService);
   private readonly roleService = inject(RoleService);
   private readonly dateHelper  = inject(DateHelper);
+  readonly fmt                 = inject(FormatService);
 
   readonly loading      = signal(false);
   readonly treeData     = signal<FamilleNode[]>([]);
   readonly mapLocations = signal<LocationDatum[]>([]);
+  readonly summary      = signal<GeoSummary | null>(null);
 
   private readonly userDateSet = signal(false);
 
@@ -197,6 +205,12 @@ export class GeoExplorerComponent implements OnInit {
         next:  locs => { this.mapLocations.set(locs); this.loading.set(false); },
         error: ()   => this.loading.set(false),
       });
+
+    const summaryParams = new HttpParams()
+      .set('date_from', this.dateFrom())
+      .set('date_to', this.dateTo());
+    this.http.get<GeoSummary>('/api/v1/geo/summary', { params: summaryParams })
+      .subscribe({ next: s => this.summary.set(s) });
   }
 
   private loadMap(): void {

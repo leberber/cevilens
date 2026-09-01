@@ -1,14 +1,14 @@
 import { Injectable, inject } from '@angular/core';
 import { calculatePercentage } from '../../../core/utils/math.util';
-import { DashboardFormatterService } from './dashboard-formatter.service';
+import { FdvPerfFormatterService } from './fdv-perf-formatter.service';
 
 /**
- * Pure calculation functions for the Dashboard.
+ * Pure calculation functions for the FDV Performance page.
  * Backend returns data in tonnes by default; this service just formats and computes percentages.
  */
 @Injectable({ providedIn: 'root' })
-export class DashboardCalculationService {
-  private formatter = inject(DashboardFormatterService);
+export class FdvPerfCalculationService {
+  private formatter = inject(FdvPerfFormatterService);
 
   /**
    * Format a total value (already in tonnes from backend).

@@ -1,11 +1,11 @@
 import { Injectable } from '@angular/core';
 
 /**
- * Pure formatting functions for the Dashboard component.
+ * Pure formatting functions for the FDV Performance page.
  * No state, fully stateless and tree-shakeable.
  */
 @Injectable({ providedIn: 'root' })
-export class DashboardFormatterService {
+export class FdvPerfFormatterService {
 
   /**
    * Format period string (YYYY-MM) to French locale display (e.g., "January 2024")

@@ -132,7 +132,7 @@ export class ErrorRecoveryService {
           ],
           action: {
             label: 'Retour au tableau de bord',
-            callback: () => this.router.navigate(['/dashboard']),
+            callback: () => this.router.navigate(['/fdv-performance']),
           },
           dismissible: true,
         };

@@ -11,19 +11,19 @@ export const authGuard: CanActivateFn = () => {
 export const adminOrEmployeGuard: CanActivateFn = () => {
   const auth   = inject(AuthService);
   const router = inject(Router);
-  return auth.isAdminOrEmploye ? true : router.createUrlTree(['/dashboard']);
+  return auth.isAdminOrEmploye ? true : router.createUrlTree(['/fdv-performance']);
 };
 
 export const adminGuard: CanActivateFn = () => {
   const auth   = inject(AuthService);
   const router = inject(Router);
-  return auth.isAdmin ? true : router.createUrlTree(['/dashboard']);
+  return auth.isAdmin ? true : router.createUrlTree(['/fdv-performance']);
 };
 
 export const platformAdminGuard: CanActivateFn = () => {
   const auth   = inject(AuthService);
   const router = inject(Router);
-  return auth.isPlatformAdmin ? true : router.createUrlTree(['/dashboard']);
+  return auth.isPlatformAdmin ? true : router.createUrlTree(['/fdv-performance']);
 };
 
 // Redirects prevenders away to their own page
@@ -37,7 +37,7 @@ export const notPrevenderGuard: CanActivateFn = () => {
 export const prevenderOnlyGuard: CanActivateFn = () => {
   const auth   = inject(AuthService);
   const router = inject(Router);
-  return auth.isPrevender ? true : router.createUrlTree(['/dashboard']);
+  return auth.isPrevender ? true : router.createUrlTree(['/fdv-performance']);
 };
 
 // Root redirect: prevenders → /prevendeur, everyone else → /ventes
@@ -46,5 +46,5 @@ export const rootGuard: CanActivateFn = () => {
   const router = inject(Router);
   return auth.isPrevender
     ? router.createUrlTree(['/prevendeur'])
-    : router.createUrlTree(['/dashboard']);
+    : router.createUrlTree(['/fdv-performance']);
 };

@@ -10,7 +10,7 @@ export const routes: Routes = [
     canActivate: [authGuard],
     children: [
       { path: '', canActivate: [rootGuard], children: [] },
-      { path: 'dashboard',         canActivate: [notPrevenderGuard], loadComponent: () => import('./pages/dashboard/dashboard.component').then(m => m.DashboardComponent) },
+      { path: 'fdv-performance',    canActivate: [notPrevenderGuard], loadComponent: () => import('./pages/fdv-performance/fdv-performance.component').then(m => m.FdvPerformanceComponent) },
 
       { path: 'carte/commune',     canActivate: [notPrevenderGuard], loadComponent: () => import('./pages/geo-explorer/commune-analytics/commune-analytics.component').then(m => m.CommuneAnalyticsComponent) },
       { path: 'carte',             canActivate: [notPrevenderGuard], loadComponent: () => import('./pages/geo-explorer/geo-explorer.component').then(m => m.GeoExplorerComponent) },
