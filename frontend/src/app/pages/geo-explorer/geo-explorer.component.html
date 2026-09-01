@@ -17,44 +17,91 @@
 
       <div class="geo-sidebar__kpis">
         @if (loading() || !summary()) {
-          <div class="geo-kpi">
-            <div class="geo-kpi__body"><div class="geo-kpi__sk"></div></div>
+          <div class="geo-vo">
+            <div class="geo-vo__sk"></div>
+            <div class="geo-vo__sk"></div>
+            <div class="geo-vo__sk"></div>
           </div>
         } @else {
           @let s = summary()!;
-          <div class="geo-kpi-table">
-            <div class="geo-kpi-table__header">Ventes (tonnes)</div>
-            <div class="geo-kpi-table__row">
-              <span class="geo-kpi-table__label">VD</span>
-              <span class="geo-kpi-table__val">{{ fmt.toLocaleString(s.vd, 0) }}</span>
+          <div class="geo-vo">
+            <div class="geo-vo__title">
+              <i class="pi pi-chart-line"></i>
+              <span>Ventes vs Objectifs</span>
             </div>
-            <div class="geo-kpi-table__row">
-              <span class="geo-kpi-table__label">VH</span>
-              <span class="geo-kpi-table__val">{{ fmt.toLocaleString(s.vh, 0) }}</span>
+
+            <!-- Header -->
+            <div class="geo-vo__head">
+              <span>Type</span>
+              <span>Ventes / Obj. (t)</span>
+              <span></span>
+              <span>Atteinte</span>
             </div>
-            <div class="geo-kpi-table__row geo-kpi-table__row--total">
-              <span class="geo-kpi-table__label">Total</span>
-              <span class="geo-kpi-table__val">{{ fmt.toLocaleString(s.total, 0) }}</span>
+
+            <!-- VD -->
+            <div class="geo-vo__row">
+              <span class="geo-vo__badge geo-vo__badge--vd">VD</span>
+              <span class="geo-vo__nums">
+                <strong>{{ fmt.toLocaleString(s.vd, 0) }}</strong>
+                <span class="geo-vo__sep">/</span>
+                <span class="geo-vo__obj">{{ s.objectif_vd > 0 ? fmt.toLocaleString(s.objectif_vd, 0) : '–' }} t</span>
+              </span>
+              <div class="geo-vo__bar-track">
+                <div class="geo-vo__bar-fill"
+                     [style.width.%]="s.objectif_vd > 0 ? Math.min(pct(s.vd, s.objectif_vd), 100) : 0"
+                     [style.background]="pctColor(s.vd, s.objectif_vd)"></div>
+              </div>
+              <span class="geo-vo__pct" [style.color]="pctColor(s.vd, s.objectif_vd)">
+                {{ s.objectif_vd > 0 ? pct(s.vd, s.objectif_vd) + '%' : '–' }}
+              </span>
+            </div>
+
+            <!-- VH -->
+            <div class="geo-vo__row">
+              <span class="geo-vo__badge geo-vo__badge--vh">VH</span>
+              <span class="geo-vo__nums">
+                <strong>{{ fmt.toLocaleString(s.vh, 0) }}</strong>
+                <span class="geo-vo__sep">/</span>
+                <span class="geo-vo__obj">{{ s.objectif_vh > 0 ? fmt.toLocaleString(s.objectif_vh, 0) : '–' }} t</span>
+              </span>
+              <div class="geo-vo__bar-track">
+                <div class="geo-vo__bar-fill"
+                     [style.width.%]="s.objectif_vh > 0 ? Math.min(pct(s.vh, s.objectif_vh), 100) : 0"
+                     [style.background]="pctColor(s.vh, s.objectif_vh)"></div>
+              </div>
+              <span class="geo-vo__pct" [style.color]="pctColor(s.vh, s.objectif_vh)">
+                {{ s.objectif_vh > 0 ? pct(s.vh, s.objectif_vh) + '%' : '–' }}
+              </span>
+            </div>
+
+            <!-- Total -->
+            <div class="geo-vo__row geo-vo__row--total">
+              <span class="geo-vo__badge geo-vo__badge--total">Total</span>
+              <span class="geo-vo__nums">
+                <strong>{{ fmt.toLocaleString(s.total, 0) }}</strong>
+                <span class="geo-vo__sep">/</span>
+                <span class="geo-vo__obj">{{ s.objectif_total > 0 ? fmt.toLocaleString(s.objectif_total, 0) : '–' }} t</span>
+              </span>
+              <div class="geo-vo__bar-track">
+                <div class="geo-vo__bar-fill"
+                     [style.width.%]="s.objectif_total > 0 ? Math.min(pct(s.total, s.objectif_total), 100) : 0"
+                     [style.background]="pctColor(s.total, s.objectif_total)"></div>
+              </div>
+              <span class="geo-vo__pct" [style.color]="pctColor(s.total, s.objectif_total)">
+                {{ s.objectif_total > 0 ? pct(s.total, s.objectif_total) + '%' : '–' }}
+              </span>
+            </div>
+
+            <!-- Legend -->
+            <div class="geo-vo__legend">
+              <span class="geo-vo__legend-note"><i class="pi pi-info-circle"></i> t = Tonnes</span>
+              <span class="geo-vo__legend-dots">
+                <span><i style="color:#2563eb">●</i> &lt; 90%</span>
+                <span><i style="color:#f97316">●</i> 90–100%</span>
+                <span><i style="color:#16a34a">●</i> &gt; 100%</span>
+              </span>
             </div>
           </div>
-
-          @if (s.objectif_total > 0) {
-            <div class="geo-kpi-table">
-              <div class="geo-kpi-table__header">Objectifs (tonnes)</div>
-              <div class="geo-kpi-table__row">
-                <span class="geo-kpi-table__label">VD</span>
-                <span class="geo-kpi-table__val">{{ fmt.toLocaleString(s.objectif_vd, 0) }}</span>
-              </div>
-              <div class="geo-kpi-table__row">
-                <span class="geo-kpi-table__label">VH</span>
-                <span class="geo-kpi-table__val">{{ fmt.toLocaleString(s.objectif_vh, 0) }}</span>
-              </div>
-              <div class="geo-kpi-table__row geo-kpi-table__row--total">
-                <span class="geo-kpi-table__label">Total</span>
-                <span class="geo-kpi-table__val">{{ fmt.toLocaleString(s.objectif_total, 0) }}</span>
-              </div>
-            </div>
-          }
         }
       </div>
     }

@@ -1,5 +1,4 @@
 import { Component, inject, signal, computed, OnInit, effect, untracked } from '@angular/core';
-import { DecimalPipe } from '@angular/common';
 import { Router } from '@angular/router';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { DistributorContextService } from '../../core/services/distributor-context.service';
@@ -33,7 +32,7 @@ interface LocationDatum {
 @Component({
   selector: 'app-geo-explorer',
   standalone: true,
-  imports: [DecimalPipe, CommuneMapComponent, ProductTreeComponent],
+  imports: [CommuneMapComponent, ProductTreeComponent],
   templateUrl: './geo-explorer.component.html',
   styleUrl: './geo-explorer.component.scss',
 })
@@ -69,15 +68,19 @@ export class GeoExplorerComponent implements OnInit {
     this.mapLocations().map(r => ({ code: r.code, total: r.total, families: r.families }))
   );
 
-  readonly activeCommuneCount = computed(() =>
-    this.mapLocations().filter(r => r.total > 0).length
-  );
+  readonly Math = Math;
 
-  readonly totalVentes = computed(() =>
-    this.mapLocations().reduce((sum, r) => sum + r.total, 0)
-  );
+  pct(ventes: number, obj: number): number {
+    return obj > 0 ? Math.round((ventes / obj) * 100) : 0;
+  }
 
-  readonly uniteLabel = 'tonnes';
+  pctColor(ventes: number, obj: number): string {
+    if (obj <= 0) return '#cbd5e1';
+    const p = (ventes / obj) * 100;
+    if (p >= 100) return '#16a34a';
+    if (p >= 90) return '#f97316';
+    return '#2563eb';
+  }
 
   readonly selectionLabel = computed(() => {
     const s = this.selection();
